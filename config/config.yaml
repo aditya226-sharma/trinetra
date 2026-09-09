@@ -1,0 +1,43 @@
+# TriNetra — default configuration. All paths are resolved relative to the project root.
+agent:
+  client_id: "trinetra-core"
+  batch_window_seconds: 2
+  batch_max_events: 500
+  tail_delay_seconds: 0.2
+
+paths:
+  raw_store: "./data/raw"
+  event_store: "./data/trinetra.db"
+  dataset: "./data/datasets"
+  pcap: "./data/pcaps"
+
+llm:
+  backend: "heuristic"          # heuristic | claude | local
+  anthropic_api_key: ""         # set via ANTHROPIC_API_KEY env var
+  anthropic_model: "claude-3-5-haiku-latest"
+  local_model: ""               # e.g. "llama3.2:3b" for the air-gapped stub
+  max_batch_chars: 12000
+
+module_a:
+  enabled: true
+  window_seconds: 60
+  unusual_threshold: 3.0        # z-score / ratio threshold for the explainable classifier
+  use_sklearn: false            # set true when scikit-learn is available
+
+module_b:
+  enabled: true
+  ike_fragment_reassembly: true
+  weak_dict: "3DES,BLOWFISH,DES,RC4,NONE"
+
+module_c:
+  enabled: true
+  min_centrality_top: 10
+
+events:
+  file_sources: []              # paths of files the file_tailer should tail
+  syslog_port: 0                # 0 disables the syslog UDP receiver (demo uses demo_feed)
+  flow_replay_path: ""          # optional JSONL flow dataset to replay
+
+output:
+  console: true
+  jsonl: "./data/events.jsonl"

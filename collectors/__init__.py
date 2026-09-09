@@ -1,0 +1,1 @@
+"""Collectors package — input sources for the ingestion core (Layer 1)."""

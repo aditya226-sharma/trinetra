@@ -1,0 +1,1 @@
+"""Pipeline package — normalizer, batcher, prefilter and the raw event store."""

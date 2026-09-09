@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trinetra:latest
+    container_name: trinetra-api
+    ports:
+      - "8000:8000"
+    environment:
+      TRINETRA_LLM_BACKEND: ${TRINETRA_LLM_BACKEND:-heuristic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TRINETRA_STORE_PATH: /app/data/trinetra.db
+      TRINETRA_RAW_DIR: /app/data/raw
+    volumes:
+      - trinetra-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  trinetra-data:

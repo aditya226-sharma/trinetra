@@ -1,0 +1,1 @@
+"""Modules package — the three AI lenses over the UES spine."""
