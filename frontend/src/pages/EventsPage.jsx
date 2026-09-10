@@ -1,8 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { searchEvents, getClients } from "../lib/api";
-import { SeverityBadge } from "../components/ui";
+import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
+const SOURCES = ["", "netflow", "syslog", "json", "cef", "csv", "windows"];
+const SEV = ["", "critical", "error", "warning", "info"];
+
+const CAT_GLYPH = {
+  flow: <DiamondGlyph />,
+  auth: <KeyGlyph />,
+  application: <AppGlyph />,
+  network: <NetGlyph />,
+  system: <SysGlyph />,
+  vpn: <VpnGlyph />,
+};
 
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -23,9 +34,8 @@ export default function EventsPage() {
       .catch(() => {});
   }, []);
 
-  const run = async () => {
+  const run = async (keepDetail = false) => {
     setLoading(true);
-    setDetail(null);
     try {
       const data = await searchEvents({
         query,
@@ -37,6 +47,7 @@ export default function EventsPage() {
       });
       setEvents(data.events);
       setTotal(data.total);
+      if (!keepDetail) setDetail(null);
       setError(null);
     } catch (e) {
       setError(e.response?.data?.detail || e.message);
@@ -46,135 +57,182 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    run();
+    run(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filtersActive = Boolean(query || src || sev || cat || client);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Event triage</h1>
-      <div className="flex flex-wrap gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="search IP / message / trace…"
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        />
-        <select
-          value={src}
-          onChange={(e) => setSrc(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-        >
-          <option value="">all sources</option>
-          {["netflow", "syslog", "json", "cef", "csv", "windows"].map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          value={sev}
-          onChange={(e) => setSev(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-        >
-          <option value="">all severities</option>
-          {["critical", "error", "warning", "info"].map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          value={cat}
-          onChange={(e) => setCat(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c || "all categories"}</option>
-          ))}
-        </select>
-        <select
-          value={client}
-          onChange={(e) => setClient(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-        >
-          <option value="">all clients</option>
-          {clients.map((c) => (
-            <option key={c.client_id} value={c.client_id}>
-              {c.client_id}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={run}
-          className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950"
-        >
-          {loading ? "…" : "Search"}
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Forensics · Event store"
+        title="Event triage"
+        sub="Search the normalized corpus — free-text over IPs, process names, messages and trace-ids, narrowed by source, client and category."
+        actions={<LiveBadge text={`${total} matched`} />}
+      />
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {/* search console */}
+      <div className="glass p-4 anim-fadeup">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative min-w-[260px] flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+              <SearchGlyph />
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && run()}
+              placeholder="search 203.0.113.5 · sshd · 10.10.1.10:80 …"
+              className="field mono w-full py-2.5 pl-10 pr-3"
+            />
+          </label>
+          <button onClick={() => run()} className="btn-primary" disabled={loading}>
+            {loading ? "SCANNING…" : "SEARCH"}
+          </button>
+        </div>
 
-      <div className="flex gap-6">
-        <div className="flex-1 space-y-2">
-          <p className="text-xs text-slate-500">{total} events stored</p>
-          {events.map((e) => (
-            <button
-              key={e.event_id}
-              onClick={() => setDetail(e)}
-              className="block w-full rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-left hover:border-emerald-500/50"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-400">{e.timestamp}</span>
-                <SeverityBadge severity={e.severity} />
-              </div>
-              <p className="mt-1 truncate text-sm text-slate-200">
-                [{e.source_type}/{e.category}] {e.message}
-              </p>
-              {e.fields?.src_ip && (
-                <p className="mt-1 text-xs text-slate-500">
-                  {e.fields.src_ip} → {e.fields.dst_ip || "?"}
-                </p>
-              )}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="eyebrow mr-1">SOURCE</span>
+          {SOURCES.map((s) => (
+            <button key={s || "none"} onClick={() => setSrc(s)} className={`chip ${src === s ? "chip-on" : ""}`}>
+              {s || "all"}
             </button>
           ))}
+          <span className="eyebrow mx-1">SEV</span>
+          {SEV.map((s) => (
+            <button key={s || "x"} onClick={() => setSev(s)} className={`chip ${sev === s ? "chip-on" : ""}`}>
+              {s || "all"}
+            </button>
+          ))}
+          <span className="eyebrow mx-1">CATEGORY</span>
+          {CATEGORIES.map((c) => (
+            <button key={c || "y"} onClick={() => setCat(c)} className={`chip ${cat === c ? "chip-on" : ""}`}>
+              {c || "all"}
+            </button>
+          ))}
+          <span className="eyebrow mx-1">CLIENT</span>
+          <select value={client} onChange={(e) => setClient(e.target.value)} className="field mono px-3 py-1.5 text-[11px]">
+            <option value="">all clients</option>
+            {clients.map((c) => (
+              <option key={c.client_id} value={c.client_id}>{c.client_id}</option>
+            ))}
+          </select>
+          {filtersActive && (
+            <button
+              onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setTimeout(run, 0); }}
+              className="ml-auto text-[11px] text-slate-500 hover:text-emerald-300"
+            >
+              reset filters ×
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && <div className="text-sm text-rose-400">{error}</div>}
+
+      {/* feed + detail */}
+      <div className="flex gap-6">
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="eyebrow px-1">
+            {filtersActive ? `${total} matches in filtered corpus` : `${total} events in store`}
+          </p>
+          {events.length === 0 ? (
+            <Empty title="No events match" hint="Loosen a filter or ingest fresh lines on the Ingest page." />
+          ) : (
+            events.map((e, i) => (
+              <button
+                key={e.event_id}
+                onClick={() => setDetail(e)}
+                className="glass-row group flex w-full items-center gap-3 p-3 text-left feed-in"
+                style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
+              >
+                <span className={`sev-strip ${stripCls(e.severity)}`} />
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/5 bg-white/5 text-slate-400 transition group-hover:text-emerald-300">
+                  {CAT_GLYPH[e.category] || <EventGlyph />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-[12.5px] text-slate-100">
+                    <span className="mono">{e.message}</span>
+                  </p>
+                  <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
+                    {e.client_id} · {e.source_type} · {e.category}
+                  </p>
+                  {e.fields?.src_ip && (
+                    <p className="mono mt-1 text-[11px] text-cyan-300/80">
+                      {e.fields.src_ip} → {e.fields.dst_ip || "?"}
+                      {e.fields.dport ? `:${e.fields.dport}` : ""}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="mono text-[11px] text-slate-500">{e.timestamp}</p>
+                  <SeverityBadge severity={e.severity} />
+                </div>
+              </button>
+            ))
+          )}
         </div>
 
         {detail && (
-          <div className="w-96 shrink-0 space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Event detail</h2>
-              <button onClick={() => setDetail(null)} className="text-slate-500">×</button>
+          <aside className="slide-in w-[360px] shrink-0">
+            <div className="glass p-5">
+              <div className="mb-4 flex items-start justify-between gap-2">
+                <div>
+                  <p className="eyebrow">Event detail</p>
+                  <p className="mt-1 mono text-[13px] text-slate-100">{detail.event_id}</p>
+                </div>
+                <button onClick={() => setDetail(null)} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-slate-400 hover:text-slate-100">
+                  ×
+                </button>
+              </div>
+              <dl className="space-y-2 text-[12px]">
+                <Row k="client" v={detail.client_id} />
+                <Row k="category" v={detail.category} />
+                <Row k="source" v={detail.source_type} />
+                <Row k="trace" v={detail.trace_id} mono />
+                <Row k="severity" v={<SeverityBadge severity={detail.severity} />} />
+                <Row k="message" v={detail.message} />
+              </dl>
+              <p className="eyebrow mb-1.5 mt-5">Parsed fields</p>
+              <CodeBlock maxH="max-h-44">{JSON.stringify(detail.fields, null, 2)}</CodeBlock>
+              {detail.raw && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
+                    original raw line ({detail.raw.length} bytes)
+                  </summary>
+                  <CodeBlock maxH="max-h-40">{detail.raw}</CodeBlock>
+                </details>
+              )}
             </div>
-            <dl className="space-y-1 text-xs">
-              <DetailRow k="event_id" v={detail.event_id} />
-              <DetailRow k="trace_id" v={detail.trace_id} />
-              <DetailRow k="client" v={detail.client_id} />
-              <DetailRow k="category" v={detail.category} />
-              <DetailRow k="source" v={detail.source_type} />
-              <DetailRow k="msg" v={detail.message} />
-            </dl>
-            <pre className="max-h-56 overflow-y-auto rounded-lg bg-slate-950 p-2 text-[11px] text-slate-400">
-              {JSON.stringify(detail.fields, null, 2)}
-            </pre>
-            {detail.raw && (
-              <details>
-                <summary className="cursor-pointer text-xs text-slate-400">
-                  raw event ({detail.raw.length} bytes)
-                </summary>
-                <pre className="mt-1 max-h-40 overflow-y-auto rounded-lg bg-slate-950 p-2 text-[11px] text-slate-400">
-                  {detail.raw}
-                </pre>
-              </details>
-            )}
-          </div>
+          </aside>
         )}
       </div>
     </div>
   );
 }
 
-function DetailRow({ k, v }) {
+function Row({ k, v, mono }) {
   return (
-    <div className="grid grid-cols-[90px_1fr] gap-2">
+    <div className="grid grid-cols-[84px_1fr] gap-2">
       <dt className="text-slate-500">{k}</dt>
-      <dd className="break-all text-slate-300">{v || "—"}</dd>
+      <dd className={`break-all text-slate-300 ${mono ? "mono text-[11px]" : ""}`}>{v || "—"}</dd>
     </div>
   );
 }
+
+const stripCls = (sev) => {
+  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
+  return m[sev] || "sev-info";
+};
+
+const S = { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" };
+/* function declarations are hoisted — CAT_GLYPH may reference them from module top-level */
+function SearchGlyph() { return <svg {...S} width="15" height="15"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>; }
+function EventGlyph() { return <svg {...S}><circle cx="12" cy="12" r="8" /><path d="M12 8v5" /></svg>; }
+function DiamondGlyph() { return <svg {...S}><path d="M12 3l6 9-6 9-6-9 6-9z" /></svg>; }
+function KeyGlyph() { return <svg {...S}><circle cx="8" cy="14" r="4" /><path d="M11 11l8-8M15 7l3 3M17 5l2 2" /></svg>; }
+function NetGlyph() { return <svg {...S}><circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><circle cx="12" cy="18" r="3" /><path d="M8.5 7.8l2 1.5M12 12v3M15.5 7.8l-2 1.5" /></svg>; }
+function AppGlyph() { return <svg {...S}><rect x="4" y="3" width="16" height="12" rx="2" /><path d="M9 19h6M12 15v4" /></svg>; }
+function SysGlyph() { return <svg {...S}><rect x="3" y="4" width="18" height="8" rx="2" /><rect x="3" y="15" width="18" height="5" rx="2" /><path d="M6 8h.01M6 17h.01" /></svg>; }
+function VpnGlyph() { return <svg {...S}><path d="M4 8h16M4 16h16M8 4v16M16 4v16" /></svg>; }

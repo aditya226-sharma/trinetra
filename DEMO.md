@@ -47,6 +47,11 @@ ALERT: [CRITICAL] data_exfiltration conf=0.67 verdict=malicious (quarantine)
 
 ## 3 · Dashboard tour
 
+A "security command center" UI — glassmorphic panels over a layered ambient
+background, a live nav rail with status beacons, a ticking GMT clock strip,
+glow-driven KPI sparklines, and pure-SVG micro-charts (donut, score rings) with
+no external chart dependencies.
+
 ![Dashboard](screenshots/dashboard.png)
 
 **Dashboard** — ingest (238 raw → 232 unique, 2.5 % dup), dedup rate, module
@@ -101,12 +106,11 @@ analyst brief:
 
 ![Ingest](screenshots/ingest.png)
 
-**Ingest** — feed live logs into the pipeline right from the dashboard:
-pick a source format (syslog / CEF / JSON / CSV / netflow / windows), a
-reporting client, optionally a host hint, paste raw lines (or insert a sample),
-and watch them normalize → dedup → modules → analyzer in one round trip. Any
-alerts in the batch fan out to the Alerts page. The **Dashboard** refreshes
-itself every 10 s, and the **Events** page filters narrow the store live.
+**Ingest** — a terminal-styled console: paste raw lines (or insert a sample),
+pick source format / client / host, and watch the normalize → dedup → modules →
+analyzer stages light up in a batch tracker. Any alerts in the batch fan out to
+the Alerts page. The **Dashboard** refreshes itself every 10 s, and the
+**Events** page filters narrow the store live.
 
 ## 4 · Scoring
 

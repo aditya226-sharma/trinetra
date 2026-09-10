@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getAssets, getCompliance } from "../lib/api";
-import { Card, SeverityBadge } from "../components/ui";
+import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, CodeBlock } from "../components/ui";
 
 export default function CompliancePage() {
   const [assets, setAssets] = useState([]);
@@ -16,92 +16,120 @@ export default function CompliancePage() {
 
   const pick = async (ip) => {
     setSelected(ip);
-    const d = await getCompliance(ip);
-    setCompliance(d);
+    setCompliance(null);
+    try {
+      const d = await getCompliance(ip);
+      setCompliance(d);
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Compliance mapping</h1>
-      {error && <div className="text-red-400">{error}</div>}
+      <PageHeader
+        eyebrow="Governance · actionable controls"
+        title="Compliance briefs"
+        sub="Every impacted asset gets a CIS Controls v8 / NIST CSF / MITRE ATT&CK mapping with a generated analyst-ready brief."
+        actions={<LiveBadge text={`${assets.length} assets require action`} />}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <Card title="Impacted assets">
+      {error && <div className="text-sm text-rose-400">{error}</div>}
+
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        {/* asset rail */}
+        <GlassCard title="Impacted assets">
           {assets.length === 0 ? (
-            <p className="text-sm text-slate-500">No impacted assets.</p>
+            <Empty title="No impacted assets" hint="Threatened assets will appear here." />
           ) : (
-            <div className="space-y-1">
-              {assets.map((a) => (
+            <div className="space-y-1.5">
+              {assets.map((a, i) => (
                 <button
                   key={a.id}
                   onClick={() => pick(a.id)}
-                  className={`block w-full rounded-lg px-3 py-2 text-left font-mono text-sm ${
-                    selected === a.id
-                      ? "bg-emerald-500/15 text-emerald-300"
-                      : "text-slate-300 hover:bg-slate-800"
-                  }`}
+                  className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition feed-in ${selected === a.id
+                      ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_20px_-4px_rgba(52,211,153,0.4)]"
+                      : "border-white/5 bg-white/[0.03] hover:border-emerald-500/30"
+                    }`}
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
-                  {a.id}
+                  <p className="mono text-[12.5px] text-slate-100">{a.id}</p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-rose-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" />
+                    {a.degree} edges · escalated
+                  </p>
                 </button>
               ))}
             </div>
           )}
-        </Card>
+        </GlassCard>
 
-        <Card title={compliance ? `Controls — ${compliance.asset_id}` : "Control mapping"}>
+        {/* mapping panel */}
+        <GlassCard
+          title={compliance ? `Controls — ${compliance.asset_id}` : "Control mapping"}
+          right={selected && !compliance && <span className="mono text-[10px] text-slate-500">loading…</span>}
+        >
           {!compliance ? (
-            <p className="text-sm text-slate-500">
-              Select an impacted asset to see the CIS Controls v8 / NIST CSF /
-              MITRE ATT&amp;CK mapping for its threat findings.
-            </p>
+            <Empty
+              title="Select an impacted asset"
+              hint="The CIS / NIST / MITRE mapping for its threat findings renders here with action status."
+            />
           ) : (
-            <div className="space-y-4">
-              <div className="space-y-3">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity="critical" />
+                <PlainBadge className="uppercase">action required</PlainBadge>
+                <span className="mono ml-auto text-[11px] text-slate-500">
+                  {compliance.controls.length} threat → control chains
+                </span>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
                 {compliance.controls.length === 0 && (
-                  <p className="text-sm text-slate-500">No mapped controls for this asset.</p>
+                  <p className="text-[12px] text-slate-500">No mapped controls for this asset.</p>
                 )}
                 {compliance.controls.map((c, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg border border-slate-800 bg-slate-950 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm">{c.threat_class}</span>
+                  <div key={i} className="glass-row feed-in p-4" style={{ animationDelay: `${i * 70}ms` }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="mono text-[13px] font-semibold text-slate-100">{c.threat_class}</span>
                       <SeverityBadge severity={c.severity} />
                     </div>
-                    <dl className="mt-2 space-y-1 text-xs">
-                      <Row k="NIST CSF" v={c.nist_csf} />
-                      <Row k="CIS Controls" v={c.cis_controls.join(", ")} />
-                      <Row k="MITRE ATT&CK" v={c.mitre_attack.join(", ") || "—"} />
-                      <Row k="Status" v={c.status} />
-                    </dl>
+                    <div className="mt-3 space-y-2 text-[11.5px]">
+                      <Frameworks label="NIST CSF" value={c.nist_csf} />
+                      <Frameworks label="CIS CONTROLS" value={c.cis_controls?.join(" · ") || "—"} />
+                      <Frameworks label="MITRE ATT&CK" value={c.mitre_attack?.join(", ") || "—"} />
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="eyebrow">STATUS</span>
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                          {c.status || "pending"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
 
               {compliance.summary_markdown && (
-                <details className="rounded-lg bg-slate-950 p-3">
-                  <summary className="cursor-pointer text-xs text-slate-400">
-                    Analyst-ready summary (markdown)
-                  </summary>
-                  <pre className="mt-2 whitespace-pre-wrap text-[11px] text-slate-300">
-                    {compliance.summary_markdown}
-                  </pre>
-                </details>
+                <div>
+                  <SectionTitle right={<span className="mono text-[10px] text-slate-500">analyst-ready</span>}>
+                    Generated brief
+                  </SectionTitle>
+                  <CodeBlock maxH="max-h-64">{compliance.summary_markdown}</CodeBlock>
+                </div>
               )}
             </div>
           )}
-        </Card>
+        </GlassCard>
       </div>
     </div>
   );
 }
 
-function Row({ k, v }) {
+function Frameworks({ label, value }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-2">
-      <dt className="text-slate-500">{k}</dt>
-      <dd className="text-slate-300">{v || "—"}</dd>
+    <div className="flex items-start justify-between gap-3">
+      <span className="eyebrow mt-0.5 shrink-0">{label}</span>
+      <span className="mono text-right text-slate-300">{value}</span>
     </div>
   );
 }

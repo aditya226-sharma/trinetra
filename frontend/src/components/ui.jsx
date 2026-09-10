@@ -1,41 +1,179 @@
 import React from "react";
+import { Sparkline } from "./charts";
 
-export function StatCard({ label, value, sub, accent = "text-slate-100" }) {
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${accent}`}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
-    </div>
-  );
-}
+/* Shared UI primitives for the TriNetra command center */
 
-const sevColors = {
-  critical: "bg-red-500/15 text-red-400 border-red-500/30",
-  high: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-  medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  warning: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  info: "bg-sky-500/15 text-sky-400 border-sky-500/30",
-  low: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+const SEV = {
+  critical: { strip: "sev-critical", text: "sev-text-critical", label: "bg-[#e11d48]" },
+  high: { strip: "sev-high", text: "sev-text-high", label: "bg-[#ea580c]" },
+  medium: { strip: "sev-medium", text: "sev-text-warning", label: "bg-[#f59e0b]" },
+  warning: { strip: "sev-warning", text: "sev-text-warning", label: "bg-[#f59e0b]" },
+  error: { strip: "sev-error", text: "sev-text-error", label: "bg-[#7c3aed]" },
+  info: { strip: "sev-info", text: "sev-text-info", label: "bg-[#0891b2]" },
+  low: { strip: "sev-low", text: "sev-text-low", label: "bg-[#0891b2]" },
 };
 
+export function SeverityDot({ severity }) {
+  const s = SEV[severity] || SEV.info;
+  return <span className={`inline-block h-2 w-2 rounded-full ${s.label}`} style={{ boxShadow: `0 0 8px ${s.label === "bg-[#e11d48]" ? "rgba(225,29,72,.8)" : "rgba(148,163,184,.5)"}` }} />;
+}
+
 export function SeverityBadge({ severity }) {
-  const cls = sevColors[severity] || sevColors.info;
+  const s = SEV[severity] || SEV.info;
   return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${s.label}`} />
       {severity}
     </span>
   );
 }
 
-export function Card({ title, children, actions }) {
+export function PlainBadge({ children, cls = "" }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
-        {actions}
-      </div>
+    <span className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium text-slate-300 ${cls}`}>
       {children}
+    </span>
+  );
+}
+
+export function PulseDot({ color = "bg-emerald-400", cls = "pulse-dot" }) {
+  return <span className={`inline-block h-2 w-2 rounded-full ${color} ${cls}`} />;
+}
+
+export function LiveBadge({ text = "LIVE" }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-300">
+      <PulseDot />
+      {text}
+    </span>
+  );
+}
+
+export function PageHeader({ eyebrow, title, sub, actions }) {
+  return (
+    <div className="mb-6 anim-fadeup">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          {eyebrow && <p className="eyebrow mb-1.5">{eyebrow}</p>}
+          <h1 className="text-2xl font-bold tracking-tight text-slate-50">{title}</h1>
+          {sub && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-400">{sub}</p>}
+        </div>
+        {actions && <div className="flex items-center gap-3">{actions}</div>}
+      </div>
     </div>
+  );
+}
+
+export function Kpi({
+  label,
+  value,
+  sub,
+  icon,
+  tone = "emerald",
+  spark,
+  delay = 0,
+}) {
+  const tones = {
+    emerald: { text: "text-grad-emerald", glow: "glow-emerald", bar: "from-emerald-500 to-cyan-500" },
+    cyan: { text: "text-grad-emerald", glow: "glow-cyan", bar: "from-cyan-400 to-sky-500" },
+    danger: { text: "text-grad-danger", glow: "glow-red", bar: "from-rose-500 to-orange-500" },
+    violet: { text: "text-grad-emerald", glow: "glow-cyan", bar: "from-indigo-400 to-fuchsia-400" },
+  };
+  const t = tones[tone] || tones.emerald;
+  return (
+    <div className={`glass p-4 anim-fadeup ${t.glow}`} style={{ animationDelay: `${delay}ms` }}>
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow truncate">{label}</p>
+          <p className={`mt-1.5 text-[26px] font-bold leading-none mono ${t.text}`}>{value}</p>
+          {sub && <p className="mt-2 text-[11px] text-slate-500">{sub}</p>}
+        </div>
+        {icon && (
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${t.bar} bg-opacity-20 text-slate-950`}>
+            {icon}
+          </span>
+        )}
+      </div>
+      {spark && spark.values.length > 0 && (
+        <div className="mt-3">
+          <Sparkline data={spark.values} color={spark.color || "#34d399"} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SectionTitle({ children, right }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="flex items-center gap-2 text-[13px] font-semibold text-slate-200">
+        <span className="inline-block h-3.5 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-cyan-500" />
+        {children}
+      </h2>
+      {right}
+    </div>
+  );
+}
+
+export function GlassCard({ title, right, children, pad = "p-4", className = "" }) {
+  return (
+    <section className={`glass ${pad} anim-fadeup ${className}`}>
+      {(title || right) && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          {title && (
+            <h2 className="flex items-center gap-2 text-[13px] font-semibold text-slate-200">
+              <span className="inline-block h-3.5 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-cyan-500" />
+              {title}
+            </h2>
+          )}
+          {right}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function ProgressBar({ value = 0, max = 100, color = "from-emerald-500 to-cyan-500", className = "" }) {
+  const pct = max ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return (
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-white/5 ${className}`}>
+      <div
+        className={`bar-grow h-full rounded-full bg-gradient-to-r ${color}`}
+        style={{ width: `${pct}%`, boxShadow: "0 0 10px rgba(52,211,153,0.45)" }}
+      />
+    </div>
+  );
+}
+
+export function CodeBlock({ children, maxH = "max-h-56" }) {
+  return (
+    <pre className={`${maxH} overflow-y-auto overflow-x-auto rounded-lg border border-white/5 bg-black/50 p-3 text-[11px] leading-relaxed text-slate-300 mono`}>
+      {children}
+    </pre>
+  );
+}
+
+export function Empty({ title = "Nothing here yet", hint = "The store is waiting for data." }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 py-10 text-center">
+      <div className="grid h-10 w-10 place-items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v4l2.5 2.5" strokeLinecap="round" />
+        </svg>
+      </div>
+      <p className="mt-3 text-sm font-medium text-slate-300">{title}</p>
+      <p className="mt-1 text-xs text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
+export function LegendDot({ color, label }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+      <span className="h-2 w-2 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
+      {label}
+    </span>
   );
 }

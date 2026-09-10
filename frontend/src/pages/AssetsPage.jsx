@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getAssets, getAssetRelations } from "../lib/api";
-import { Card, SeverityBadge } from "../components/ui";
+import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, ProgressBar, CodeBlock } from "../components/ui";
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState([]);
@@ -15,63 +15,83 @@ export default function AssetsPage() {
 
   const open = async (ip) => {
     setRelation(null);
-    const data = await getAssetRelations(ip);
-    setRelation({ ip, ...data });
+    try {
+      const data = await getAssetRelations(ip);
+      setRelation({ ip, ...data });
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    }
   };
+
+  const maxDegree = Math.max(...assets.map((a) => a.degree), 1);
+  const threatenedCount = assets.filter((a) => a.threatened).length;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Assets & lateral movement</h1>
-      {error && <div className="text-red-400">{error}</div>}
+      <PageHeader
+        eyebrow="Inventory · graph entities"
+        title="Asset registry"
+        sub="Every internal host seen by the sensors, risk-ranked by graph degree. Threatened assets are escalated and mapped to controls."
+        actions={<LiveBadge text={`${assets.length} assets · ${threatenedCount} threatened`} />}
+      />
+
+      {error && <div className="text-sm text-rose-400">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Internal assets (risk-ranked)">
+        <GlassCard title="Internal assets — risk ranked">
           {assets.length === 0 ? (
-            <p className="text-sm text-slate-500">No assets in graph.</p>
+            <Empty title="No assets in graph" hint="Ingest flows so Module C can map entities." />
           ) : (
             <div className="space-y-2">
-              {assets.map((a) => (
+              {assets.map((a, i) => (
                 <button
                   key={a.id}
                   onClick={() => open(a.id)}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-950 p-3 text-left hover:border-emerald-500/50"
+                  className="glass-row group flex w-full items-center gap-3 p-3 text-left feed-in"
+                  style={{ animationDelay: `${Math.min(i, 15) * 40}ms` }}
                 >
-                  <div>
-                    <span className="font-mono text-sm">{a.id}</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      degree {a.degree}
-                    </span>
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.threatened ? "bg-rose-500 pulse-dot-red" : "bg-emerald-400/70"}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="mono text-[13px] text-slate-100">{a.id}</p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <ProgressBar value={a.degree} max={maxDegree} color={a.threatened ? "from-rose-500 to-orange-400" : "from-emerald-500 to-cyan-400"} className="w-40" />
+                      <span className="mono text-[10px] text-slate-500">degree {a.degree}</span>
+                    </div>
                   </div>
                   {a.threatened ? (
                     <SeverityBadge severity="critical" />
                   ) : (
-                    <SeverityBadge severity="info" />
+                    <PlainBadge>clean</PlainBadge>
                   )}
                 </button>
               ))}
             </div>
           )}
-        </Card>
+        </GlassCard>
 
-        <Card title={relation ? `Relations — ${relation.ip}` : "Asset drill down"}>
+        <GlassCard
+          title={relation ? `Relations — ${relation.ip}` : "Asset drill-down"}
+          right={relation && <button onClick={() => setRelation(null)} className="text-[11px] text-slate-500 hover:text-slate-200">close ×</button>}
+        >
           {!relation ? (
-            <p className="text-sm text-slate-500">
-              Click an asset to see its communication edges, linked findings
-              and compliance mapping.
-            </p>
+            <Empty
+              title="Select an asset to pivot"
+              hint="A summary of communication edges, linked findings and mapped controls appears here."
+            />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <h3 className="mb-1 text-xs uppercase text-slate-500">Edges</h3>
-                <div className="max-h-40 space-y-1 overflow-y-auto">
-                  {relation.edges.slice(0, 24).map((e, i) => (
-                    <div key={i} className="text-xs">
-                      <span className="font-mono text-slate-300">
-                        {e.source} → {e.target}
-                      </span>
-                      <span className="ml-2 text-slate-500">
-                        [{e.kind}] flows {e.flows}
-                        {e.threat ? " · THREAT" : ""}
+                <SectionTitle right={<span className="mono text-[10px] text-slate-500">{relation.edges.length} edges</span>}>
+                  Communication edges
+                </SectionTitle>
+                <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                  {relation.edges.slice(0, 30).map((e, i) => (
+                    <div key={i} className="glass-row flex items-center justify-between px-3 py-1.5 text-[12px]">
+                      <span className="mono truncate text-slate-300">{e.source} → {e.target}</span>
+                      <span className="flex items-center gap-2">
+                        <PlainBadge>{e.kind}</PlainBadge>
+                        <span className="mono text-[10px] text-slate-500">{e.flows}f</span>
+                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" /> : null}
                       </span>
                     </div>
                   ))}
@@ -79,36 +99,47 @@ export default function AssetsPage() {
               </div>
 
               <div>
-                <h3 className="mb-1 text-xs uppercase text-slate-500">Findings</h3>
-                <div className="space-y-1">
-                  {relation.findings.length === 0 && (
-                    <p className="text-xs text-slate-500">No findings on this asset.</p>
-                  )}
-                  {relation.findings.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="font-mono">{f.threat_class}</span>
-                      <SeverityBadge severity={f.severity} />
-                    </div>
-                  ))}
-                </div>
+                <SectionTitle>Linked findings</SectionTitle>
+                {relation.findings.length === 0 ? (
+                  <p className="text-[12px] text-slate-500">No findings on this asset.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {relation.findings.map((f, i) => (
+                      <div key={i} className="glass-row flex items-center justify-between px-3 py-2 text-[12.5px]">
+                        <span className="mono text-slate-200">{f.threat_class}</span>
+                        <SeverityBadge severity={f.severity} />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
-                <h3 className="mb-1 text-xs uppercase text-slate-500">
-                  Compliance controls
-                </h3>
-                <div className="space-y-1">
-                  {relation.compliance?.controls?.map((c, i) => (
-                    <div key={i} className="text-xs text-slate-300">
-                      <b className="text-slate-100">{c.threat_class}</b> —{" "}
-                      {c.cis_controls.join(", ") || "n/a"} · {c.nist_csf}
-                    </div>
-                  ))}
-                </div>
+                <SectionTitle>Mapped controls</SectionTitle>
+                {!relation.compliance?.controls?.length ? (
+                  <p className="text-[12px] text-slate-500">No controls mapped for this asset.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {relation.compliance.controls.map((c, i) => (
+                      <div key={i} className="glass-row px-3 py-2 text-[12px]">
+                        <p className="mono text-slate-100">{c.threat_class}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          CIS {c.cis_controls?.join(", ") || "—"} · NIST {c.nist_csf}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {relation.compliance?.summary_markdown && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">analyst brief (markdown)</summary>
+                    <CodeBlock maxH="max-h-40" >{relation.compliance.summary_markdown}</CodeBlock>
+                  </details>
+                )}
               </div>
             </div>
           )}
-        </Card>
+        </GlassCard>
       </div>
     </div>
   );

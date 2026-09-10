@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ingestLines, getClients, searchEvents } from "../lib/api";
-import { Card, SeverityBadge } from "../components/ui";
+import { PageHeader, LiveBadge, SeverityBadge, PlainBadge, Empty } from "../components/ui";
 
 const SOURCES = ["syslog", "cef", "json", "csv", "netflow", "windows"];
 const SAMPLES = {
@@ -12,6 +12,8 @@ const SAMPLES = {
   csv: "Sep 10 09:00:01,203.0.113.9,10.10.1.20,tcp,51234,4444,5,800,S",
 };
 
+const PIPELINE_STAGES = ["normalize", "dedup", "modules", "analyzer"];
+
 export default function IngestPage() {
   const [source, setSource] = useState("syslog");
   const [clientId, setClientId] = useState("");
@@ -22,6 +24,7 @@ export default function IngestPage() {
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
   const [stored, setStored] = useState(0);
+  const [stage, setStage] = useState(-1);
 
   const refreshStored = () =>
     searchEvents({ limit: 1 })
@@ -35,9 +38,26 @@ export default function IngestPage() {
       .catch(() => {});
   }, []);
 
+  // drive the terminal stage animation during ingest
+  useEffect(() => {
+    if (!sending) return;
+    const id = setInterval(() => {
+      setStage((s) => {
+        if (s >= PIPELINE_STAGES.length - 1) {
+          clearInterval(id);
+          return s;
+        }
+        return s + 1;
+      });
+    }, 260);
+    return () => clearInterval(id);
+  }, [sending]);
+
   const submit = async () => {
     setSending(true);
+    setStage(0);
     setError(null);
+    setResult(null);
     try {
       const parsed = lines
         .split("\n")
@@ -47,148 +67,225 @@ export default function IngestPage() {
       if (parsed.length === 0) {
         setError("Paste at least one raw log line.");
         setSending(false);
+        setStage(-1);
         return;
       }
-      const { data } = await ingestLines(parsed);
+      const data = await ingestLines(parsed);
+      setStage(PIPELINE_STAGES.length);
       setResult(data);
       refreshStored();
       setLines("");
     } catch (e) {
       setError(e.response?.data?.detail || e.message);
+      setStage(-1);
     } finally {
-      setSending(false);
+      setTimeout(() => setSending(false), 400);
     }
   };
 
   const sample = () =>
-    setLines(
-      Array.from({ length: 3 }, (_, i) => SAMPLES[source]).join("\n"),
-    );
+    setLines(Array.from({ length: 3 }, (_, i) => SAMPLES[source]).join("\n"));
+
+  const lineCount = lines.split("\n").filter((l) => l.trim()).length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Ingest logs</h1>
-        <p className="text-sm text-slate-400">
-          Feed real logs into the ULPF pipeline — normalize → dedup → modules →
-          analyzer. Everything lands in the event store and graph immediately.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="ULP pipeline · edge interface"
+        title="Live ingest"
+        sub="Feed raw log lines straight into the pipeline — normalize → dedup → modules → analyzer in one shot. Everything lands in the store and graph immediately."
+        actions={
+          <>
+            <span className="mono text-[11px] text-slate-500">{stored} events in store</span>
+            <LiveBadge text="Port /api/ingest" />
+          </>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card title="New ingest">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">Source format</span>
-              <select
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              >
-                {SOURCES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">Client</span>
-              <input
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                list="client-list"
-                placeholder="e.g. web01"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              />
-              <datalist id="client-list">
-                {knownClients.map((c) => (
-                  <option key={c.client_id} value={c.client_id} />
-                ))}
-              </datalist>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs text-slate-500">Host hint</span>
-              <input
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="reporter hostname"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-              />
-            </label>
-          </div>
-
-          <textarea
-            value={lines}
-            onChange={(e) => setLines(e.target.value)}
-            rows={10}
-            placeholder="One raw log line per row — paste syslog lines, CEF events, netflow rows, JSON objects…"
-            className="mt-4 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200 outline-none focus:border-emerald-500"
-          />
-
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              onClick={submit}
-              disabled={sending}
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
-            >
-              {sending ? "Processing…" : "Ingest"}
-            </button>
-            <button
-              onClick={sample}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:border-slate-500"
-            >
-              Insert sample lines
-            </button>
-            <span className="text-xs text-slate-500">
-              {stored} events in store
-            </span>
-          </div>
-          {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
-        </Card>
-
-        <Card title="Pipeline result">
-          {!result ? (
-            <p className="text-sm text-slate-500">
-              Ingested lines are parsed per the selected format, deduplicated by
-              fingerprint, run through Module A (flows), wired into the graph,
-              and gated through the analyzer — alerts from this batch appear
-              here and on the Alerts page.
+      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+        {/* ------------------------------------------------ terminal console */}
+        <section className="glass overflow-hidden anim-fadeup">
+          {/* terminal chrome */}
+          <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+            <p className="mono ml-3 text-[11px] tracking-widest text-slate-500">
+              trinetra@{source} — ingest console
             </p>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="rounded-lg bg-slate-950 p-3">
-                  <p className="text-2xl font-bold text-emerald-400">{result.accepted}</p>
-                  <p className="text-xs text-slate-500">accepted</p>
-                </div>
-                <div className="rounded-lg bg-slate-950 p-3">
-                  <p className="text-2xl font-bold text-red-400">{result.failed}</p>
-                  <p className="text-xs text-slate-500">failed</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">
-                {result.total} events now in store · {result.alerts.length} new alerts
-              </p>
-              {result.alerts.length > 0 && (
-                <div className="space-y-2">
-                  {[...result.alerts].reverse().map((a, i) => (
-                    <div key={i} className="rounded-lg bg-slate-950 p-2 text-xs">
-                      {typeof a === "string" ? (
-                        <span className="text-slate-300">{a}</span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <SeverityBadge severity={a.severity || "high"} />
-                          <span className="font-mono text-slate-200">{a.threat_class}</span>
-                          <span className="text-slate-500">conf {a.confidence}</span>
-                        </span>
-                      )}
-                    </div>
+          </div>
+
+          <div className="terminal p-5">
+            {/* source tabs */}
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {SOURCES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSource(s)}
+                  className={`mono rounded-md border px-2.5 py-1 text-[11px] transition ${
+                    source === s
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                      : "border-white/10 bg-white/[0.03] text-slate-500 hover:text-slate-200"
+                  }`}
+                >
+                  $ {s}
+                </button>
+              ))}
+            </div>
+
+            {/* meta fields */}
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">
+                  client_id
+                </span>
+                <input
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  list="client-list"
+                  placeholder="web01"
+                  className="field mono w-full px-3 py-2"
+                />
+                <datalist id="client-list">
+                  {knownClients.map((c) => (
+                    <option key={c.client_id} value={c.client_id} />
                   ))}
-                </div>
+                </datalist>
+              </label>
+              <label className="block">
+                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">
+                  host_hint
+                </span>
+                <input
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  placeholder="reporter hostname"
+                  className="field mono w-full px-3 py-2"
+                />
+              </label>
+            </div>
+
+            {/* raw lines */}
+            <textarea
+              value={lines}
+              onChange={(e) => setLines(e.target.value)}
+              rows={11}
+              placeholder={'$ paste raw log lines…\n<134>Sep 10 09:00:01 web01 sshd: Failed password for invalid user root from 203.0.113.9 port 51122 ssh2'}
+              className="mono w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3.5 py-3 text-[12px] leading-relaxed text-emerald-100/90 caret-emerald-400 outline-none placeholder:text-slate-600 focus:border-emerald-500/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.08)]"
+            />
+
+            {/* artist bar */}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button onClick={submit} disabled={sending} className="btn-primary mono">
+                {sending ? "PIPELINING…" : "▶ INGEST"}
+              </button>
+              <button onClick={sample} className="btn-ghost mono text-[11px]">
+                INSERT SAMPLE ×3
+              </button>
+              <span className="mono ml-auto text-[10px] text-slate-600">
+                buffer: {lineCount} line{lineCount === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            {/* stage tracker */}
+            <div className="mt-4 flex items-center gap-2">
+              {PIPELINE_STAGES.map((p, i) => (
+                <React.Fragment key={p}>
+                  {i > 0 && <span className="text-slate-700">›</span>}
+                  <span
+                    className={`mono rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-widest transition ${
+                      sending && stage >= i
+                        ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                        : result && stage >= PIPELINE_STAGES.length
+                          ? "border-emerald-500/40 text-emerald-400/80"
+                          : "border-white/5 text-slate-600"
+                    }`}
+                  >
+                    {sending && stage === i && <Blink />} {p}
+                  </span>
+                </React.Fragment>
+              ))}
+              {!sending && result && (
+                <span className="ml-auto mono text-[10px] text-emerald-400">✓ batch complete</span>
               )}
             </div>
-          )}
-        </Card>
+
+            {error && (
+              <p className="mono mt-3 text-[12px] text-rose-400">✗ {error}</p>
+            )}
+          </div>
+        </section>
+
+        {/* ------------------------------------------------ pipeline result */}
+        <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "80ms" }}>
+          <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
+            <p className="mono text-[11px] tracking-widest text-slate-500">output :: last batch</p>
+          </div>
+          <div className="terminal p-5">
+            {!result ? (
+              <Empty
+                title="No batch processed yet"
+                hint="Paste lines and hit INGEST — the pipeline verdict prints here."
+              />
+            ) : (
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+                    <p className="text-grad-emerald text-3xl font-bold leading-none mono">{result.accepted}</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">accepted</p>
+                  </div>
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-center">
+                    <p className="text-grad-danger text-3xl font-bold leading-none mono">{result.failed}</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">failed</p>
+                  </div>
+                </div>
+
+                <div className="mono text-[11px] leading-relaxed text-slate-500">
+                  <p>$ store.total <span className="text-emerald-300">→ {result.total}</span></p>
+                  <p>$ alerts.batch <span className="text-amber-300">→ {result.alerts.length}</span></p>
+                  {result.accepted > 0 && (
+                    <p className="text-emerald-400">✓ {result.accepted} lines accepted{failedNote(result)}</p>
+                  )}
+                  {result.failed > 0 && (
+                    <p className="text-rose-400">✗ {result.failed} lines rejected by parsers</p>
+                  )}
+                </div>
+
+                {result.alerts.length > 0 && (
+                  <div>
+                    <p className="eyebrow mb-2">Fan-out verdicts</p>
+                    <div className="space-y-2">
+                      {[...result.alerts].reverse().map((a, i) => (
+                        <div key={i} className="glass-row flex items-center gap-2 px-3 py-2 text-[12px]">
+                          {typeof a === "string" ? (
+                            <span className="mono text-slate-300">{a}</span>
+                          ) : (
+                            <>
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === "critical" ? "bg-rose-500 pulse-dot-red" : "bg-amber-400"}`} />
+                              <SeverityBadge severity={a.severity} />
+                              <span className="mono text-slate-200">{a.threat_class}</span>
+                              <span className="ml-auto text-[10px] text-slate-500">conf {a.confidence}</span>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
+}
+
+function failedNote(r) {
+  return r.failed > 0 ? ` · ${r.failed} rejected` : "";
+}
+
+function Blink() {
+  return <span className="inline-block h-3 w-1.5 animate-pulse bg-emerald-400 align-middle" style={{ verticalAlign: "-2px" }} />;
 }

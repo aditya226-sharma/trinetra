@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getAlerts } from "../lib/api";
-import { Card, SeverityBadge } from "../components/ui";
+import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
 const POLL_MS = 5000;
+const SEVERS = ["", "critical", "high", "warning", "info"];
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [sent, setSent] = useState(0);
   const [sevFilter, setSevFilter] = useState("");
-  const [expanded, setExpanded] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -30,89 +31,117 @@ export default function AlertsPage() {
     };
   }, []);
 
-  const verdicts = useMemo(() => {
-    const counts = {};
+  const stats = useMemo(() => {
+    const out = { critical: 0, high: 0, warning: 0, info: 0, malicious: 0, suspicious: 0 };
     alerts.forEach((a) => {
-      counts[a.verdict] = (counts[a.verdict] || 0) + 1;
+      if (out[a.severity] !== undefined) out[a.severity] += 1;
+      if (a.verdict === "malicious") out.malicious += 1;
+      if (a.verdict === "suspicious") out.suspicious += 1;
     });
-    return counts;
+    return out;
   }, [alerts]);
 
   const visible = sevFilter ? alerts.filter((a) => a.severity === sevFilter) : alerts;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Alerts</h1>
-        <p className="text-sm text-slate-400">
-          Live export of the analyzer + notifier fan-out (polls every {POLL_MS / 1000}s).
-        </p>
+      <PageHeader
+        eyebrow="Analyzer · notifier fan-out"
+        title="Alert stream"
+        sub="Live export of verdicts pushed by the pipeline every batch — expand a verdict to inspect the raw evidence that fired it."
+        actions={<LiveBadge text={`Poll 5s · ${sent} sent`} />}
+      />
+
+      {/* verdict tiles */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4 anim-fadeup">
+        <Tile label="Alert events" value={sent} tone="tone-info" />
+        <Tile label="Open verdicts" value={alerts.length} tone="tone-slate" />
+        <Tile label="malicious · quarantine" value={stats.malicious} tone="tone-danger" />
+        <Tile label="suspicious · review" value={stats.suspicious} tone="tone-warn" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-b border-slate-800 pb-4 lg:grid-cols-4">
-        <Stat label="Alert events" value={sent} />
-        <Stat label="Open alerts" value={alerts.length} />
-        <Stat label="malicious" value={verdicts.malicious || 0} tone="text-red-400" />
-        <Stat label="suspicious" value={verdicts.suspicious || 0} tone="text-amber-400" />
-      </div>
+      {error && <div className="text-sm text-rose-400">{error}</div>}
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-slate-500">Filter severity:</span>
-        {["", "critical", "high", "warning", "info"].map((s) => (
-          <button
-            key={s || "all"}
-            onClick={() => setSevFilter(s)}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              sevFilter === s
-                ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                : "border-slate-700 text-slate-400 hover:border-slate-500"
-            }`}
-          >
-            {s || "all"}
+      {/* severity pills */}
+      <div className="flex flex-wrap items-center gap-2 anim-fadeup">
+        <span className="eyebrow mr-1">FILTER</span>
+        {SEVERS.map((s) => (
+          <button key={s || "all"} onClick={() => setSevFilter(s)} className={`chip ${sevFilter === s ? "chip-on" : ""}`}>
+            {s === "" ? "all verdicts" : s}
           </button>
         ))}
+        {stats.critical > 0 && (
+          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-rose-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" />
+            {stats.critical} critical inbound
+          </span>
+        )}
       </div>
 
+      {/* timeline feed */}
       {visible.length === 0 ? (
-        <Card title="No alerts yet">Run the demo dataset to fan out alerts.</Card>
+        <Empty title="No verdicts in flight" hint="Run the demo dataset to fan out alerts." />
       ) : (
-        <div className="space-y-2">
-          {visible.map((a, i) => (
-            <button
-              key={a.timestamp + a.threat_class + i}
-              onClick={() => setExpanded(expanded === a.timestamp + a.threat_class + i ? null : a.timestamp + a.threat_class + i)}
-              className="block w-full rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-left hover:border-emerald-500/50"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <SeverityBadge severity={a.severity} />
-                  <span className="font-mono text-sm text-slate-200">{a.threat_class}</span>
-                  <span className="text-xs text-slate-500">
-                    conf {a.confidence} · verdict <b className={a.verdict === "malicious" ? "text-red-400" : "text-amber-400"}>{a.verdict}</b> ({a.store_decision})
-                  </span>
+        <div className="relative space-y-3 pl-6 anim-fadeup">
+          {/* spine */}
+          <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
+          {visible.map((a, i) => {
+            const key = `${a.timestamp}_${a.threat_class}_${i}`;
+            const open = expandedId === key;
+            return (
+              <div key={key} className="relative feed-in" style={{ animationDelay: `${i * 55}ms` }}>
+                <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(a.severity)} ${a.severity === "critical" ? "pulse-dot-red" : ""}`} />
+                <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
+                  <button onClick={() => setExpandedId(open ? null : key)} className="flex w-full items-center gap-3 p-4 text-left">
+                    <span className={`sev-strip ${stripCls(a.severity)}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="mono text-[13.5px] font-semibold text-slate-100">{a.threat_class}</span>
+                        <SeverityBadge severity={a.severity} />
+                        <PlainBadge>verdict <b className={a.verdict === "malicious" ? "text-rose-300" : "text-amber-300"}>{a.verdict}</b></PlainBadge>
+                      </div>
+                      <p className="mono mt-1 text-[11px] uppercase tracking-widest text-slate-500">
+                        conf {a.confidence} · store → {a.store_decision} · {a.timestamp}
+                      </p>
+                    </div>
+                    <span className="text-slate-600 transition group-hover:text-emerald-300">{open ? "−" : "+"}</span>
+                  </button>
+                  {open && (
+                    <div className="border-t border-white/5 bg-black/30 p-4">
+                      <p className="eyebrow mb-2">Supporting evidence · raw flows</p>
+                      <CodeBlock maxH="max-h-64">{JSON.stringify(a.evidence || {}, null, 2)}</CodeBlock>
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs text-slate-500">{a.timestamp}</span>
               </div>
-              {expanded === a.timestamp + a.threat_class + i && (
-                <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-950 p-3 text-[11px] text-slate-300">
-                  {JSON.stringify(a.evidence || {}, null, 2)}
-                </pre>
-              )}
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function Stat({ label, value, tone = "text-slate-100" }) {
+function Tile({ label, value, tone }) {
+  const tones = {
+    "tone-danger": "text-grad-danger glow-red",
+    "tone-warn": "text-[24px] mono font-bold text-amber-300",
+    "tone-info": "text-[24px] mono font-bold text-sky-300",
+    "tone-slate": "text-[24px] mono font-bold text-slate-200",
+  };
   return (
-    <div>
-      <p className={`text-2xl font-bold ${tone}`}>{value}</p>
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+    <div className={`glass p-4 ${tone === "tone-danger" ? "glow-red" : ""}`}>
+      <p className={`${tones[tone]} leading-none`}>{value}</p>
+      <p className="eyebrow mt-2">{label}</p>
     </div>
   );
 }
+
+const stripCls = (sev) => {
+  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", warning: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
+  return m[sev] || "sev-info";
+};
+const dotCls = (sev) => {
+  const m = { critical: "bg-rose-500", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
+  return m[sev] || "bg-sky-500";
+};
