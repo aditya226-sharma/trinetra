@@ -16,7 +16,7 @@ export default function EventsPage() {
     setLoading(true);
     setDetail(null);
     try {
-      const { data } = await searchEvents({
+      const data = await searchEvents({
         query,
         source_type: src,
         severity: sev,
