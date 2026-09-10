@@ -22,6 +22,11 @@ from schema import Event, make_trace_id, new_uuid, utc_now
 
 log = logging.getLogger("trinetra.normalizer")
 
+#: Sentinel returned by :meth:`Normalizer.normalize` when a line was consumed
+#: but produced no event (e.g. a CSV header row). Not ``None`` so the
+#: orchestrator can tell "skip" apart from "invalid (blank)".
+SKIPPED = object()
+
 
 class Normalizer:
     def __init__(self, raw_store: RawStore, default_client_id: str = "trinetra-core") -> None:
@@ -30,7 +35,8 @@ class Normalizer:
 
     def normalize(self, raw: str, source: str = "", client_id: str = "",
                   host_hint: str = "") -> Optional[Event]:
-        """Return a UES ``Event`` or ``None`` for blank/empty lines."""
+        """Return a UES ``Event``, ``None`` for blank/empty lines, or
+        ``SKIPPED`` for lines consumed without producing an event."""
         if not raw or not raw.strip():
             return None
 
@@ -45,6 +51,9 @@ class Normalizer:
         parsed = registry.parse(raw, source_type, client_id, host_hint)
         if parsed is None:
             parsed = parse_any(raw, source_type, client_id, host_hint)
+        if parsed.get("_skip"):
+            # Consumed (e.g. CSV header row) — preserve raw, emit nothing.
+            return SKIPPED
 
         # 3. Assemble the UES event.
         fields = dict(parsed.get("fields") or {})

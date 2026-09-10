@@ -5,11 +5,14 @@ A parser is any callable with signature::
     fn(raw: str, source: str, client_id: str, host_hint: str = "") -> dict | None
 
 Returned dicts are merged into the UES event (timestamp, category, severity,
-message, client_ip, fields). Returning ``None`` means "I can't parse this".
+message, client_ip, fields). Returning ``None`` means "I can't parse this";
+the normalizer falls back to ``parse_any`` so the raw event is *always*
+preserved regardless of outcome. A parser may also return ``{"_skip": True}``
+to consume a line without emitting an event (e.g. a CSV header row) — the
+normalizer preserves the raw line but produces no record for it.
 
 ``parse_any`` is the fallback that produces a usable generic event from any
-orphan line, so the system degrades gracefully instead of dropping data —
-the raw event is *always* preserved regardless of parsing outcome.
+orphan line, so the system degrades gracefully instead of dropping data.
 """
 
 from __future__ import annotations
@@ -17,7 +20,8 @@ from __future__ import annotations
 import functools
 from typing import Any, Callable, Dict, Optional
 
-from schema import CATEGORIES, SEVERITY_LEVELS
+from parsers.common import norm_category as _norm_category  # noqa: F401
+from parsers.common import norm_severity as _norm_severity  # noqa: F401
 
 ParserFn = Callable[[str, str, str, str], Optional[Dict[str, Any]]]
 
@@ -52,23 +56,8 @@ def _clean(message: str) -> str:
     return " ".join(str(message).split()).strip()
 
 
-def _norm_severity(value: Any) -> str:
-    text = str(value or "").strip().lower()
-    if text in SEVERITY_LEVELS:
-        return text
-    mapping = {
-        "emerg": "critical", "alert": "critical", "crit": "critical", "fatal": "critical",
-        "err": "error", "error": "error",
-        "warn": "warning", "warning": "warning",
-        "notice": "info", "info": "info", "informational": "info",
-        "debug": "info",
-    }
-    return mapping.get(text, "info")
-
-
-def _norm_category(value: Any) -> str:
-    text = str(value or "network").strip().lower()
-    return text if text in CATEGORIES else "network"
+# `_norm_severity`/`_norm_category` come from parsers.common (shared with
+# the json/csv parsers) — see the imports at the top of this module.
 
 
 # --------------------------------------------------------------------------

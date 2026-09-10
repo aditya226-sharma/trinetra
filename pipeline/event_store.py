@@ -59,49 +59,88 @@ def _row_to_event(row: Optional[sqlite3.Row]) -> Optional[Event]:
 
 
 class EventStore:
+    _STALE_MSGS = ("readonly database", "unable to open database file")
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self._connect()
+
+    # ------------------------------------------------------------- connection
+    def _connect(self) -> None:
+        """Open the sqlite connection (assumes the caller holds ``_lock``)."""
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
-        with self._lock:
-            self._conn.executescript(_SCHEMA)
-            self._conn.commit()
+        self._conn.executescript(_SCHEMA)
+        self._conn.commit()
+
+    def _reconnect(self) -> None:
+        """Re-open the store after the underlying file was replaced under us.
+
+        Triggers like ``demo_run(reset=True)`` or a second process unlinking
+        ``data/trinetra.db`` while this store is open leave our connection
+        pointing at a stale inode: reads then return old data and writes fail
+        with "attempt to write a readonly database". Reconnecting re-binds to
+        the current file. The caller must hold ``_lock``.
+        """
+        try:
+            self._conn.close()
+        except sqlite3.Error:
+            pass
+        self._connect()
+
+    def _staleness_retry(self, op: Any) -> Any:
+        """Run ``op`` (with ``_lock`` already held), retry once after a
+        reconnect if the database file was replaced outside this process."""
+        try:
+            return op()
+        except sqlite3.Error as exc:
+            if not any(msg in str(exc).lower() for msg in self._STALE_MSGS):
+                raise
+            self._reconnect()
+            return op()
 
     # ------------------------------------------------------------- writes
     def save(self, event: Event) -> None:
         with self._lock:
-            self._conn.execute(
-                """INSERT OR REPLACE INTO events
-                   (event_id, timestamp, source_type, client_id, client_ip,
-                    category, severity, message, trace_id, fields_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (event.event_id, event.timestamp, event.source_type,
-                 event.client_id, event.client_ip, event.category,
-                 event.severity, event.message, event.trace_id,
-                 json.dumps(event.fields, default=str)),
-            )
-            self._conn.commit()
+            def _do() -> None:
+                self._conn.execute(
+                    """INSERT OR REPLACE INTO events
+                       (event_id, timestamp, source_type, client_id, client_ip,
+                        category, severity, message, trace_id, fields_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (event.event_id, event.timestamp, event.source_type,
+                     event.client_id, event.client_ip, event.category,
+                     event.severity, event.message, event.trace_id,
+                     json.dumps(event.fields, default=str)),
+                )
+                self._conn.commit()
+            self._staleness_retry(_do)
 
     def save_many(self, events: List[Event]) -> None:
         with self._lock:
-            self._conn.executemany(
-                """INSERT OR REPLACE INTO events
-                   (event_id, timestamp, source_type, client_id, client_ip,
-                    category, severity, message, trace_id, fields_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [(e.event_id, e.timestamp, e.source_type, e.client_id,
-                  e.client_ip, e.category, e.severity, e.message, e.trace_id,
-                  json.dumps(e.fields, default=str)) for e in events],
-            )
-            self._conn.commit()
+            def _do() -> None:
+                self._conn.executemany(
+                    """INSERT OR REPLACE INTO events
+                       (event_id, timestamp, source_type, client_id, client_ip,
+                        category, severity, message, trace_id, fields_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    [(e.event_id, e.timestamp, e.source_type, e.client_id,
+                      e.client_ip, e.category, e.severity, e.message, e.trace_id,
+                      json.dumps(e.fields, default=str)) for e in events],
+                )
+                self._conn.commit()
+            self._staleness_retry(_do)
 
     # ------------------------------------------------------------- reads
     def get(self, event_id: str) -> Optional[Event]:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
+            def _do() -> Optional[sqlite3.Row]:
+                return self._conn.execute(
+                    "SELECT * FROM events WHERE event_id = ?",
+                    (event_id,)).fetchone()
+            row = self._staleness_retry(_do)
         return _row_to_event(row)
 
     def _where(self, query: str = "", source_type: str = "", severity: str = "",
@@ -127,7 +166,9 @@ class EventStore:
                f"LIMIT ? OFFSET ?")
         params += [limit, offset]
         with self._lock:
-            rows = self._conn.execute(sql, params).fetchall()
+            def _do() -> List[sqlite3.Row]:
+                return self._conn.execute(sql, params).fetchall()
+            rows = self._staleness_retry(_do)
         return [e for e in (_row_to_event(r) for r in rows) if e is not None]
 
     def count_filtered(self, query: str = "", source_type: str = "",
@@ -135,29 +176,37 @@ class EventStore:
                        client_id: str = "") -> int:
         where, params = self._where(query, source_type, severity, category, client_id)
         with self._lock:
-            row = self._conn.execute(
-                f"SELECT COUNT(*) AS c FROM events {where}", params).fetchone()
+            def _do() -> sqlite3.Row:
+                return self._conn.execute(
+                    f"SELECT COUNT(*) AS c FROM events {where}", params).fetchone()
+            row = self._staleness_retry(_do)
         return int(row["c"])
 
     def count(self) -> int:
         with self._lock:
-            row = self._conn.execute("SELECT COUNT(*) AS c FROM events").fetchone()
+            def _do() -> sqlite3.Row:
+                return self._conn.execute("SELECT COUNT(*) AS c FROM events").fetchone()
+            row = self._staleness_retry(_do)
         return int(row["c"])
 
     def count_by(self, column: str) -> Dict[str, int]:
         with self._lock:
-            rows = self._conn.execute(
-                f"SELECT {column} AS k, COUNT(*) AS c FROM events GROUP BY {column}"
-            ).fetchall()
+            def _do() -> List[sqlite3.Row]:
+                return self._conn.execute(
+                    f"SELECT {column} AS k, COUNT(*) AS c FROM events GROUP BY {column}"
+                ).fetchall()
+            rows = self._staleness_retry(_do)
         return {str(r["k"]): int(r["c"]) for r in rows}
 
     def clients(self) -> List[Dict[str, Any]]:
         """Per-client summary: total events plus dominant source type."""
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT client_id, source_type, COUNT(*) AS c FROM events "
-                "GROUP BY client_id, source_type ORDER BY client_id, c DESC"
-            ).fetchall()
+            def _do() -> List[sqlite3.Row]:
+                return self._conn.execute(
+                    "SELECT client_id, source_type, COUNT(*) AS c FROM events "
+                    "GROUP BY client_id, source_type ORDER BY client_id, c DESC"
+                ).fetchall()
+            rows = self._staleness_retry(_do)
         merged: Dict[str, Dict[str, Any]] = {}
         for r in rows:
             cid = str(r["client_id"])
@@ -181,8 +230,10 @@ class EventStore:
 
     def by_trace(self, trace_id: str) -> List[Event]:
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM events WHERE trace_id = ?", (trace_id,)).fetchall()
+            def _do() -> List[sqlite3.Row]:
+                return self._conn.execute(
+                    "SELECT * FROM events WHERE trace_id = ?", (trace_id,)).fetchall()
+            rows = self._staleness_retry(_do)
         return [e for e in (_row_to_event(r) for r in rows) if e is not None]
 
     def close(self) -> None:

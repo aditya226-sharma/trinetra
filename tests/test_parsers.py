@@ -91,3 +91,38 @@ def test_guess_source_type():
 
 def test_parse_none_on_garbage_source():
     assert parse("garbage", "not-a-parser", "c", "") is None
+
+
+def test_json_parser_structured_event():
+    raw = ('{"ts": "Sep 10 09:00:01", "src": "10.10.1.20", '
+           '"dst": "198.51.100.9", "proto": "tcp", "sport": 47777, '
+           '"dport": 443, "pkts": 3, "bytes": 2100, "flags": "SA", '
+           '"severity": "error", "category": "flow"}')
+    parsed = parse(raw, "json", "client", "")
+    assert parsed is not None
+    assert parsed["category"] == "flow"
+    assert parsed["severity"] == "error"
+    assert parsed["fields"]["src"] == "10.10.1.20"
+    assert parsed["client_ip"] == "10.10.1.20"
+
+
+def test_csv_header_then_data_rows():
+    header = "timestamp,src_ip,dst_ip,proto,sport,dport,pkts,bytes,flags"
+    row = "Sep 12 09:00:00,198.51.100.77,10.10.1.40,tcp,44000,445,2,900,S"
+    # Header row is consumed, not materialised into a fake event.
+    assert parse(header, "csv", "client", "") == {"_skip": True}
+    parsed = parse(row, "csv", "client", "")
+    assert parsed is not None
+    assert parsed["client_ip"] == "198.51.100.77"
+    assert parsed["fields"]["dst_ip"] == "10.10.1.40"
+    assert parsed["fields"]["dport"] == "445"
+
+
+def test_csv_headerless_positional_mapping():
+    row = "Sep 12 09:00:00,198.51.100.77,10.10.1.40,tcp,44000,445,2,900,S"
+    parsed = parse(row, "csv", "client", "")
+    assert parsed is not None
+    assert parsed["fields"]["src_ip"] == "198.51.100.77"
+    assert parsed["fields"]["dport"] == "445"
+    # Deterministic output -> same input yields the same fingerprint.
+    assert parse(row, "csv", "client", "")["fields"] == parsed["fields"]

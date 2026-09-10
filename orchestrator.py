@@ -16,7 +16,7 @@ from config.settings import Settings
 from parsers.registry import parse  # noqa: F401  (parser registry warm-up)
 from pipeline.raw_store import RawStore
 from pipeline.event_store import EventStore
-from pipeline.normalizer import Normalizer
+from pipeline.normalizer import Normalizer, SKIPPED
 from pipeline.batcher import Batcher, DedupCounter
 from pipeline.prefilter import Prefilter
 from modules.network_threat import ThreatDetector
@@ -58,15 +58,23 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ run
     def ingest(self, raw: str, source: str = "", client_id: str = "",
-               host_hint: str = "") -> None:
-        """Collect→normalize→dedup→modules→analyze→notify for one raw line."""
+               host_hint: str = "") -> str:
+        """Collect→normalize→dedup→modules→analyze→notify for one raw line.
+
+        Returns the outcome so callers can report honest accounting:
+        ``"stored"``, ``"duplicate"`` (deduped), ``"invalid"`` (line could
+        not be normalized, e.g. blank input), or ``"ignored"`` (consumed but
+        not an event, e.g. a CSV header row).
+        """
         self.stats["raw_lines"] += 1
         event = self.normalizer.normalize(raw, source, client_id, host_hint)
         if event is None:
-            return
+            return "invalid"
+        if event is SKIPPED:
+            return "ignored"
         if not self.dedup.track(event):
             self.stats["duplicates"] += 1
-            return
+            return "duplicate"
         self.stats["events"] += 1
 
         # Persist the normalized UES event (searchable via API/dashboard).
@@ -74,6 +82,7 @@ class Orchestrator:
             self.event_store.save(event)
         except Exception as exc:  # noqa: BLE001 — store must never kill ingestion
             log.warning("event store save failed: %s", exc)
+            return "invalid"
 
         # Module A — flow threat detection (metadata only)
         if event.category == "flow":
@@ -93,6 +102,7 @@ class Orchestrator:
         self.stats["analyzer_calls"] += 1
         if result.severity_override:
             event.severity = result.severity_override
+        return "stored"
 
     def flush_batch(self) -> List[str]:
         """Run module windows; analyze + notify findings; return alert lines."""

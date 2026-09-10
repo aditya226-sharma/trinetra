@@ -138,6 +138,12 @@ body {
   background-clip: text;
   color: transparent;
 }
+.text-grad-warn {
+  background: linear-gradient(100deg, #fde68a, #fbbf24 55%, #fb923c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .mono {
   font-family: var(--font-mono);
 }

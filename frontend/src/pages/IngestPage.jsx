@@ -230,10 +230,14 @@ export default function IngestPage() {
               />
             ) : (
               <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
                     <p className="text-grad-emerald text-3xl font-bold leading-none mono">{result.accepted}</p>
                     <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">accepted</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+                    <p className="text-grad-warn text-3xl font-bold leading-none mono">{result.duplicates ?? 0}</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">duplicates</p>
                   </div>
                   <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-center">
                     <p className="text-grad-danger text-3xl font-bold leading-none mono">{result.failed}</p>
@@ -247,8 +251,14 @@ export default function IngestPage() {
                   {result.accepted > 0 && (
                     <p className="text-emerald-400">✓ {result.accepted} lines accepted{failedNote(result)}</p>
                   )}
+                  {(result.duplicates ?? 0) > 0 && (
+                    <p className="text-amber-300">↺ {result.duplicates} lines deduplicated — identical event already in store</p>
+                  )}
+                  {(result.ignored ?? 0) > 0 && (
+                    <p className="text-slate-400">· {result.ignored} lines consumed as format scaffolding (e.g. CSV header) — raw preserved</p>
+                  )}
                   {result.failed > 0 && (
-                    <p className="text-rose-400">✗ {result.failed} lines rejected by parsers</p>
+                    <p className="text-rose-400">✗ {result.failed} lines rejected — blank or malformed input</p>
                   )}
                 </div>
 
@@ -283,7 +293,8 @@ export default function IngestPage() {
 }
 
 function failedNote(r) {
-  return r.failed > 0 ? ` · ${r.failed} rejected` : "";
+  const n = (r.duplicates ?? 0) > 0 ? ` · ${r.duplicates} deduped` : "";
+  return r.failed > 0 ? `${n} · ${r.failed} rejected` : n;
 }
 
 function Blink() {

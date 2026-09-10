@@ -141,3 +141,32 @@ def test_api_demo_round_trip():
 
         threats = client.get("/api/network-threats").json()["findings"]
         assert any(f["threat_class"] == "c2_beaconing" for f in threats)
+
+
+def test_api_ingest_reports_accepted_duplicates_failed():
+    """/api/ingest must not count silently-dropped lines as accepted."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        client.post("/api/demo/run?reset=true")
+        dup_raw = "Sep 12 09:00:00,192.0.2.5,10.10.1.88,tcp,40000,443,3,1500,S"
+        resp = client.post("/api/ingest", json={"lines": [
+            {"raw": dup_raw, "source": "csv", "client_id": "ingest-probe"},
+            {"raw": dup_raw, "source": "csv", "client_id": "ingest-probe"},
+            {"raw": "   ", "source": "csv", "client_id": "ingest-probe"},
+        ]})
+        body = resp.json()
+        assert body["accepted"] == 1
+        assert body["duplicates"] == 1
+        assert body["failed"] == 1
+        probe = client.get("/api/events/search",
+                           params={"client_id": "ingest-probe"}).json()
+        assert probe["total"] == 1
+        # tidy up: leave the demo store exactly as it was
+        import sqlite3
+        con = sqlite3.connect(str(api_module._settings.path("event_store")))
+        con.execute("DELETE FROM events WHERE client_id = 'ingest-probe'")
+        con.commit()
+        con.close()

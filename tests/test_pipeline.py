@@ -58,6 +58,52 @@ def test_batcher_window_flush():
     assert out is None or (out and out[0].event_id == "1")
 
 
+def _dummy_event(event_id):
+    return Event(event_id=event_id, timestamp="2026-09-12T10:00:00Z",
+                 source_type="csv", client_id="probe", category="system",
+                 severity="info", message="m", trace_id=f"probe::{event_id}",
+                 fields={})
+
+
+def test_event_store_self_heals_after_external_replace(tmp_path):
+    """Ingest must keep working when another process replaces the DB file."""
+    from pipeline.event_store import EventStore
+
+    path = tmp_path / "events.db"
+    store = EventStore(path)
+    store.save(_dummy_event("ev-1"))
+    assert store.count() == 1
+
+    # External process (e.g. `python main.py --demo`, or a second reset)
+    # unlinks and recreates data/trinetra.db while `store` stays open.
+    path.unlink(missing_ok=True)
+    fresh = EventStore(path)
+    fresh.save(_dummy_event("new-0"))
+
+    # The stale connection must self-heal and write to the CURRENT file —
+    # never silently write to the now-deleted inode.
+    store.save(_dummy_event("ev-2"))
+    assert store.get("ev-2") is not None
+    assert EventStore(path).count() == 2  # new-0 + ev-2 (fresh reader)
+
+
+def test_orchestrator_ingest_outcomes(monkeypatch, tmp_path):
+    """ingest() reports honest statuses: stored / duplicate / invalid."""
+    monkeypatch.setenv("TRINETRA_STORE_PATH", str(tmp_path / "events.db"))
+    monkeypatch.setenv("TRINETRA_RAW_DIR", str(tmp_path / "raw"))
+    from config.settings import Settings as TSettings
+    from orchestrator import Orchestrator
+
+    orch = Orchestrator(TSettings())
+    raw = ("<134>Sep 11 10:00:01 webx sshd: Failed password for invalid "
+           "user root from 198.51.100.7 port 51122 ssh2")
+    assert orch.ingest(raw, "syslog", "webx") == "stored"
+    assert orch.ingest(raw, "syslog", "webx") == "duplicate"
+    assert orch.ingest("   ", "syslog", "webx") == "invalid"
+    assert orch.event_store.count() == 1
+    assert orch.stats["duplicates"] == 1
+
+
 def test_prefilter_severity_gate():
     p = Prefilter(min_severity="error")
     info = Event(event_id="1", timestamp="t", source_type="syslog", client_id="c",

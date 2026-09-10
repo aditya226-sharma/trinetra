@@ -8,12 +8,40 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
+from schema import CATEGORIES, SEVERITY_LEVELS
+
 _IP_RE = re.compile(
     r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"
 )
 _MONTHS = {m: i + 1 for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
 _KV_RE = re.compile(r"([A-Za-z0-9_.-]+)=((?:\"(?:[^\"\\]|\\.)*\"|\S+))")
+
+
+def norm_severity(value: Any) -> str:
+    """Map arbitrary severity tokens onto the UES severity vocabulary."""
+    text = str(value or "").strip().lower()
+    if text in SEVERITY_LEVELS:
+        return text
+    mapping = {
+        "emerg": "critical", "alert": "critical", "crit": "critical", "fatal": "critical",
+        "err": "error", "error": "error",
+        "warn": "warning", "warning": "warning",
+        "notice": "info", "info": "info", "informational": "info",
+        "debug": "info",
+    }
+    return mapping.get(text, "info")
+
+
+def norm_category(value: Any) -> str:
+    """Normalize a category token onto the UES category set."""
+    text = str(value or "network").strip().lower()
+    return text if text in CATEGORIES else "network"
+
+
+# Back-compat aliases used by parsers written before the helpers moved here.
+_norm_severity = norm_severity
+_norm_category = norm_category
 
 
 def find_ip(text: str) -> Optional[str]:

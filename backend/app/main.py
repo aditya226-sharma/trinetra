@@ -254,16 +254,26 @@ def ingest(body: IngestRequest) -> Dict[str, Any]:
     if _ORCH is None:
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
-    accepted, failed = 0, 0
+    accepted, duplicates, ignored, failed = 0, 0, 0, 0
     for line in body.lines:
         try:
-            _ORCH.ingest(line.raw, line.source, line.client_id, line.host_hint)
-            accepted += 1
+            outcome = _ORCH.ingest(line.raw, line.source, line.client_id,
+                                   line.host_hint)
         except Exception as exc:  # noqa: BLE001
             failed += 1
             log.warning("ingest failed: %s", exc)
+            continue
+        if outcome == "stored":
+            accepted += 1
+        elif outcome == "duplicate":
+            duplicates += 1
+        elif outcome == "ignored":
+            ignored += 1
+        else:
+            failed += 1
     alerts = _ORCH.flush_batch()
-    return {"accepted": accepted, "failed": failed, "alerts": alerts,
+    return {"accepted": accepted, "failed": failed, "duplicates": duplicates,
+            "ignored": ignored, "alerts": alerts,
             "total": _ORCH.event_store.count()}
 
 
@@ -280,10 +290,19 @@ def _touches_targets(finding: Dict[str, Any]) -> str:
     return str(evidence.get("src") or alert.get("src") or "")
 # ------------------------------------------------------- static dashboard
 # In a bundled deployment (Docker image) the React build lives in
-# frontend/dist and is served directly from the API on "/". Register this
-# mount LAST so the explicit API routes above keep precedence.
+# frontend/dist and is served directly from the API. The catch-all below is
+# registered LAST so the explicit API routes keep precedence, and it falls
+# back to index.html for client-side routes (deep links / refresh / share).
 _DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 if _DIST.is_dir():
-    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
 
-    app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="dashboard")
+    _DIST_RESOLVED = str(_DIST.resolve())
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str) -> FileResponse:
+        target = (_DIST / full_path).resolve()
+        if (str(target).startswith(_DIST_RESOLVED) and target.is_file()
+                and target.name != "index.html"):
+            return FileResponse(target)
+        return FileResponse(_DIST / "index.html")

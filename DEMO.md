@@ -108,14 +108,17 @@ analyst brief:
 
 **Ingest** — a terminal-styled console: paste raw lines (or insert a sample),
 pick source format / client / host, and watch the normalize → dedup → modules →
-analyzer stages light up in a batch tracker. Any alerts in the batch fan out to
+analyzer stages light up in a batch tracker. The verdict panel reports honest
+accounting per batch — **accepted** · **duplicates** (identical lines deduped)
+· **failed** (blank/malformed input) — plus any alerts the batch fanned out to
 the Alerts page. The **Dashboard** refreshes itself every 10 s, and the
 **Events** page filters narrow the store live.
 
 ## 4 · Scoring
 
 - **Demo run** `--demo --json`: 232 events, 5 findings, 5 alerts, ~0.1 s wall.
-- **Tests**: `python -m pytest tests/ -q` → 33 passed (parsers, pipeline,
+- **Tests**: `python -m pytest tests/ -q` → 39 passed (parsers, pipeline,
+  network threat, VPN module, API round-trip + ingest accounting).
   modules A/B/C, analyzer, compliance, API).
 - **CI**: pytest + Vite build + Docker build all green on every push.
 
