@@ -58,15 +58,24 @@ CEF, `cloud-audit` JSON) with per-client event counts drawn from
 
 ![Events](screenshots/events.png)
 
-**Events** — full event explorer: regex search over IPs / messages / trace-ids,
-source-type and severity filters, and a detail panel with the lossless raw
-event trace-back (every event keeps its original log line).
+**Events** — full event explorer: regex search over IPs / messages / trace-ids
+(now also covering the parsed `fields` JSON, so `sshd` surfaces the auth
+events), source-type, **client** and **category** filters with a live filtered
+total, and a detail panel with the lossless raw event trace-back (every event
+keeps its original log line).
+
+![Alerts](screenshots/alerts.png)
+
+**Alerts** — a live (5 s auto-refresh) view of analyzer fan-out: every verdict
+from the pipeline with severity chips, verdict stats, and an expandable
+evidence panel per alert (the raw flows that triggered the finding).
 
 ![Graph](screenshots/graph.png)
 
 **Graph** — the Module C entity graph (`ip / user / proc / domain / threat`
 nodes, `comm / dns / auth / exec` edges). Red edges are flagged by module
-threats. 37 nodes / 220 edges for the demo story.
+threats. 37 nodes / 220 edges for the demo story. **Click any node** to inspect
+its connected edges and raw node data in a detail panel.
 
 ![Assets](screenshots/assets.png)
 
@@ -89,6 +98,15 @@ analyst brief:
 1. Isolate 10.10.1.50 and capture memory/network evidence.
 2. … 
 ```
+
+![Ingest](screenshots/ingest.png)
+
+**Ingest** — feed live logs into the pipeline right from the dashboard:
+pick a source format (syslog / CEF / JSON / CSV / netflow / windows), a
+reporting client, optionally a host hint, paste raw lines (or insert a sample),
+and watch them normalize → dedup → modules → analyzer in one round trip. Any
+alerts in the batch fan out to the Alerts page. The **Dashboard** refreshes
+itself every 10 s, and the **Events** page filters narrow the store live.
 
 ## 4 · Scoring
 

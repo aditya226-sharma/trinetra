@@ -54,6 +54,7 @@ class Orchestrator:
         self.stats = {"raw_lines": 0, "events": 0, "duplicates": 0, "findings": 0,
                       "alerts_sent": 0, "analyzer_calls": 0}
         self.findings_log: List[Dict] = []
+        self.alerts_log: List[Dict] = []
 
     # ------------------------------------------------------------------ run
     def ingest(self, raw: str, source: str = "", client_id: str = "",
@@ -109,6 +110,18 @@ class Orchestrator:
             findings_alerts = self.notifier.alert(finding)
             self.stats["alerts_sent"] += sum(
                 1 for r in findings_alerts if r.get("status") == "sent")
+            self.alerts_log.append({
+                "timestamp": finding.get("alert", {}).get("timestamp") or
+                             finding.get("timestamp") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "threat_class": finding["threat_class"],
+                "severity": finding.get("severity", "high"),
+                "confidence": round(float(confidence), 3),
+                "verdict": result.verdict,
+                "store_decision": result.store_decision,
+                "evidence": finding.get("alert", {}).get("evidence", {}),
+                "flows": (finding.get("alert", {}).get("flows") or
+                          finding.get("alert", {}).get("flow_id") or ""),
+            })
             alerts.append(f"[{finding.get('severity', 'high').upper()}] "
                           f"{finding['threat_class']} conf={confidence} "
                           f"verdict={result.verdict} ({result.store_decision})")

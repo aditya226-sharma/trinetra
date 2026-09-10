@@ -8,12 +8,21 @@ export default function DashboardPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getDashboard()
-      .then(setData)
-      .catch((e) => setError(e.message));
-    getClients()
-      .then((d) => setClients(d.clients || []))
-      .catch(() => {});
+    let alive = true;
+    const tick = () => {
+      getDashboard()
+        .then((d) => alive && setData(d))
+        .catch((e) => alive && setError(e.message));
+      getClients()
+        .then((d) => alive && setClients(d.clients || []))
+        .catch(() => {});
+    };
+    tick();
+    const id = setInterval(tick, 10000); // live refresh
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
   }, []);
 
   if (error) {

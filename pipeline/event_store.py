@@ -104,25 +104,40 @@ class EventStore:
                 "SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
         return _row_to_event(row)
 
-    def search(self, query: str = "", source_type: str = "", severity: str = "",
-               category: str = "", client_id: str = "", limit: int = 100,
-               offset: int = 0) -> List[Event]:
+    def _where(self, query: str = "", source_type: str = "", severity: str = "",
+               category: str = "", client_id: str = "") -> tuple[str, list]:
         clauses, params = [], []
         if query:
-            clauses.append("(message LIKE ? OR trace_id LIKE ? OR client_ip LIKE ?)")
-            params += [f"%{query}%"] * 3
+            clauses.append("(message LIKE ? OR trace_id LIKE ? OR client_ip LIKE ?"
+                           " OR fields_json LIKE ?)")
+            params += [f"%{query}%"] * 4
         for column, value in (("source_type", source_type), ("severity", severity),
                               ("category", category), ("client_id", client_id)):
             if value:
                 clauses.append(f"{column} = ?")
                 params.append(value)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        return where, params
+
+    def search(self, query: str = "", source_type: str = "", severity: str = "",
+               category: str = "", client_id: str = "", limit: int = 100,
+               offset: int = 0) -> List[Event]:
+        where, params = self._where(query, source_type, severity, category, client_id)
         sql = (f"SELECT * FROM events {where} ORDER BY timestamp DESC, event_id "
                f"LIMIT ? OFFSET ?")
         params += [limit, offset]
         with self._lock:
             rows = self._conn.execute(sql, params).fetchall()
         return [e for e in (_row_to_event(r) for r in rows) if e is not None]
+
+    def count_filtered(self, query: str = "", source_type: str = "",
+                       severity: str = "", category: str = "",
+                       client_id: str = "") -> int:
+        where, params = self._where(query, source_type, severity, category, client_id)
+        with self._lock:
+            row = self._conn.execute(
+                f"SELECT COUNT(*) AS c FROM events {where}", params).fetchone()
+        return int(row["c"])
 
     def count(self) -> int:
         with self._lock:

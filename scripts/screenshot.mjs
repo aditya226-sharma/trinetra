@@ -18,9 +18,11 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const pages = [
   ["dashboard", { to: "/", wait: 1800 }],
   ["events", { to: "/events", wait: 1800 }],
+  ["alerts", { to: "/alerts", wait: 1800 }],
   ["graph", { to: "/graph", wait: 2500 }],
   ["assets", { to: "/assets", wait: 1800 }],
   ["compliance", { to: "/compliance", wait: 1800 }],
+  ["ingest", { to: "/ingest", wait: 1800 }],
 ];
 
 const browser = await puppeteer.launch({

@@ -39,6 +39,11 @@ export async function getCompliance(assetId) {
   return data;
 }
 
+export async function getAlerts(limit = 100) {
+  const { data } = await api.get("/alerts", { params: { limit } });
+  return data;
+}
+
 export async function getNetworkThreats(limit = 100) {
   const { data } = await api.get("/network-threats", { params: { limit } });
   return data;
@@ -56,5 +61,10 @@ export async function searchEvents(params = {}) {
 
 export async function getEvent(id) {
   const { data } = await api.get(`/events/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export async function ingestLines(lines) {
+  const { data } = await api.post("/ingest", { lines });
   return data;
 }

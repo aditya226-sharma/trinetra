@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { searchEvents } from "../lib/api";
+import { searchEvents, getClients } from "../lib/api";
 import { SeverityBadge } from "../components/ui";
+
+const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
 
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -8,9 +10,18 @@ export default function EventsPage() {
   const [query, setQuery] = useState("");
   const [src, setSrc] = useState("");
   const [sev, setSev] = useState("");
+  const [cat, setCat] = useState("");
+  const [client, setClient] = useState("");
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    getClients()
+      .then((d) => setClients(d.clients || []))
+      .catch(() => {});
+  }, []);
 
   const run = async () => {
     setLoading(true);
@@ -20,6 +31,8 @@ export default function EventsPage() {
         query,
         source_type: src,
         severity: sev,
+        category: cat,
+        client_id: client,
         limit: 60,
       });
       setEvents(data.events);
@@ -65,6 +78,27 @@ export default function EventsPage() {
           <option value="">all severities</option>
           {["critical", "error", "warning", "info"].map((s) => (
             <option key={s}>{s}</option>
+          ))}
+        </select>
+        <select
+          value={cat}
+          onChange={(e) => setCat(e.target.value)}
+          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+        >
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c || "all categories"}</option>
+          ))}
+        </select>
+        <select
+          value={client}
+          onChange={(e) => setClient(e.target.value)}
+          className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+        >
+          <option value="">all clients</option>
+          {clients.map((c) => (
+            <option key={c.client_id} value={c.client_id}>
+              {c.client_id}
+            </option>
           ))}
         </select>
         <button

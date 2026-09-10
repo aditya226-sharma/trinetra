@@ -64,6 +64,7 @@ function useForceLayout(nodes, edges, width = 900, height = 560) {
 export default function GraphPage() {
   const [graph, setGraph] = useState(null);
   const [error, setError] = useState(null);
+  const [selected, setSelected] = useState(null);
   const svgRef = useRef(null);
   const [size, setSize] = useState({ w: 900, h: 560 });
 
@@ -129,15 +130,27 @@ export default function GraphPage() {
             })}
             {nodes.map((n) => {
               const p = pos[n.id] || { x: 10, y: 10 };
+              const isSel = selected === n.id;
               return (
-                <g key={n.id}>
-                  <circle cx={p.x} cy={p.y} r={n.kind === "threat" ? 11 : 7} fill={n.color} />
+                <g
+                  key={n.id}
+                  onClick={() => setSelected(n.id)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={n.kind === "threat" ? 11 : 7}
+                    fill={n.color}
+                    stroke={isSel ? "#f8fafc" : "none"}
+                    strokeWidth={isSel ? 2 : 0}
+                  />
                   <text
                     x={p.x}
                     y={p.y + (n.kind === "threat" ? -14 : -12)}
                     textAnchor="middle"
-                    fontSize={n.kind === "threat" ? 11 : 9}
-                    fill="#cbd5e1"
+                    fontSize={isSel ? 12 : n.kind === "threat" ? 11 : 9}
+                    fill={isSel ? "#f8fafc" : "#cbd5e1"}
                   >
                     {n.label && String(n.label).length > 16
                       ? String(n.label).slice(0, 15) + "…"
@@ -149,12 +162,62 @@ export default function GraphPage() {
           </svg>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          Red edges carry module-threat flags; node labels are IPs, users,
-          processes, domains and threat classes.
+          Click any node to inspect it. Red edges carry module-threat flags;
+          node labels are IPs, users, processes, domains and threat classes.
         </p>
       </Card>
+
+      {selectedNode() && (
+        <Card
+          title={`Node — ${selectedNode().label || selectedNode().id}`}
+          actions={
+            <div className="flex items-center gap-3">
+              <Legend color={selectedNode().color} label={selectedNode().kind} />
+              <button
+                onClick={() => setSelected(null)}
+                className="text-xs text-slate-500 hover:text-slate-300"
+              >
+                close ×
+              </button>
+            </div>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-xs uppercase text-slate-500">Connected edges</h3>
+              <div className="max-h-56 space-y-1 overflow-y-auto">
+                {(graph.edges || [])
+                  .filter((e) => e.source === selected || e.target === selected)
+                  .slice(0, 40)
+                  .map((e, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-slate-300">
+                        {e.source} → {e.target}
+                      </span>
+                      <span className={e.threat ? "text-red-400" : "text-slate-500"}>
+                        [{e.kind}]{e.flows ? ` ${e.flows} flows` : ""}
+                        {e.threat ? " · THREAT" : ""}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="mb-2 text-xs uppercase text-slate-500">Node</h3>
+              <pre className="max-h-56 overflow-y-auto rounded-lg bg-slate-950 p-3 text-[11px] text-slate-300">
+                {JSON.stringify(selectedNode(), null, 2)}
+              </pre>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
+
+  function selectedNode() {
+    if (!selected) return null;
+    return nodes.find((n) => n.id === selected) || null;
+  }
 }
 
 function Legend({ color, label }) {

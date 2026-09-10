@@ -197,6 +197,15 @@ def network_threats(limit: int = Query(50, le=500)) -> Dict[str, Any]:
             "count": len(_ORCH.findings_log)}
 
 
+@app.get("/api/alerts", tags=["alerts"])
+def alerts(limit: int = Query(50, le=500)) -> Dict[str, Any]:
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+    return {"alerts": _ORCH.alerts_log[-limit:][::-1],
+            "count": len(_ORCH.alerts_log),
+            "sent": _ORCH.stats.get("alerts_sent", 0)}
+
+
 @app.get("/api/clients", tags=["store"])
 def clients() -> Dict[str, Any]:
     if _ORCH is None:
@@ -215,7 +224,10 @@ def search_events(
     events = _ORCH.event_store.search(query=query, source_type=source_type,
                                       severity=severity, category=category,
                                       client_id=client_id, limit=limit, offset=offset)
-    return {"total": _ORCH.event_store.count(), "limit": limit, "offset": offset,
+    total = _ORCH.event_store.count_filtered(
+        query=query, source_type=source_type, severity=severity,
+        category=category, client_id=client_id)
+    return {"total": total, "limit": limit, "offset": offset,
             "events": [e.to_dict() for e in events]}
 
 

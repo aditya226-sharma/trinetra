@@ -119,6 +119,18 @@ def test_api_demo_round_trip():
         assert by_id["flow-sensor-1"]["source_type"] == "netflow"
         assert by_id["edge-fw-01"]["source_type"] == "cef"
 
+        alerts = client.get("/api/alerts").json()
+        assert alerts["count"] == 5
+        assert alerts["sent"] == 5
+        verdicts = {a["threat_class"]: a["verdict"] for a in alerts["alerts"]}
+        assert verdicts["c2_beaconing"] == "malicious"
+        assert verdicts["ddos"] == "malicious"
+        assert verdicts["dga_dns"] == "suspicious"
+
+        filtered = client.get("/api/events/search", params={"client_id": "web01"}).json()
+        assert filtered["total"] == 20
+        assert all(e["client_id"] == "web01" for e in filtered["events"])
+
         comp = client.get("/api/compliance/10.10.1.50")
         assert comp.status_code == 200
         assert comp.json()["controls"]

@@ -3,16 +3,20 @@ import { Link, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { bootstrapDemo, getHealth } from "./lib/api";
 import DashboardPage from "./pages/DashboardPage";
 import EventsPage from "./pages/EventsPage";
+import AlertsPage from "./pages/AlertsPage";
 import GraphPage from "./pages/GraphPage";
 import AssetsPage from "./pages/AssetsPage";
 import CompliancePage from "./pages/CompliancePage";
+import IngestPage from "./pages/IngestPage";
 
 const navItems = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/events", label: "Events" },
+  { to: "/alerts", label: "Alerts" },
   { to: "/graph", label: "Graph" },
   { to: "/assets", label: "Assets" },
   { to: "/compliance", label: "Compliance" },
+  { to: "/ingest", label: "Ingest" },
 ];
 
 export default function App() {
@@ -101,9 +105,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/graph" element={<GraphPage />} />
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/ingest" element={<IngestPage />} />
         </Routes>
       </main>
     </div>
