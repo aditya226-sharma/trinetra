@@ -112,6 +112,13 @@ def test_api_demo_round_trip():
         assets = client.get("/api/assets").json()["assets"]
         assert any(a["threatened"] for a in assets)
 
+        clients = client.get("/api/clients").json()["clients"]
+        assert len(clients) >= 7
+        by_id = {c["client_id"]: c for c in clients}
+        assert by_id["flow-sensor-1"]["events"] >= by_id["web01"]["events"]
+        assert by_id["flow-sensor-1"]["source_type"] == "netflow"
+        assert by_id["edge-fw-01"]["source_type"] == "cef"
+
         comp = client.get("/api/compliance/10.10.1.50")
         assert comp.status_code == 200
         assert comp.json()["controls"]

@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { getDashboard } from "../lib/api";
+import { getDashboard, getClients } from "../lib/api";
 import { StatCard, Card, SeverityBadge } from "../components/ui";
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
+  const [clients, setClients] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     getDashboard()
       .then(setData)
       .catch((e) => setError(e.message));
+    getClients()
+      .then((d) => setClients(d.clients || []))
+      .catch(() => {});
   }, []);
 
   if (error) {
@@ -81,6 +85,36 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+
+      <Card title="Clients & feeds">
+        {clients.length === 0 ? (
+          <p className="text-sm text-slate-500">No clients reporting yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {clients
+              .slice()
+              .sort((a, b) => b.events - a.events)
+              .map((c) => (
+                <div
+                  key={c.client_id}
+                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
+                >
+                  <div>
+                    <span className="font-mono text-sm text-slate-200">
+                      {c.client_id}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-500">
+                      {c.source_type} feed
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-400">
+                    {c.events} events
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+      </Card>
 
       <Card title="VPN / IPsec gateway assessment (Module B)">
         {vpn.length === 0 ? (

@@ -136,6 +136,23 @@ class EventStore:
             ).fetchall()
         return {str(r["k"]): int(r["c"]) for r in rows}
 
+    def clients(self) -> List[Dict[str, Any]]:
+        """Per-client summary: total events plus dominant source type."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT client_id, source_type, COUNT(*) AS c FROM events "
+                "GROUP BY client_id, source_type ORDER BY client_id, c DESC"
+            ).fetchall()
+        merged: Dict[str, Dict[str, Any]] = {}
+        for r in rows:
+            cid = str(r["client_id"])
+            # First row per client is its dominant source (c DESC ordering).
+            entry = merged.setdefault(
+                cid, {"client_id": cid, "events": 0,
+                      "source_type": str(r["source_type"])})
+            entry["events"] += int(r["c"])
+        return list(merged.values())
+
     def range_result(self, **kwargs: Any) -> Dict[str, Any]:
         limit = min(int(kwargs.pop("limit", 100)), 1000)
         offset = int(kwargs.pop("offset", 0))

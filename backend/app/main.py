@@ -201,8 +201,7 @@ def network_threats(limit: int = Query(50, le=500)) -> Dict[str, Any]:
 def clients() -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
-    return {"clients": [{"client_id": c, "events": n} for c, n in
-                        _ORCH.event_store.count_by("client_id").items()]}
+    return {"clients": _ORCH.event_store.clients()}
 
 
 @app.get("/api/events/search", tags=["store"])

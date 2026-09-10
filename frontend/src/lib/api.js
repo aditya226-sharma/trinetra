@@ -44,6 +44,11 @@ export async function getNetworkThreats(limit = 100) {
   return data;
 }
 
+export async function getClients() {
+  const { data } = await api.get("/clients");
+  return data;
+}
+
 export async function searchEvents(params = {}) {
   const { data } = await api.get("/events/search", { params });
   return data;

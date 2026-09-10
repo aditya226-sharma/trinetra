@@ -51,7 +51,10 @@ ALERT: [CRITICAL] data_exfiltration conf=0.67 verdict=malicious (quarantine)
 
 **Dashboard** — ingest (238 raw → 232 unique, 2.5 % dup), dedup rate, module
 findings, alert fan-out, and the entity graph summary with the 4 impacted
-assets.
+assets. A **Clients & feeds** card lists every reporting endpoint
+(`flow-sensor-1` netflow, `web01`/`vpn-gw-*`/`apache02` syslog, `edge-fw-01`
+CEF, `cloud-audit` JSON) with per-client event counts drawn from
+`GET /api/clients`.
 
 ![Events](screenshots/events.png)
 
