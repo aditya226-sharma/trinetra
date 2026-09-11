@@ -1,0 +1,58 @@
+name: Deploy GitHub Pages
+
+# Publishes the React dashboard to GitHub Pages
+# (https://aditya226-sharma.github.io/trinetra/) as an interactive static
+# preview. GitHub Pages cannot host the Python API, so the built app shows the
+# STATIC PREVIEW banner and links the live container (GHCR) for full data.
+# The 404.html copy gives the SPA client-side routing for deep links.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Build dashboard (sub-path base)
+        working-directory: frontend
+        env:
+          VITE_BASE: /trinetra/
+        run: npm run build
+      - name: SPA fallback for deep links (GitHub Pages has none)
+        working-directory: frontend
+        run: cp dist/index.html dist/404.html
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

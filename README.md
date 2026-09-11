@@ -102,6 +102,13 @@ Images are multi-arch (`linux/amd64`, `linux/arm64`). Semver tags (`vX.Y.Z`)
 are published whenever a `v*` tag is pushed. Bind-mount `/app/data` to keep
 events across container restarts.
 
+### Live preview (GitHub Pages)
+
+The dashboard also deploys as an interactive preview to
+**https://aditya226-sharma.github.io/trinetra/** on every `main` push. Pages
+can only host static files, so the UI shows a STATIC PREVIEW banner there —
+run the container above for the full live pipeline and data.
+
 ### CLI
 
 ```

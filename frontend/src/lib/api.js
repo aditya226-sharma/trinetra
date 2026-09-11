@@ -1,8 +1,11 @@
 import axios from "axios";
 
 // Requests go through the Vite dev proxy (/api -> FastAPI) so the browser
-// needs no CORS config in local dev either.
-const api = axios.create({ baseURL: "/api", timeout: 30000 });
+// needs no CORS config in local dev either. A build may point VITE_API_BASE
+// at a deployed FastAPI origin; the default "/api" keeps everything
+// same-origin for the Docker image.
+const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
+const api = axios.create({ baseURL: BASE, timeout: 30000 });
 
 export async function bootstrapDemo(reset = true) {
   const { data } = await api.post("/demo/run", null, { params: { reset } });

@@ -80,6 +80,7 @@ const TITLES = {
 
 export default function App() {
   const [ready, setReady] = useState(null);
+  const [apiOffline, setApiOffline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clock, setClock] = useState(new Date());
   const [health, setHealth] = useState(null);
@@ -93,7 +94,10 @@ export default function App() {
         setReady(h.demo_ready === true);
         setHealth(h);
       })
-      .catch(() => setReady(false));
+      .catch(() => {
+        setReady(false);
+        setApiOffline(true);
+      });
     return () => clearInterval(int);
   }, []);
 
@@ -176,7 +180,15 @@ export default function App() {
 
         <div className="mt-auto space-y-3 px-4 pb-5">
           <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-            {ready ? (
+            {apiOffline ? (
+              <div className="flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <div>
+                  <p className="text-[11px] font-medium text-amber-300">STATIC PREVIEW</p>
+                  <p className="text-[10px] text-slate-500">API not reachable from Pages</p>
+                </div>
+              </div>
+            ) : ready ? (
               <div className="flex items-center gap-2.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 pulse-dot" />
                 <div>
@@ -212,7 +224,7 @@ export default function App() {
               <div className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
                 <span className={`h-2 w-2 rounded-full ${health?.analyzer?.healthy ? "bg-emerald-400 pulse-dot" : "bg-amber-400 pulse-dot-red"}`} />
                 <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
-                  analyzer · {health?.analyzer?.configured_backend || "…"}
+                  {health ? `analyzer · ${health?.analyzer?.configured_backend || "…"}` : "api · offline"}
                 </span>
               </div>
               <div className="mono text-right">
@@ -228,6 +240,13 @@ export default function App() {
         </header>
 
         <main className="mx-auto w-full max-w-[1500px] flex-1 px-7 pb-14 pt-7">
+          {apiOffline && (
+            <div className="mb-5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3 text-[11px] leading-relaxed text-amber-200/90">
+              <span className="mono font-semibold tracking-widest text-amber-300">STATIC PREVIEW</span>
+              {" — the Python API lives in the container, so this page shows the UI shell. Run it live: "}
+              <code className="mono text-amber-100">docker run -p 8000:8000 ghcr.io/aditya226-sharma/trinetra:latest</code>
+            </div>
+          )}
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />
