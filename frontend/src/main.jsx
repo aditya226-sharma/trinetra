@@ -1,17 +1,21 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, HashRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
-// Vite's BASE_URL reflects the build `base` (e.g. "/trinetra/" on GitHub
-// Pages, "/" for local/Docker), so deep links resolve on sub-path deploys.
-const basename = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
+// Root builds (Docker, local dev, VITE_OFFLINE_DEMO off) use clean BrowserRouter
+// paths against the same-origin API. Sub-path deploys (GitHub Pages at
+// /trinetra/) switch to hash routing — Pages answers unknown document paths
+// with HTTP 404 even when serving 404.html, so path deep-links log a
+// "Failed to load resource: 404" every visit. Hash URLs never hit the server.
+const base = import.meta.env.BASE_URL || "/";
+const Router = base === "/" ? BrowserRouter : HashRouter;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter basename={basename}>
+    <Router>
       <App />
-    </BrowserRouter>
+    </Router>
   </React.StrictMode>,
 );

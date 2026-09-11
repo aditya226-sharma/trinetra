@@ -40,8 +40,10 @@ server.listen(PORT, async () => {
     defaultViewport: { width: 1440, height: 900 },
   });
 
-  const routes = ["/trinetra/", "/trinetra/events", "/trinetra/alerts", "/trinetra/graph",
-                  "/trinetra/assets", "/trinetra/compliance", "/trinetra/ingest"];
+  // Hash-routed (GitHub Pages): the document path is always /trinetra/ (200),
+  // the route lives in the fragment — no server round-trips, no 404 logs.
+  const routes = ["/trinetra/#/", "/trinetra/#/events", "/trinetra/#/alerts", "/trinetra/#/graph",
+                  "/trinetra/#/assets", "/trinetra/#/compliance", "/trinetra/#/ingest"];
   let failed = 0;
 
   for (const route of routes) {
@@ -63,7 +65,7 @@ server.listen(PORT, async () => {
 
   // interactions: event detail first (full list), then live search on preview
   const page = await browser.newPage();
-  await page.goto(`http://127.0.0.1:${PORT}/trinetra/events`, { waitUntil: "networkidle2", timeout: 30000 });
+  await page.goto(`http://127.0.0.1:${PORT}/trinetra/#/events`, { waitUntil: "networkidle2", timeout: 30000 });
   await sleep(1500);
   const rowExists = await page.evaluate(() => document.querySelector(".glass-row") !== null);
   await page.evaluate(() => document.querySelector(".glass-row")?.click());
