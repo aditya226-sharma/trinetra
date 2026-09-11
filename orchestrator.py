@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,9 +40,19 @@ _CATEGORY_BY_SOURCE = {
 
 
 def _parse_utc_ts(value: str) -> str:
-    """Normalize an ISO timestamp (offset-aware or Z) to UTC ``Z`` form."""
+    """Normalize an ISO timestamp (offset-aware or Z) to UTC ``Z`` form.
+
+    Also clamps "future" timestamps more than 12h ahead of the wall clock:
+    a macOS ``log`` database that runs ahead (e.g. after a clock rollback)
+    otherwise pollutes ``last_seen`` and the dashboard sort order with dates
+    weeks in the future.
+    """
     try:
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt > datetime.now(timezone.utc) + timedelta(hours=12):
+            return utc_now()
         return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     except (ValueError, AttributeError):
         return utc_now()

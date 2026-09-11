@@ -60,7 +60,18 @@ log = logging.getLogger("trinetra.api")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Seed the first admin account + start the retention prune loop."""
+    """Boot the shared orchestrator, seed the first admin account and start
+    the retention prune loop.
+
+    The orchestrator is initialized eagerly so reads (dashboard, clients,
+    events/search, health counts) reflect already-persisted data without a
+    demo/ingest bootstrap first.
+    """
+    global _ORCH, _GRAPH
+    if _ORCH is None:
+        _ORCH = Orchestrator(_settings)
+        _GRAPH = _ORCH.graph
+        _ORCH.stream = hub
     ensure_admin(_settings)
     start_retention_loop(_settings)
     yield
@@ -154,11 +165,12 @@ def run_demo(reset: bool = Query(False)) -> Dict[str, Any]:
 
 @app.get("/api/health", tags=["meta"])
 def health() -> Dict[str, Any]:
+    count = _ORCH.event_store.count() if _ORCH else 0
     return {
         "status": "ok",
-        "events_stored": _ORCH.event_store.count() if _ORCH else 0,
+        "events_stored": count,
         "analyzer": _ORCH.analyzer.status() if _ORCH else {"configured_backend": "heuristic"},
-        "demo_ready": _ORCH is not None,
+        "demo_ready": count > 0,
     }
 
 
@@ -457,10 +469,11 @@ def spa(full_path: str):
     target = (_DIST / full_path).resolve()
     if (str(target).startswith(_DIST_RESOLVED) and target.is_file()
             and target != _DIST / "index.html"):
-        return FileResponse(target)
+        return FileResponse(target,
+                            headers={"Cache-Control": "public, max-age=31536000, immutable"})
     index = _DIST / "index.html"
     if index.is_file():
-        return FileResponse(index)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
     return JSONResponse(
         {"detail": "frontend/dist not built yet — run `npm run build` in frontend/"},
         status_code=503,
