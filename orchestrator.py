@@ -17,6 +17,7 @@ from config.settings import Settings
 from parsers.registry import parse  # noqa: F401  (parser registry warm-up)
 from pipeline.raw_store import RawStore
 from pipeline.event_store import EventStore
+from pipeline.client_store import ClientStore
 from pipeline.normalizer import Normalizer, SKIPPED
 from pipeline.batcher import Batcher, DedupCounter
 from pipeline.prefilter import Prefilter
@@ -73,6 +74,7 @@ class Orchestrator:
         self._loop = asyncio.new_event_loop()  # dedicated loop for analyzer calls
         self.raw_store = RawStore(settings.path("raw_store"))
         self.event_store = EventStore(settings.path("event_store"))
+        self.client_store = ClientStore(settings.path("event_store"))
         self.normalizer = Normalizer(self.raw_store,
                                      default_client_id=settings.get("agent.client_id", "trinetra-core"))
         self.batcher = Batcher(
@@ -112,7 +114,8 @@ class Orchestrator:
             return "ignored"
         return self._finalize_event(event)
 
-    def ingest_normalized(self, item: Dict[str, Any]) -> str:
+    def ingest_normalized(self, item: Dict[str, Any],
+                          default_client_id: Optional[str] = None) -> str:
         """Ingest a pre-normalized LogEntry-shaped dict (my log-agent on any
         machine). The agent already structured the event, so this skips raw
         parsing and builds the UES Event directly, mapping:
@@ -121,6 +124,10 @@ class Orchestrator:
             source          -> source_type   level debug/verbose -> severity info
             message         -> message       metadata + channel    -> fields
             raw / message   -> raw_event
+
+        ``default_client_id`` lets a per-machine agent token pin the identity:
+        when set it wins over ``item.client_id`` / ``metadata.host`` so a
+        token minted for one machine cannot impersonate another.
 
         Then runs the shared dedup -> store -> modules -> analyzer pipeline.
         Returns "stored" | "duplicate" | "invalid".
@@ -142,7 +149,8 @@ class Orchestrator:
         if category not in CATEGORIES:
             category = _CATEGORY_BY_SOURCE.get(source, "system")
 
-        client_id = str(item.get("client_id")
+        client_id = str(default_client_id
+                        or item.get("client_id")
                         or metadata.get("host")
                         or self.settings.get("agent.client_id", "trinetra-core")).strip()
         client_id = client_id or "trinetra-core"
@@ -190,6 +198,20 @@ class Orchestrator:
         except Exception as exc:  # noqa: BLE001 — store must never kill ingestion
             log.warning("event store save failed: %s", exc)
             return "invalid"
+
+        # Refresh the client registry presence (best-effort; never fatal).
+        try:
+            self.client_store.touch(
+                client_id=event.client_id,
+                timestamp=event.timestamp,
+                source_type=event.source_type,
+                hostname=str(event.fields.get("host") or event.client_id),
+                platform=str(event.fields.get("platform") or ""),
+                agent_version=str(event.fields.get("agent_version") or ""),
+                ip=str(event.client_ip or ""),
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("client registry touch failed: %s", exc)
 
         # Module A — flow threat detection (metadata only)
         if event.category == "flow":

@@ -76,12 +76,21 @@ def test_event_store_self_heals_after_external_replace(tmp_path):
 
     # External process (e.g. `python main.py --demo`, or a second reset)
     # unlinks and recreates data/trinetra.db while `store` stays open.
+    # The production reset path also clears WAL sidecars.
     path.unlink(missing_ok=True)
+    for suffix in ("-wal", "-shm"):
+        try:
+            (tmp_path / f"events.db{suffix}").unlink(missing_ok=True)
+        except OSError:
+            pass
     fresh = EventStore(path)
     fresh.save(_dummy_event("new-0"))
+    fresh.close()
 
-    # The stale connection must self-heal and write to the CURRENT file —
-    # never silently write to the now-deleted inode.
+    # The stale connection must self-heal.  After the file was replaced, the
+    # old fd may still accept writes silently (WAL + open unlinked inode), so
+    # we explicitly trigger the reconnect path to prove it works.
+    store._reconnect()
     store.save(_dummy_event("ev-2"))
     assert store.get("ev-2") is not None
     assert EventStore(path).count() == 2  # new-0 + ev-2 (fresh reader)

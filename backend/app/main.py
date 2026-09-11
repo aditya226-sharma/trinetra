@@ -13,10 +13,14 @@ Serves the dashboard data model from the last demo/ingestion run:
     GET  /api/events/search       full-text search over the UES event store
     GET  /api/events/{event_id}   one UES event + raw trace (PS26156-d)
     GET  /api/events/stream       SSE live tail (requires bearer token)
-    GET  /api/clients             distinct clients in the store
+    GET  /api/clients             fleet registry (presence, volume, status)
+    GET  /api/agents              agent token inventory
+    POST /api/agents              mint a per-machine agent token (admin)
+    DELETE /api/agents/{token_id} revoke a per-machine agent token (admin)
     POST /api/ingest              ingest raw lines (multi-source, admin only)
     POST /api/ingest-events       ingest pre-normalized agent LogEntry dicts
-                                  (shared X-Agent-Token, rate-limited)
+                                  (X-Agent-Token, rate-limited)
+    POST /api/agent/heartbeat     agent liveness/identity ping (X-Agent-Token)
     POST /api/auth/login          dashboard login -> bearer token
     POST /api/auth/register       create users (admin only)
 
@@ -27,11 +31,13 @@ role ``admin``. Run:  uvicorn backend.app.main:app --reload
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -115,17 +121,47 @@ class IngestRequest(BaseModel):
     demo: bool = False
 
 
+class HeartbeatRequest(BaseModel):
+    """Liveness + identity ping from a running agent (X-Agent-Token)."""
+    client_id: str
+    hostname: str = ""
+    platform: str = ""
+    agent_version: str = ""
+    ip: str = ""
+
+
+class MintAgentRequest(BaseModel):
+    """Admin request to mint a per-machine agent token."""
+    label: str = ""
+    client_id: str = ""
+
+
 # ------------------------------------------------------------------ agent auth
 
 
-def _agent_token_ok(provided: Optional[str]) -> bool:
-    import hmac
+def _resolve_agent_token(provided: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Resolve an ``X-Agent-Token`` to an identity.
 
+    Priority: an admin-minted per-machine token (bound to a ``client_id``,
+    revocable), then the legacy shared ``AGENT_TOKEN``. Returns ``None`` when
+    neither matches so the endpoint stays disabled-by-default.
+    """
+    if not provided:
+        return None
+    if _ORCH is not None:
+        token_hash = hashlib.sha256(str(provided).encode("utf-8")).hexdigest()
+        tok = _ORCH.client_store.token_by_hash(token_hash)
+        if tok and tok["enabled"]:
+            return {"mode": "machine",
+                    "token_id": str(tok["token_id"]),
+                    "client_id": str(tok["client_id"]) if tok["client_id"] else None}
     expected = str(_settings.get("auth.agent_token") or os.environ.get("AGENT_TOKEN", "")).strip()
-    if not expected:
-        # No token configured: the endpoint stays disabled (defense in depth).
-        return False
-    return bool(provided) and hmac.compare_digest(str(provided), expected)
+    if expected:
+        import hmac
+
+        if hmac.compare_digest(str(provided), expected):
+            return {"mode": "shared", "token_id": None, "client_id": None}
+    return None
 
 
 def _rate_limit_ok(key: str) -> bool:
@@ -149,10 +185,11 @@ def run_demo(reset: bool = Query(False)) -> Dict[str, Any]:
     global _ORCH, _GRAPH
     if reset:
         for path in (_settings.path("raw_store"), _settings.path("event_store")):
-            try:
-                Path(path).unlink(missing_ok=True)
-            except OSError:
-                pass
+            for suffix in ("", "-wal", "-shm"):  # clear WAL sidecars too
+                try:
+                    Path(str(path) + suffix).unlink(missing_ok=True)
+                except OSError:
+                    pass
     _ORCH = Orchestrator(_settings)
     _GRAPH = _ORCH.graph
     from collectors.demo_feed import DemoFeed
@@ -286,9 +323,66 @@ def alerts(limit: int = Query(50, le=500)) -> Dict[str, Any]:
 
 @app.get("/api/clients", tags=["store"], dependencies=[Depends(require_auth)])
 def clients() -> Dict[str, Any]:
+    """Fleet registry: per-machine presence + event volume.
+
+    Merges the event-derived summaries (counts, dominant source, last event)
+    with the client registry (hostname, platform, agent version, IP, heartbeat)
+    and reports ``status`` online/offline from the configured grace window
+    plus events in the recent rate window.
+    """
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
-    return {"clients": _ORCH.event_store.clients()}
+    grace_s = int(_settings.get("events.client_online_grace_s", 180))
+    window_s = int(_settings.get("events.client_rate_window_s", 300))
+    now = datetime.now(timezone.utc)
+    grace_cutoff = (now - timedelta(seconds=grace_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    window_cutoff = (now - timedelta(seconds=window_s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    meta = {m["client_id"]: m for m in _ORCH.client_store.list_clients()}
+    recent = _ORCH.event_store.client_counts_since(window_cutoff)
+
+    # Union: registered clients (heartbeat-only agents included) + any client
+    # that only has events (e.g. shared-token agents not yet heartbeating).
+    merged: Dict[str, Dict[str, Any]] = {}
+    for entry in _ORCH.event_store.clients():
+        merged[entry["client_id"]] = {
+            "events": entry["events"], "source_type": entry["source_type"],
+            "event_last_seen": entry.get("last_seen") or ""}
+    for cid, m in meta.items():
+        row = merged.setdefault(cid, {"events": 0, "source_type": "",
+                                      "event_last_seen": ""})
+        row["meta"] = m
+
+    rows = []
+    for cid, entry in merged.items():
+        m = entry.get("meta", {})
+        last_seen = str(m.get("last_seen") or entry.get("event_last_seen") or "")
+        online = bool(last_seen) and last_seen >= grace_cutoff
+        source_type = entry.get("source_type") or (m.get("source_types") or [""])[0]
+        rows.append({
+            "client_id": cid,
+            "hostname": str(m.get("hostname") or cid),
+            "platform": str(m.get("platform") or ""),
+            "agent_version": str(m.get("agent_version") or ""),
+            "ip": str(m.get("ip") or ""),
+            "source_types": m.get("source_types") or ([source_type] if source_type else []),
+            "events": entry["events"],
+            "events_recent": recent.get(cid, 0),
+            "first_seen": str(m.get("first_seen") or ""),
+            "last_seen": last_seen,
+            "heartbeat_at": str(m.get("last_heartbeat") or ""),
+            "token_id": str(m.get("token_id") or "") or None,
+            "status": "online" if online else "offline",
+        })
+    rows.sort(key=lambda r: (r["status"] == "offline", -r["events_recent"]))
+    totals = {
+        "clients": len(rows),
+        "online": sum(1 for r in rows if r["status"] == "online"),
+        "offline": sum(1 for r in rows if r["status"] == "offline"),
+        "events": sum(r["events"] for r in rows),
+        "events_recent": sum(r["events_recent"] for r in rows),
+    }
+    return {"clients": rows, "totals": totals}
 
 
 @app.get("/api/events/search", tags=["store"], dependencies=[Depends(require_auth)])
@@ -390,12 +484,20 @@ def ingest_events(request: Request,
     """Accept pre-normalized LogEntry dicts from my log-agent.
 
     The body may be a bare array of event dicts (what the agent's HTTP
-    forwarder posts) or ``{"events": [...]}``. Guarded by the shared
-    ``X-Agent-Token`` (constant-time compare) plus a simple per-IP rate limit
-    and a body-size cap. Events map to UES and flow through the same
-    dedup / modules / analyzer pipeline as raw ingestion.
+    forwarder posts) or ``{"events": [...]}``. Guarded by an agent token
+    (per-machine or shared; constant-time compare) plus a simple per-IP rate
+    limit and a body-size cap. Events map to UES and flow through the same
+    dedup / modules / analyzer pipeline as raw ingestion. A per-machine token
+    pins ``client_id`` so one machine cannot impersonate another.
     """
-    if not _agent_token_ok(x_agent_token):
+    global _ORCH, _GRAPH
+    if _ORCH is None:
+        _ORCH = Orchestrator(_settings)
+        _GRAPH = _ORCH.graph
+        _ORCH.stream = hub
+
+    identity = _resolve_agent_token(x_agent_token)
+    if identity is None:
         raise HTTPException(status_code=401, detail="Invalid X-Agent-Token")
 
     if isinstance(payload, dict):
@@ -414,11 +516,19 @@ def ingest_events(request: Request,
     if not _rate_limit_ok(key):
         raise HTTPException(status_code=429, detail="Agent ingest rate limit exceeded")
 
-    global _ORCH, _GRAPH
-    if _ORCH is None:
-        _ORCH = Orchestrator(_settings)
-        _GRAPH = _ORCH.graph
-        _ORCH.stream = hub
+    # An unbound per-machine token gets pinned to the first client it speaks
+    # for; once bound, that identity is authoritative for all its events.
+    pinned_client = identity["client_id"]
+    if identity["mode"] == "machine" and not pinned_client:
+        first = next((i for i in events if isinstance(i, dict)
+                      and (i.get("client_id") or (i.get("metadata") or {}).get("host"))), None)
+        if first is not None:
+            metadata = first.get("metadata") or {}
+            pinned_client = str(first.get("client_id")
+                                or metadata.get("host")
+                                or _settings.get("agent.client_id", "trinetra-core")).strip()
+            if pinned_client:
+                _ORCH.client_store.bind_token(pinned_client, identity["token_id"])
 
     accepted, duplicates, failed = 0, 0, 0
     for item in events:
@@ -426,7 +536,8 @@ def ingest_events(request: Request,
             failed += 1
             continue
         try:
-            outcome = _ORCH.ingest_normalized(item)
+            outcome = _ORCH.ingest_normalized(item,
+                                              default_client_id=pinned_client)
         except Exception as exc:  # noqa: BLE001
             failed += 1
             log.warning("ingest-events failed: %s", exc)
@@ -440,6 +551,81 @@ def ingest_events(request: Request,
     alerts = _ORCH.flush_batch()
     return {"accepted": accepted, "failed": failed, "duplicates": duplicates,
             "alerts": alerts, "total": _ORCH.event_store.count()}
+
+
+@app.post("/api/agent/heartbeat", tags=["ingest"])
+def agent_heartbeat(request: Request, body: HeartbeatRequest,
+                    x_agent_token: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Agent liveness ping (mint: cURL from the onboarding wizard).
+
+    Authenticated like ingest-events (per-machine or shared token). Updates
+    the client registry presence/identity and — for a per-machine token that
+    has not yet been bound — binds it to the reported ``client_id`` (a bound
+    token's identity is authoritative).
+    """
+    global _ORCH, _GRAPH
+    if _ORCH is None:
+        _ORCH = Orchestrator(_settings)
+        _GRAPH = _ORCH.graph
+        _ORCH.stream = hub
+
+    identity = _resolve_agent_token(x_agent_token)
+    if identity is None:
+        raise HTTPException(status_code=401, detail="Invalid X-Agent-Token")
+
+    client_id = str(body.client_id or "").strip()
+    if identity["mode"] == "machine":
+        if identity["client_id"]:
+            client_id = identity["client_id"]
+        elif client_id:
+            _ORCH.client_store.bind_token(client_id, identity["token_id"])
+    if not client_id:
+        client_id = str(_settings.get("agent.client_id", "trinetra-core"))
+
+    _ORCH.client_store.heartbeat(
+        client_id=client_id,
+        hostname=str(body.hostname or body.client_id or ""),
+        platform=str(body.platform or ""),
+        agent_version=str(body.agent_version or ""),
+        ip=str(body.ip or (request.client.host if request.client else "")),
+    )
+    if identity["token_id"]:
+        _ORCH.client_store.note_token_used(identity["token_id"])
+    return {"status": "ok", "client_id": client_id,
+            "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
+# ------------------------------------------------------------------ agents
+
+
+@app.post("/api/agents", tags=["agents"], dependencies=[Depends(require_admin)])
+def mint_agent(body: MintAgentRequest) -> Dict[str, Any]:
+    """Mint a per-machine agent token (admin only). The raw token is returned
+    exactly once; only its sha256 is persisted. ``client_id`` may be pre-bound
+    or left for the agent's first heartbeat to bind."""
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+    token_id, token = _ORCH.client_store.mint_token(
+        label=str(body.label or ""), client_id=str(body.client_id or ""))
+    return {"token_id": token_id, "token": token,
+            "client_id": str(body.client_id or "") or None}
+
+
+@app.get("/api/agents", tags=["agents"], dependencies=[Depends(require_auth)])
+def list_agents() -> Dict[str, Any]:
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+    return {"agents": _ORCH.client_store.list_tokens()}
+
+
+@app.delete("/api/agents/{token_id}", tags=["agents"],
+            dependencies=[Depends(require_admin)])
+def revoke_agent(token_id: str) -> Dict[str, Any]:
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+    if not _ORCH.client_store.revoke_token(token_id):
+        raise HTTPException(status_code=404, detail="token not found")
+    return {"status": "revoked", "token_id": token_id}
 
 
 # ------------------------------------------------------------------- utils

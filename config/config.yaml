@@ -38,6 +38,8 @@ events:
   syslog_port: 0                # 0 disables the syslog UDP receiver (demo uses demo_feed)
   flow_replay_path: ""          # optional JSONL flow dataset to replay
   retention_days: 30            # prune events older than this; 0 = keep forever (1/7/30/90/365)
+  client_online_grace_s: 180    # clients with no heartbeat/event in this window show offline
+  client_rate_window_s: 300     # fleet "events_recent" volume window
 
 auth:
   agent_token: ""               # shared X-Agent-Token for POST /api/ingest-events (set AGENT_TOKEN in prod)

@@ -124,8 +124,8 @@ def test_api_demo_round_trip():
         assert len(clients) >= 7
         by_id = {c["client_id"]: c for c in clients}
         assert by_id["flow-sensor-1"]["events"] >= by_id["web01"]["events"]
-        assert by_id["flow-sensor-1"]["source_type"] == "netflow"
-        assert by_id["edge-fw-01"]["source_type"] == "cef"
+        assert by_id["flow-sensor-1"]["source_types"][0] == "netflow"
+        assert by_id["edge-fw-01"]["source_types"][0] == "cef"
         assert "last_seen" in by_id["web01"]
 
         alerts = client.get("/api/alerts", headers=headers).json()

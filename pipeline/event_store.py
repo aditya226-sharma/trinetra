@@ -38,6 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_events_ts      ON events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_events_sev     ON events(severity);
 CREATE INDEX IF NOT EXISTS idx_events_source  ON events(source_type);
 CREATE INDEX IF NOT EXISTS idx_events_client  ON events(client_id);
+CREATE INDEX IF NOT EXISTS idx_events_client_ts ON events(client_id, timestamp);
 """
 
 
@@ -59,7 +60,8 @@ def _row_to_event(row: Optional[sqlite3.Row]) -> Optional[Event]:
 
 
 class EventStore:
-    _STALE_MSGS = ("readonly database", "unable to open database file")
+    _STALE_MSGS = ("readonly database", "unable to open database file",
+                   "disk i/o error")
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -72,6 +74,8 @@ class EventStore:
         """Open the sqlite connection (assumes the caller holds ``_lock``)."""
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL").fetchone()
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
 
@@ -81,8 +85,9 @@ class EventStore:
         Triggers like ``demo_run(reset=True)`` or a second process unlinking
         ``data/trinetra.db`` while this store is open leave our connection
         pointing at a stale inode: reads then return old data and writes fail
-        with "attempt to write a readonly database". Reconnecting re-binds to
-        the current file. The caller must hold ``_lock``.
+        with "attempt to write a readonly database" or "disk I/O error".
+        Reconnecting re-binds to the current file.  The caller must hold
+        ``_lock``.
         """
         try:
             self._conn.close()
@@ -197,6 +202,17 @@ class EventStore:
                 ).fetchall()
             rows = self._staleness_retry(_do)
         return {str(r["k"]): int(r["c"]) for r in rows}
+
+    def client_counts_since(self, cutoff: str) -> Dict[str, int]:
+        """Events per client with ``timestamp >= cutoff`` (ISO UTC)."""
+        with self._lock:
+            def _do() -> List[sqlite3.Row]:
+                return self._conn.execute(
+                    "SELECT client_id AS cid, COUNT(*) AS c FROM events "
+                    "WHERE timestamp >= ? GROUP BY client_id",
+                    (cutoff,)).fetchall()
+            rows = self._staleness_retry(_do)
+        return {str(r["cid"]): int(r["c"]) for r in rows}
 
     def clients(self) -> List[Dict[str, Any]]:
         """Per-client summary: total events, dominant source type, last seen."""
