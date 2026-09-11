@@ -75,6 +75,33 @@ python -m uvicorn backend.app.main:app --port 8000
 docker compose up --build          # http://localhost:8000
 ```
 
+### Container deployment (GitHub Container Registry)
+
+Every push to `main` publishes the self-contained image to GHCR — the API and
+dashboard share one port, so a single `docker run` gives you the full product:
+
+```bash
+docker run --rm -d -p 8000:8000 \
+  -e TRINETRA_STORE_PATH=/app/data/trinetra.db \
+  -e TRINETRA_RAW_DIR=/app/data/raw \
+  --name trinetra \
+  ghcr.io/aditya226-sharma/trinetra:latest
+
+open http://localhost:8000        # then bootstrap once:
+curl -X POST "http://localhost:8000/api/demo/run?reset=true"
+```
+
+Or with compose against the published image:
+
+```bash
+docker pull ghcr.io/aditya226-sharma/trinetra:latest
+docker run --rm -p 8000:8000 ghcr.io/aditya226-sharma/trinetra:latest
+```
+
+Images are multi-arch (`linux/amd64`, `linux/arm64`). Semver tags (`vX.Y.Z`)
+are published whenever a `v*` tag is pushed. Bind-mount `/app/data` to keep
+events across container restarts.
+
 ### CLI
 
 ```

@@ -1,0 +1,14 @@
+# Keep the build context lean (everything regenerates inside the image).
+.git
+.gitignore
+.github
+data/
+frontend/node_modules
+frontend/dist
+screenshots/
+tests/
+*.pyc
+__pycache__
+.pytest_cache
+.venv
+.DS_Store
