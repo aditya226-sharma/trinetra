@@ -212,10 +212,15 @@ def test_stream_hub_publishes_to_subscribers():
 
     from backend.app.stream import hub
 
-    queue = asyncio.Queue()
-    hub.subscribe(queue)
-    hub.publish({"event_id": "evt-1", "message": "hello"})
-    item = queue.get_nowait()
-    hub.unsubscribe(queue)
-    assert "evt-1" in item
-    assert "hello" in item
+    async def scenario():
+        queue = asyncio.Queue()
+        hub.subscribe(queue, asyncio.get_running_loop())
+        try:
+            hub.publish({"event_id": "evt-1", "message": "hello"})
+            item = await asyncio.wait_for(queue.get(), timeout=1)
+            assert "evt-1" in item
+            assert "hello" in item
+        finally:
+            hub.unsubscribe(queue)
+
+    asyncio.run(scenario())

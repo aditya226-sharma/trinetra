@@ -72,6 +72,13 @@ async def lifespan(_app: FastAPI):
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
         _ORCH.stream = hub
+        # Rebuild the in-memory counters from persisted data so the dashboard
+        # reflects everything previously collected (they reset on restart).
+        _ORCH.stats["events"] = _ORCH.event_store.count()
+        try:
+            _ORCH.stats["raw_lines"] = len(_ORCH.raw_store)
+        except Exception:
+            pass
     ensure_admin(_settings)
     start_retention_loop(_settings)
     yield
@@ -310,7 +317,7 @@ async def events_stream(payload: Dict[str, Any] = Depends(require_token_query)):
 
     async def generator():
         queue: asyncio.Queue = asyncio.Queue(maxsize=200)
-        hub.subscribe(queue)
+        hub.subscribe(queue, asyncio.get_running_loop())
         try:
             yield ": connected\n\n"
             while True:
@@ -473,7 +480,7 @@ def spa(full_path: str):
                             headers={"Cache-Control": "public, max-age=31536000, immutable"})
     index = _DIST / "index.html"
     if index.is_file():
-        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
     return JSONResponse(
         {"detail": "frontend/dist not built yet — run `npm run build` in frontend/"},
         status_code=503,
