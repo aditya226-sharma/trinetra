@@ -186,11 +186,20 @@ def test_api_unknown_routes_return_json_not_spa_html():
             assert "html" not in resp.headers.get("content-type", ""), path
 
 
-def test_spa_serves_deep_links_and_static_assets():
+def test_spa_serves_deep_links_and_static_assets(tmp_path, monkeypatch):
     """The catch-all serves real frontend/dist files, falls back to
-    index.html for client-side deep links, and keeps explicit API routes."""
+    index.html for client-side deep links, and keeps explicit API routes.
+    (A minimal dist is created here because CI runs pytest before building
+    the frontend, so frontend/dist does not exist yet.)"""
     import backend.app.main as api_module
     from fastapi.testclient import TestClient
+
+    dist = tmp_path / "frontend" / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html><head></head><body>app</body></html>")
+    (dist / "assets" / "app.js").write_text("console.log('app')")
+    monkeypatch.setattr(api_module, "_DIST", dist)
+    monkeypatch.setattr(api_module, "_DIST_RESOLVED", str(dist.resolve()))
 
     client = TestClient(api_module.app)
     with client:
@@ -200,15 +209,10 @@ def test_spa_serves_deep_links_and_static_assets():
         resp = client.get("/events")
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/html")
-        # referenced bundle asset is served with the right content type
-        index_html = client.get("/").text
-        import re
-        m = re.search(r'(?:src|href)="(/assets/[^"]+)"', index_html)
-        if m:
-            asset_path = m.group(1).lstrip("/")
-            res = client.get("/" + asset_path)
-            assert res.status_code == 200, asset_path
-            assert "javascript" in res.headers["content-type"], asset_path
+        # bundle asset served with the right content type
+        res = client.get("/assets/app.js")
+        assert res.status_code == 200
+        assert "javascript" in res.headers["content-type"]
 
 
 def test_spa_missing_dist_returns_clear_503(monkeypatch):
