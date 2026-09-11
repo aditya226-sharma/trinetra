@@ -12,6 +12,7 @@ import CompliancePage from "./pages/CompliancePage";
 import IngestPage from "./pages/IngestPage";
 import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
+import OnboardingPage from "./pages/OnboardingPage";
 
 const ICONS = {
   Dashboard: (
@@ -93,6 +94,7 @@ const navItems = [
 const TITLES = {
   "/": "Security overview",
   "/clients": "Client fleet",
+  "/clients/onboard": "Onboarding",
   "/events": "Event triage",
   "/alerts": "Alert fan-out",
   "/graph": "Entity graph",
@@ -349,6 +351,7 @@ export default function App() {
           )}
           <Routes>
             <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/clients/onboard" element={<OnboardingPage />} />
             <Route path="/clients/:id" element={<LogConsolePage />} />
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />

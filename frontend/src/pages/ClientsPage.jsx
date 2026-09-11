@@ -75,6 +75,12 @@ export default function ClientsPage() {
         sub={`${totals.online ?? 0} online · ${totals.offline ?? 0} offline · ${totals.events ?? 0} total events`}
         actions={
           <div className="flex items-center gap-2">
+            <Link
+              to="/clients/onboard"
+              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition hover:bg-emerald-500/20"
+            >
+              + Onboard agent
+            </Link>
             <LiveBadgeInline online={totals.online ?? 0} total={totals.clients ?? 0} />
           </div>
         }
