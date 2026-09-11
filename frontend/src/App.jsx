@@ -10,6 +10,8 @@ import GraphPage from "./pages/GraphPage";
 import AssetsPage from "./pages/AssetsPage";
 import CompliancePage from "./pages/CompliancePage";
 import IngestPage from "./pages/IngestPage";
+import ClientsPage from "./pages/ClientsPage";
+import LogConsolePage from "./pages/LogConsolePage";
 
 const ICONS = {
   Dashboard: (
@@ -58,9 +60,27 @@ const ICONS = {
       <path d="M17 15v6M17 15l-2 2M17 15l2 2" strokeWidth="1.6" />
     </svg>
   ),
+  Clients: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="8" height="8" rx="1.5" />
+      <rect x="14" y="3" width="8" height="8" rx="1.5" />
+      <rect x="8" y="13" width="8" height="8" rx="1.5" />
+      <circle cx="6" cy="7" r="1" />
+      <circle cx="18" cy="7" r="1" />
+      <circle cx="12" cy="17" r="1" />
+    </svg>
+  ),
+  Logs: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M4 5h16M4 9h12M4 13h14M4 17h8" />
+      <circle cx="19" cy="17" r="3" strokeWidth="1.4" />
+      <path d="M17.5 15.5l1 1 1.5-1.5" strokeWidth="1.4" />
+    </svg>
+  ),
 };
 
 const navItems = [
+  { to: "/clients", label: "Clients" },
   { to: "/", label: "Dashboard", end: true },
   { to: "/events", label: "Events" },
   { to: "/alerts", label: "Alerts" },
@@ -72,6 +92,7 @@ const navItems = [
 
 const TITLES = {
   "/": "Security overview",
+  "/clients": "Client fleet",
   "/events": "Event triage",
   "/alerts": "Alert fan-out",
   "/graph": "Entity graph",
@@ -277,7 +298,9 @@ export default function App() {
         <header className="sticky top-0 z-30 border-b border-white/5 bg-[#05080f]/70 px-7 py-3 backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <p className="eyebrow">/{TITLES[location.pathname]?.toLowerCase().replace(/ /g, "-") || "console"}</p>
+              <p className="eyebrow">/{TITLES[location.pathname]
+                  || (location.pathname.startsWith("/clients/") ? "log console" : null)
+                  || "console"}</p>
             </div>
             <div className="flex items-center gap-5">
               {!isPreview && (
@@ -325,6 +348,8 @@ export default function App() {
             </div>
           )}
           <Routes>
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/clients/:id" element={<LogConsolePage />} />
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/alerts" element={<AlertsPage />} />

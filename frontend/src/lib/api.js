@@ -232,7 +232,7 @@ export function logoutUser() {
 // live event stream (SSE)
 // ------------------------------------------------------------------
 
-export function streamEvents({ onEvent, onError } = {}) {
+export function streamEvents({ onEvent, onError, clientFilter } = {}) {
   // Preview builds serve the frozen snapshot — nothing to stream.
   if (OFFLINE) return () => {};
   const token = getToken();
@@ -240,11 +240,32 @@ export function streamEvents({ onEvent, onError } = {}) {
   const es = new EventSource(url);
   es.onmessage = (ev) => {
     try {
-      onEvent?.(JSON.parse(ev.data));
+      const parsed = JSON.parse(ev.data);
+      if (clientFilter && parsed.client_id !== clientFilter) return;
+      onEvent?.(parsed);
     } catch {
       /* ignore non-JSON sse lines */
     }
   };
   es.onerror = () => onError?.();
   return () => es.close();
+}
+
+// ------------------------------------------------------------------
+// agents (per-machine tokens)
+// ------------------------------------------------------------------
+
+export async function getAgents() {
+  const { data } = await api.get("/agents");
+  return data;
+}
+
+export async function mintAgent(label = "", clientId = "") {
+  const { data } = await api.post("/agents", { label, client_id: clientId });
+  return data;
+}
+
+export async function revokeAgent(tokenId) {
+  const { data } = await api.delete(`/agents/${encodeURIComponent(tokenId)}`);
+  return data;
 }

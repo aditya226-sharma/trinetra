@@ -224,7 +224,7 @@ export default function DashboardPage() {
                   <div key={c.client_id} className="flex items-center gap-2 text-[12px]">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length], boxShadow: `0 0 8px ${DONUT_COLORS[i % DONUT_COLORS.length]}` }} />
                     <span className="mono truncate text-slate-300">{c.client_id}</span>
-                    <span className="text-[10px] text-slate-600">{c.source_type}</span>
+                    <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
                     <span className="ml-auto mono tabular-nums text-slate-500">{c.events}</span>
                   </div>
                 ))}
