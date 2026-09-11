@@ -57,9 +57,12 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    run(true);
+    // Live filtering: refresh whenever the search/filter inputs change
+    // (chips toggle above the table). Enter / SEARCH still run instantly.
+    const t = setTimeout(() => run(true), 250);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [query, src, sev, cat, client]);
 
   const filtersActive = Boolean(query || src || sev || cat || client);
 

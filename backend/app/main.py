@@ -250,7 +250,7 @@ def event_detail(event_id: str) -> Dict[str, Any]:
 
 @app.post("/api/ingest", tags=["ingest"])
 def ingest(body: IngestRequest) -> Dict[str, Any]:
-    global _ORCH
+    global _ORCH, _GRAPH
     if _ORCH is None:
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
@@ -293,16 +293,29 @@ def _touches_targets(finding: Dict[str, Any]) -> str:
 # frontend/dist and is served directly from the API. The catch-all below is
 # registered LAST so the explicit API routes keep precedence, and it falls
 # back to index.html for client-side routes (deep links / refresh / share).
+# It is registered unconditionally so a later `npm run build` is picked up
+# without an app restart, unknown /api/* paths get a JSON 404 (never the SPA
+# HTML), and a missing build yields a clear 503 instead of a 500.
+from fastapi.responses import FileResponse, JSONResponse
+
 _DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-if _DIST.is_dir():
-    from fastapi.responses import FileResponse
+_DIST_RESOLVED = str(_DIST.resolve())
 
-    _DIST_RESOLVED = str(_DIST.resolve())
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa(full_path: str) -> FileResponse:
-        target = (_DIST / full_path).resolve()
-        if (str(target).startswith(_DIST_RESOLVED) and target.is_file()
-                and target.name != "index.html"):
-            return FileResponse(target)
-        return FileResponse(_DIST / "index.html")
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa(full_path: str):
+    # Unknown API routes must stay machine-readable (JSON 404), not fall
+    # through to the dashboard HTML.
+    if full_path.startswith("api/") or full_path == "api":
+        return JSONResponse({"detail": "API route not found"}, status_code=404)
+    target = (_DIST / full_path).resolve()
+    if (str(target).startswith(_DIST_RESOLVED) and target.is_file()
+            and target != _DIST / "index.html"):
+        return FileResponse(target)
+    index = _DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    return JSONResponse(
+        {"detail": "frontend/dist not built yet — run `npm run build` in frontend/"},
+        status_code=503,
+    )

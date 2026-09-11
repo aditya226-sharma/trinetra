@@ -170,3 +170,91 @@ def test_api_ingest_reports_accepted_duplicates_failed():
         con.execute("DELETE FROM events WHERE client_id = 'ingest-probe'")
         con.commit()
         con.close()
+
+def test_api_unknown_routes_return_json_not_spa_html():
+    """Unknown /api/* paths must answer 404 JSON — never the dashboard HTML
+    (a silent HTML-on-200 response breaks axios callers)."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        for path in ("/api/nope", "/api/assets/9.9.9.9", "/api"):
+            resp = client.get(path)
+            assert resp.status_code == 404, path
+            assert resp.json().get("detail") == "API route not found", path
+            assert "html" not in resp.headers.get("content-type", ""), path
+
+
+def test_spa_serves_deep_links_and_static_assets():
+    """The catch-all serves real frontend/dist files, falls back to
+    index.html for client-side deep links, and keeps explicit API routes."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        # explicit API routes keep precedence
+        assert client.get("/api/health").status_code == 200
+        # deep link -> index.html
+        resp = client.get("/events")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/html")
+        # referenced bundle asset is served with the right content type
+        index_html = client.get("/").text
+        import re
+        m = re.search(r'(?:src|href)="(/assets/[^"]+)"', index_html)
+        if m:
+            asset_path = m.group(1).lstrip("/")
+            res = client.get("/" + asset_path)
+            assert res.status_code == 200, asset_path
+            assert "javascript" in res.headers["content-type"], asset_path
+
+
+def test_spa_missing_dist_returns_clear_503(monkeypatch):
+    """A long-running server whose frontend/dist disappears must answer a
+    readable 503 (build hint), not an opaque 500."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    missing = api_module.Path("/nonexistent/trinetra/frontend/dist")
+    monkeypatch.setattr(api_module, "_DIST", missing)
+    monkeypatch.setattr(api_module, "_DIST_RESOLVED", str(missing.resolve()))
+    client = TestClient(api_module.app)
+    with client:
+        resp = client.get("/deep/link/route")
+        assert resp.status_code == 503
+        assert "not built" in resp.json().get("detail", "")
+        assert "html" not in resp.headers.get("content-type", ""), resp.headers.get("content-type")
+
+
+def test_ingest_bootstraps_graph_when_first_call():
+    """POST /api/ingest must bootstrap BOTH globals (orchestrator + graph) —
+    a previous local-variable shadowing left the module `_GRAPH` None, so
+    /api/graph answered 428 even though events had been ingested."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    prev_orch, prev_graph = api_module._ORCH, api_module._GRAPH
+    api_module._ORCH = None
+    api_module._GRAPH = None
+    try:
+        client = TestClient(api_module.app)
+        with client:
+            resp = client.post("/api/ingest", json={"lines": [
+                {"raw": "Sep 12 09:00:00,192.0.2.9,10.10.1.99,tcp,40000,443,3,1500,S",
+                 "source": "csv", "client_id": "ingest-first-call"},
+            ]})
+            assert resp.status_code == 200, resp.text
+            # graph must now be live (was masked by the shadowing bug)
+            graph = client.get("/api/graph")
+            assert graph.status_code == 200, graph.text
+            assert api_module._GRAPH is not None
+            # tidy up: leave the demo store exactly as it was
+            import sqlite3
+            con = sqlite3.connect(str(api_module._settings.path("event_store")))
+            con.execute("DELETE FROM events WHERE client_id = 'ingest-first-call'")
+            con.commit()
+            con.close()
+    finally:
+        api_module._ORCH, api_module._GRAPH = prev_orch, prev_graph
