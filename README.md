@@ -84,11 +84,15 @@ dashboard share one port, so a single `docker run` gives you the full product:
 docker run --rm -d -p 8000:8000 \
   -e TRINETRA_STORE_PATH=/app/data/trinetra.db \
   -e TRINETRA_RAW_DIR=/app/data/raw \
+  -e AGENT_TOKEN=change-me \
+  -e ADMIN_USER=admin \
+  -e ADMIN_PASSWORD=change-me \
+  -e TRINETRA_RETENTION_DAYS=30 \
   --name trinetra \
   ghcr.io/aditya226-sharma/trinetra:latest
 
-open http://localhost:8000        # then bootstrap once:
-curl -X POST "http://localhost:8000/api/demo/run?reset=true"
+open http://localhost:8000        # log in with ADMIN_USER / ADMIN_PASSWORD,
+                                  # then run the demo story from the UI (admin)
 ```
 
 Or with compose against the published image:
@@ -113,6 +117,54 @@ demo corpus (exported with `scripts/export_snapshot.py`, wired via
 and drill-downs behave exactly like the live product (a small amber
 `PREVIEW DATA` badge indicates bundled data). Run the container for the live
 pipeline against fresh/ingested data:
+
+### Central log forwarding (log-agent → dashboard)
+
+Point the [log-agent](https://github.com/aditya226-sharma/log-agent) at a Trinetra
+instance to turn it into a live, cross-machine log browser. Agents on any host
+(LAN or internet) forward normalized events to `/api/ingest-events` and show up
+as per-machine chips on the dashboard's Events page.
+
+Authentication model:
+
+- Dashboard access requires **login**; the first admin is seeded from the
+  `ADMIN_USER` / `ADMIN_PASSWORD` env vars (default `admin`/`admin`). Admins can
+  create additional users via the UI (Settings) or `POST /api/auth/register`.
+- Agents authenticate with a shared **`X-Agent-Token`**, deliberately
+  independent of dashboard sessions (machines log in with the token, humans with
+  accounts). The SSE live tail accepts it via `?token=` because `EventSource`
+  can't set headers.
+
+```bash
+# 1) VPS / container env (reverse-proxied at https://logs.example.com)
+AGENT_TOKEN=<long-random-shared-secret>   # shared with every agent
+ADMIN_USER=admin
+ADMIN_PASSWORD=<strong-password>
+TRINETRA_RETENTION_DAYS=30                # 1|7|30|90|365|0 (=forever)
+
+# 2) docker-compose on the box:
+#    docker compose up -d --build   → http://127.0.0.1:8000 behind a proxy
+
+# 3) reverse proxy + TLS (Caddy):
+#    logs.example.com {
+#        reverse_proxy 127.0.0.1:8000
+#    }
+#    Nginx: proxy_pass http://127.0.0.1:8000; plus
+#    proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";
+#    for SSE. Keep TRINETRA_STORE_PATH / TRINETRA_RAW_DIR on a persistent volume.
+
+# 4) agent config.yaml on each machine (see log-agent README):
+#    output:
+#      type: http
+#      url: https://logs.example.com/api/ingest-events
+#      auth_token: "<same AGENT_TOKEN>"
+#    agent:
+#      hostname_override: "mac-mini"   # optional dashboard client chip
+```
+
+Events arriving from agents keep their source/host/channel metadata, map to the
+same UES schema as demo/file/syslog ingestion, and flow through dedup, modules,
+the analyzer and the SSE live tail exactly like everything else.
 
 ### CLI
 
@@ -150,15 +202,23 @@ ALERT: [CRITICAL] data_exfiltration conf=0.67 verdict=malicious (quarantine)
 | route | purpose |
 |---|---|
 | `GET /api/health` | store count, configured analyzer backend |
-| `POST /api/demo/run?reset=` | bootstrap the demo story, returns full results |
+| `POST /api/auth/login` · `GET /api/auth/me` | dashboard login + session check |
+| `POST /api/auth/register` | create a viewer account (admin-only) |
+| `POST /api/demo/run?reset=` | bootstrap the demo story, returns full results (admin) |
 | `GET /api/dashboard` | aggregated stats + graph + latest findings |
 | `GET /api/graph` | full entity graph payload for the SVG view |
 | `GET /api/assets` · `GET /api/assets/{ip}/relations` | impacted asset list + drill-down |
 | `GET /api/compliance` · `GET /api/compliance/{asset}` | CIS/NIST/ATT&CK mapping + markdown brief |
 | `GET /api/network-threats` | current Module A findings |
-| `GET /api/clients` | distinct client ids |
+| `GET /api/clients` | distinct client ids (each agent host shows live here) |
 | `GET /api/events/search?query=` · `GET /api/events/{id}` | event explorer with raw trace-back |
+| `GET /api/events/stream?token=&client_id=` | SSE live tail for the dashboard |
+| `POST /api/ingest-events` | agent/flocker intake (`X-Agent-Token`; array or `{events:[...]}`) |
 | `POST /api/ingest` | normalize + analyze arbitrary lines (`{source, host, lines[]}`) |
+
+All routes above the `POST /api/ingest` row require a valid bearer token
+(dashboard pages send it automatically); `POST /api/ingest` and
+`POST /api/demo/run` additionally require the `admin` role.
 
 ## Configuration
 
@@ -178,6 +238,10 @@ Environment variables:
 | `TRINETRA_LOCAL_LLM_URL` | OpenAI-compatible base URL for the `local` backend |
 | `TRINETRA_LLM_BACKEND` | overrides `llm.backend` (used in docker-compose) |
 | `TRINETRA_STORE_PATH` / `TRINETRA_RAW_DIR` | containerized store locations |
+| `AGENT_TOKEN` | shared `X-Agent-Token` accepted by `/api/ingest-events` + `/api/events/stream`; no ingestion from agents until set |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | first admin account (seeded on start if none exists) |
+| `TRINETRA_RETENTION_DAYS` | event retention (1/7/30/90/365/0); background pruning on start |
+| `TRINETRA_JWT_SECRET` | override the persisted HMAC signing secret (omit to auto-generate) |
 
 ## Repository layout
 

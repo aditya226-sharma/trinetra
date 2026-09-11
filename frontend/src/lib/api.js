@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getToken, setToken } from "./auth";
 
 // Requests go through the Vite dev proxy (/api -> FastAPI) so the browser
 // needs no CORS config in local dev either. A build may point VITE_API_BASE
@@ -6,6 +7,26 @@ import axios from "axios";
 // same-origin for the Docker image.
 const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
 const api = axios.create({ baseURL: BASE, timeout: 30000 });
+
+// Attach the dashboard bearer token to every request.
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// A 401 anywhere (except the login call itself) means the session expired.
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const url = String(err?.config?.url || "");
+    if (err?.response?.status === 401 && !OFFLINE && !url.includes("/auth/login")) {
+      setToken(null);
+      window.dispatchEvent(new Event("trinetra:unauthorized"));
+    }
+    return Promise.reject(err);
+  }
+);
 
 // ---------------------------------------------------------------------------
 // GitHub Pages preview mode: the Python backend cannot run there, so the
@@ -180,3 +201,50 @@ export async function ingestLines(lines) {
 
 // Export whether this build runs in preview mode (used for UI chrome).
 export const isPreview = OFFLINE;
+
+// ------------------------------------------------------------------
+// auth
+// ------------------------------------------------------------------
+
+export async function loginUser(username, password) {
+  const { data } = await api.post("/auth/login", { username, password });
+  setToken(data.access_token);
+  return data;
+}
+
+export async function authMe() {
+  if (OFFLINE) return { username: "preview", role: "viewer" };
+  const { data } = await api.get("/auth/me");
+  return data;
+}
+
+export async function registerUser(username, password, role = "viewer") {
+  if (OFFLINE) return { username, role };
+  const { data } = await api.post("/auth/register", { username, password, role });
+  return data;
+}
+
+export function logoutUser() {
+  setToken(null);
+}
+
+// ------------------------------------------------------------------
+// live event stream (SSE)
+// ------------------------------------------------------------------
+
+export function streamEvents({ onEvent, onError } = {}) {
+  // Preview builds serve the frozen snapshot — nothing to stream.
+  if (OFFLINE) return () => {};
+  const token = getToken();
+  const url = `${BASE}/events/stream${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  const es = new EventSource(url);
+  es.onmessage = (ev) => {
+    try {
+      onEvent?.(JSON.parse(ev.data));
+    } catch {
+      /* ignore non-JSON sse lines */
+    }
+  };
+  es.onerror = () => onError?.();
+  return () => es.close();
+}

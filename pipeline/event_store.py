@@ -199,11 +199,12 @@ class EventStore:
         return {str(r["k"]): int(r["c"]) for r in rows}
 
     def clients(self) -> List[Dict[str, Any]]:
-        """Per-client summary: total events plus dominant source type."""
+        """Per-client summary: total events, dominant source type, last seen."""
         with self._lock:
             def _do() -> List[sqlite3.Row]:
                 return self._conn.execute(
-                    "SELECT client_id, source_type, COUNT(*) AS c FROM events "
+                    "SELECT client_id, source_type, COUNT(*) AS c, "
+                    "MAX(timestamp) AS last_seen FROM events "
                     "GROUP BY client_id, source_type ORDER BY client_id, c DESC"
                 ).fetchall()
             rows = self._staleness_retry(_do)
@@ -213,9 +214,22 @@ class EventStore:
             # First row per client is its dominant source (c DESC ordering).
             entry = merged.setdefault(
                 cid, {"client_id": cid, "events": 0,
-                      "source_type": str(r["source_type"])})
+                      "source_type": str(r["source_type"]),
+                      "last_seen": str(r["last_seen"] or "")})
             entry["events"] += int(r["c"])
+            if str(r["last_seen"] or "") > str(entry["last_seen"] or ""):
+                entry["last_seen"] = str(r["last_seen"])
         return list(merged.values())
+
+    def prune_before(self, cutoff: str) -> int:
+        """Delete events with ``timestamp < cutoff`` (ISO UTC). Returns count."""
+        with self._lock:
+            def _do() -> int:
+                cur = self._conn.execute(
+                    "DELETE FROM events WHERE timestamp < ?", (cutoff,))
+                self._conn.commit()
+                return cur.rowcount
+            return self._staleness_retry(_do)
 
     def range_result(self, **kwargs: Any) -> Dict[str, Any]:
         limit = min(int(kwargs.pop("limit", 100)), 1000)

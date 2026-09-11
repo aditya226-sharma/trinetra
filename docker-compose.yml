@@ -12,6 +12,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       TRINETRA_STORE_PATH: /app/data/trinetra.db
       TRINETRA_RAW_DIR: /app/data/raw
+      AGENT_TOKEN: ${AGENT_TOKEN:-}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TRINETRA_RETENTION_DAYS: ${TRINETRA_RETENTION_DAYS:-30}
     volumes:
       - trinetra-data:/app/data
     healthcheck:

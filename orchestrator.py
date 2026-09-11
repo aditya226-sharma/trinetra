@@ -9,8 +9,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from config.settings import Settings
 from parsers.registry import parse  # noqa: F401  (parser registry warm-up)
@@ -23,8 +24,35 @@ from modules.network_threat import ThreatDetector
 from modules.entity_graph import EntityGraph
 from analyzer.llm_analyzer import LLMAnalyzer, build_analyzer
 from alerting.notifier import Notifier
+from schema import (CATEGORIES, SEVERITY_LEVELS, Event, make_trace_id,
+                    new_uuid, utc_now)
 
 log = logging.getLogger("trinetra")
+
+_CATEGORY_BY_SOURCE = {
+    "windows_event_log": "system",
+    "macos_unified_log": "system",
+    "macos_system_log": "system",
+    "file_log": "application",
+    "syslog": "system",
+    "agent": "system",
+}
+
+
+def _parse_utc_ts(value: str) -> str:
+    """Normalize an ISO timestamp (offset-aware or Z) to UTC ``Z`` form."""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, AttributeError):
+        return utc_now()
+
+
+def _slug_source(value: str) -> str:
+    """UES source_type: lowercase [a-z0-9_], never empty."""
+    import re
+
+    return re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_") or "agent"
 
 
 class Orchestrator:
@@ -72,6 +100,75 @@ class Orchestrator:
             return "invalid"
         if event is SKIPPED:
             return "ignored"
+        return self._finalize_event(event)
+
+    def ingest_normalized(self, item: Dict[str, Any]) -> str:
+        """Ingest a pre-normalized LogEntry-shaped dict (my log-agent on any
+        machine). The agent already structured the event, so this skips raw
+        parsing and builds the UES Event directly, mapping:
+
+            metadata.host   -> client_id     timestamp (offset-aware) -> UTC Z
+            source          -> source_type   level debug/verbose -> severity info
+            message         -> message       metadata + channel    -> fields
+            raw / message   -> raw_event
+
+        Then runs the shared dedup -> store -> modules -> analyzer pipeline.
+        Returns "stored" | "duplicate" | "invalid".
+        """
+        if not isinstance(item, dict) or not str(item.get("message") or "").strip():
+            return "invalid"
+
+        metadata = item.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        source = _slug_source(str(item.get("source") or "agent"))
+        level = str(item.get("level") or "info").lower()
+        severity = {"debug": "info", "verbose": "info"}.get(level, level)
+        if severity not in SEVERITY_LEVELS:
+            severity = "info"
+
+        category = str(item.get("category") or "").lower()
+        if category not in CATEGORIES:
+            category = _CATEGORY_BY_SOURCE.get(source, "system")
+
+        client_id = str(item.get("client_id")
+                        or metadata.get("host")
+                        or self.settings.get("agent.client_id", "trinetra-core")).strip()
+        client_id = client_id or "trinetra-core"
+
+        raw_event = str(item.get("raw") or item.get("message") or "")
+        event = Event(
+            event_id=str(item.get("event_id") or new_uuid()),
+            timestamp=_parse_utc_ts(str(item.get("timestamp") or "")),
+            source_type=source,
+            client_id=client_id,
+            client_ip=str(metadata.get("client_ip") or ""),
+            category=category,
+            severity=severity,
+            message=str(item.get("message") or ""),
+            raw_event=raw_event,
+            trace_id=make_trace_id(client_id, source, raw_event),
+            fields=dict(metadata),
+        )
+        if item.get("channel"):
+            event.fields.setdefault("channel", str(item["channel"]))
+        if item.get("client_id") and "host" not in event.fields:
+            event.fields["host"] = item.get("client_id")
+        if raw_event:
+            try:
+                self.raw_store.append(event.trace_id, event.client_id,
+                                      event.source_type, raw_event)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("raw store append failed: %s", exc)
+        return self._finalize_event(event)
+
+    def _finalize_event(self, event: Event) -> str:
+        """Dedup -> annotate stats -> persist -> modules -> analyzer.
+
+        Shared by the raw-line ingest path and the normalized agent path so
+        both routes behave identically downstream.
+        """
         if not self.dedup.track(event):
             self.stats["duplicates"] += 1
             return "duplicate"
@@ -91,6 +188,14 @@ class Orchestrator:
         self.graph.add_event(event)
         if event.category != "flow":
             self.graph.add_auth(event)
+
+        # Stream live to dashboard SSE subscribers (optional, set by main).
+        sink = getattr(self, "stream", None)
+        if sink is not None:
+            try:
+                sink.publish(event.to_dict())
+            except Exception as exc:  # noqa: BLE001
+                log.warning("stream publish failed: %s", exc)
 
         # Analyzer gate + backend (flow/vpn pass only when modules found)
         findings: List[Dict] = []

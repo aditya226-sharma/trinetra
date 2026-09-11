@@ -37,6 +37,14 @@ events:
   file_sources: []              # paths of files the file_tailer should tail
   syslog_port: 0                # 0 disables the syslog UDP receiver (demo uses demo_feed)
   flow_replay_path: ""          # optional JSONL flow dataset to replay
+  retention_days: 30            # prune events older than this; 0 = keep forever (1/7/30/90/365)
+
+auth:
+  agent_token: ""               # shared X-Agent-Token for POST /api/ingest-events (set AGENT_TOKEN in prod)
+  admin_user: ""                # seed admin account (env ADMIN_USER)
+  admin_password: ""            # seed admin password (env ADMIN_PASSWORD); defaults to admin/admin
+  jwt_secret: ""                # leave empty -> persisted random secret next to the event store
+  jwt_expiry_hours: 12
 
 output:
   console: true

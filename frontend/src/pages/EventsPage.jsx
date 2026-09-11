@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { searchEvents, getClients } from "../lib/api";
+import React, { useEffect, useRef, useState } from "react";
+import { searchEvents, getClients, streamEvents } from "../lib/api";
 import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
-const SOURCES = ["", "netflow", "syslog", "json", "cef", "csv", "windows"];
+// Live agent sources (my log-agent collectors) are shown alongside the demo ones.
+const SOURCES = ["", "netflow", "syslog", "json", "cef", "csv", "windows",
+                 "windows_event_log", "macos_unified_log", "macos_system_log", "file_log"];
 const SEV = ["", "critical", "error", "warning", "info"];
 
 const CAT_GLYPH = {
@@ -27,6 +29,44 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
+
+  // Live tail via the SSE /api/events/stream endpoint.
+  const [live, setLive] = useState(false);
+  const [liveActive, setLiveActive] = useState(false);
+  const [liveCount, setLiveCount] = useState(0);
+  const closeStream = useRef(() => {});
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
+  const stopLive = () => {
+    closeStream.current?.();
+    closeStream.current = () => {};
+    setLiveActive(false);
+  };
+
+  const toggleLive = () => {
+    if (live) {
+      stopLive();
+      setLive(false);
+      return;
+    }
+    setLive(true);
+    closeStream.current = streamEvents({
+      onEvent: (ev) => {
+        setLiveCount((n) => n + 1);
+        // Prepend only matching the active filters when live is on.
+        const matches = runFiltersMatch(ev, { query, src, sev, cat, client });
+        if (matches) {
+          setEvents((list) => [ev, ...list.filter((e) => e.event_id !== ev.event_id)]);
+          setTotal((t) => t + 1);
+        }
+      },
+      onError: () => setLiveActive(false),
+    });
+    setLiveActive(true);
+  };
+
+  useEffect(() => stopLive, []);
 
   useEffect(() => {
     getClients()
@@ -71,9 +111,44 @@ export default function EventsPage() {
       <PageHeader
         eyebrow="Forensics · Event store"
         title="Event triage"
-        sub="Search the normalized corpus — free-text over IPs, process names, messages and trace-ids, narrowed by source, client and category."
-        actions={<LiveBadge text={`${total} matched`} />}
+        sub="Search the normalized corpus — free-text over IPs, process names, messages and trace-ids, narrowed by source, client and category. Toggle LIVE to watch new events from your agents as they land."
+        actions={
+          <div className="flex items-center gap-3">
+            <LiveBadge text={`${total} matched`} />
+            <button
+              onClick={toggleLive}
+              className={`chip ${live ? "chip-on" : ""}`}
+              style={live ? { borderColor: "rgba(52,211,153,0.6)", color: "#6ee7b7" } : undefined}
+            >
+              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${liveActive ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+              {liveActive ? `LIVE · ${liveCount} new` : "LIVE TAIL"}
+            </button>
+          </div>
+        }
       />
+
+      {/* systems: every agent / client currently in the store */}
+      {clients.length > 0 && (
+        <div className="glass p-3">
+          <p className="eyebrow px-1 pb-2">Systems reporting</p>
+          <div className="flex flex-wrap gap-2">
+            {clients.map((c) => (
+              <button
+                key={c.client_id}
+                onClick={() => setClient(client === c.client_id ? "" : c.client_id)}
+                className={`chip ${client === c.client_id ? "chip-on" : ""}`}
+                title={`${c.source_type} · ${c.events} events`}
+              >
+                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className="mono">{c.client_id}</span>
+                <span className="ml-1.5 text-[10px] text-slate-500">
+                  {c.last_seen ? fmtAgo(c.last_seen) : `${c.events} evt`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* search console */}
       <div className="glass p-4 anim-fadeup">
@@ -228,6 +303,36 @@ const stripCls = (sev) => {
   const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
   return m[sev] || "sev-info";
 };
+
+// Mirrors the backend /api/events/search matching so live SSE events respect
+// the currently active filters.
+function runFiltersMatch(ev, { query = "", src = "", sev = "", cat = "", client = "" } = {}) {
+  if (query) {
+    const q = query.toLowerCase();
+    const hay = [
+      ev.message || "",
+      ev.client_ip || "",
+      ev.trace_id || "",
+      JSON.stringify(ev.fields || {}),
+    ].join(" ").toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (src && ev.source_type !== src) return false;
+  if (sev && ev.severity !== sev) return false;
+  if (cat && ev.category !== cat) return false;
+  if (client && ev.client_id !== client) return false;
+  return true;
+}
+
+function fmtAgo(iso) {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  const delta = Math.max(0, Math.round((Date.now() - then.getTime()) / 1000));
+  if (delta < 60) return "just now";
+  if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+  if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+  return `${Math.floor(delta / 86400)}d ago`;
+}
 
 const S = { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" };
 /* function declarations are hoisted — CAT_GLYPH may reference them from module top-level */

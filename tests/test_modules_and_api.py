@@ -92,34 +92,43 @@ def test_compliance_mapping_for_asset():
     assert "MITRE" in payload["summary_markdown"]
 
 
+def _login_headers(client):
+    """Seed admin + return bearer headers (startup seeds admin/admin)."""
+    resp = client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+    assert resp.status_code == 200, resp.text
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
 def test_api_demo_round_trip():
     import backend.app.main as api_module
     from fastapi.testclient import TestClient
 
     client = TestClient(api_module.app)
     with client:
-        resp = client.post("/api/demo/run?reset=true")
+        headers = _login_headers(client)
+        resp = client.post("/api/demo/run?reset=true", headers=headers)
         assert resp.status_code == 200
         body = resp.json()
         assert body["stats"]["findings"] >= 5
         assert set(body["threat_detections"]) >= {
             "port_scan", "ddos", "c2_beaconing", "dga_dns", "data_exfiltration"}
 
-        dash = client.get("/api/dashboard")
+        dash = client.get("/api/dashboard", headers=headers)
         assert dash.status_code == 200
         assert dash.json()["graph_summary"]["nodes"] > 0
 
-        assets = client.get("/api/assets").json()["assets"]
+        assets = client.get("/api/assets", headers=headers).json()["assets"]
         assert any(a["threatened"] for a in assets)
 
-        clients = client.get("/api/clients").json()["clients"]
+        clients = client.get("/api/clients", headers=headers).json()["clients"]
         assert len(clients) >= 7
         by_id = {c["client_id"]: c for c in clients}
         assert by_id["flow-sensor-1"]["events"] >= by_id["web01"]["events"]
         assert by_id["flow-sensor-1"]["source_type"] == "netflow"
         assert by_id["edge-fw-01"]["source_type"] == "cef"
+        assert "last_seen" in by_id["web01"]
 
-        alerts = client.get("/api/alerts").json()
+        alerts = client.get("/api/alerts", headers=headers).json()
         assert alerts["count"] == 5
         assert alerts["sent"] == 5
         verdicts = {a["threat_class"]: a["verdict"] for a in alerts["alerts"]}
@@ -127,19 +136,21 @@ def test_api_demo_round_trip():
         assert verdicts["ddos"] == "malicious"
         assert verdicts["dga_dns"] == "suspicious"
 
-        filtered = client.get("/api/events/search", params={"client_id": "web01"}).json()
+        filtered = client.get("/api/events/search", headers=headers,
+                              params={"client_id": "web01"}).json()
         assert filtered["total"] == 20
         assert all(e["client_id"] == "web01" for e in filtered["events"])
 
-        comp = client.get("/api/compliance/10.10.1.50")
+        comp = client.get("/api/compliance/10.10.1.50", headers=headers)
         assert comp.status_code == 200
         assert comp.json()["controls"]
 
-        search = client.get("/api/events/search", params={"query": "sshd"})
+        search = client.get("/api/events/search", headers=headers,
+                            params={"query": "sshd"})
         assert search.status_code == 200
         assert search.json()["total"] > 0
 
-        threats = client.get("/api/network-threats").json()["findings"]
+        threats = client.get("/api/network-threats", headers=headers).json()["findings"]
         assert any(f["threat_class"] == "c2_beaconing" for f in threats)
 
 
@@ -150,19 +161,21 @@ def test_api_ingest_reports_accepted_duplicates_failed():
 
     client = TestClient(api_module.app)
     with client:
-        client.post("/api/demo/run?reset=true")
+        headers = _login_headers(client)
+        client.post("/api/demo/run?reset=true", headers=headers)
         dup_raw = "Sep 12 09:00:00,192.0.2.5,10.10.1.88,tcp,40000,443,3,1500,S"
         resp = client.post("/api/ingest", json={"lines": [
             {"raw": dup_raw, "source": "csv", "client_id": "ingest-probe"},
             {"raw": dup_raw, "source": "csv", "client_id": "ingest-probe"},
             {"raw": "   ", "source": "csv", "client_id": "ingest-probe"},
-        ]})
+        ]}, headers=headers)
         body = resp.json()
         assert body["accepted"] == 1
         assert body["duplicates"] == 1
         assert body["failed"] == 1
         probe = client.get("/api/events/search",
-                           params={"client_id": "ingest-probe"}).json()
+                           params={"client_id": "ingest-probe"},
+                           headers=headers).json()
         assert probe["total"] == 1
         # tidy up: leave the demo store exactly as it was
         import sqlite3
@@ -245,13 +258,14 @@ def test_ingest_bootstraps_graph_when_first_call():
     try:
         client = TestClient(api_module.app)
         with client:
+            headers = _login_headers(client)
             resp = client.post("/api/ingest", json={"lines": [
                 {"raw": "Sep 12 09:00:00,192.0.2.9,10.10.1.99,tcp,40000,443,3,1500,S",
                  "source": "csv", "client_id": "ingest-first-call"},
-            ]})
+            ]}, headers=headers)
             assert resp.status_code == 200, resp.text
             # graph must now be live (was masked by the shadowing bug)
-            graph = client.get("/api/graph")
+            graph = client.get("/api/graph", headers=headers)
             assert graph.status_code == 200, graph.text
             assert api_module._GRAPH is not None
             # tidy up: leave the demo store exactly as it was

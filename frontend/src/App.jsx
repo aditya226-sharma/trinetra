@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { bootstrapDemo, getHealth, isPreview } from "./lib/api";
+import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { bootstrapDemo, getHealth, isPreview, authMe, logoutUser } from "./lib/api";
+import { getToken, setToken } from "./lib/auth";
+import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import EventsPage from "./pages/EventsPage";
 import AlertsPage from "./pages/AlertsPage";
@@ -84,8 +86,42 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [clock, setClock] = useState(new Date());
   const [health, setHealth] = useState(null);
+  const [authState, setAuthState] = useState(isPreview ? "authed" : "checking");
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // -------- session -----------------------------------------------------
+  useEffect(() => {
+    if (isPreview) {
+      setUser({ username: "preview", role: "viewer" });
+      setAuthState("authed");
+      return;
+    }
+    if (getToken()) {
+      authMe()
+        .then((u) => { setUser(u); setAuthState("authed"); })
+        .catch(() => { setToken(null); setAuthState("guest"); });
+    } else {
+      setAuthState("guest");
+    }
+  }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setToken(null);
+      setAuthState("guest");
+      navigate("/login");
+    };
+    window.addEventListener("trinetra:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("trinetra:unauthorized", onUnauthorized);
+  }, [navigate]);
+
+  const signOut = () => {
+    logoutUser();
+    setAuthState("guest");
+    navigate("/login");
+  };
 
   useEffect(() => {
     const int = setInterval(() => setClock(new Date()), 1000);
@@ -113,6 +149,21 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  if (authState === "checking") {
+    return (
+      <div className="grid h-full place-items-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
+          <p className="mono text-xs tracking-widest text-slate-500">VERIFYING SESSION…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authState === "guest" && !isPreview) {
+    return <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />;
+  }
 
   if (ready === null) {
     return (
@@ -229,6 +280,24 @@ export default function App() {
               <p className="eyebrow">/{TITLES[location.pathname]?.toLowerCase().replace(/ /g, "-") || "console"}</p>
             </div>
             <div className="flex items-center gap-5">
+              {!isPreview && (
+                <>
+                  <div className="hidden items-center gap-2.5 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">
+                      {(user?.username || "?")[0]?.toUpperCase()}
+                    </span>
+                    <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
+                      {user?.username} · {user?.role}
+                    </span>
+                    <button
+                      onClick={signOut}
+                      className="mono text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-rose-300"
+                    >
+                      sign out
+                    </button>
+                  </div>
+                </>
+              )}
               <div className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
                 <span className={`h-2 w-2 rounded-full ${health?.analyzer?.healthy ? "bg-emerald-400 pulse-dot" : "bg-amber-400 pulse-dot-red"}`} />
                 <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
@@ -263,6 +332,9 @@ export default function App() {
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/ingest" element={<IngestPage />} />
+            <Route path="/login" element={authState === "authed"
+              ? <Navigate to="/" replace />
+              : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />
           </Routes>
         </main>
 

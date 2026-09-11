@@ -63,6 +63,28 @@ class RawStore:
                 except json.JSONDecodeError:
                     continue
 
+    def prune_before(self, cutoff: str) -> int:
+        """Rewrite the JSONL keeping records with ``stored_at >= cutoff``
+        (ISO UTC). Returns number of raw records removed (keeps raw/event
+        stores aligned when retention prunes events)."""
+        with self._lock:
+            kept: list = []
+            removed = 0
+            if self.path.exists():
+                for record in self.iter_records():
+                    stored_at = record.get("stored_at", "")
+                    if not stored_at or stored_at >= cutoff:
+                        kept.append(record)
+                    else:
+                        removed += 1
+            tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as fh:
+                for record in kept:
+                    fh.write(json.dumps(record, ensure_ascii=True) + "\n")
+            tmp.replace(self.path)
+            self._index = {r["trace_id"]: r.get("raw", "") for r in kept}
+            return removed
+
     def __len__(self) -> int:
         if self._index:
             return len(self._index)

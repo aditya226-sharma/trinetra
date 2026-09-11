@@ -44,6 +44,11 @@ class Settings:
             "TRINETRA_RAW_DIR": ("paths", "raw_store"),
             "TRINETRA_STORE_PATH": ("paths", "event_store"),
             "TRINETRA_CLIENT_ID": ("agent", "client_id"),
+            "AGENT_TOKEN": ("auth", "agent_token"),
+            "TRINETRA_RETENTION_DAYS": ("events", "retention_days"),
+            "ADMIN_USER": ("auth", "admin_user"),
+            "ADMIN_PASSWORD": ("auth", "admin_password"),
+            "TRINETRA_JWT_SECRET": ("auth", "jwt_secret"),
         }
         for env, path in mapping.items():
             value = os.environ.get(env)
