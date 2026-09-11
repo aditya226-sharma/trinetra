@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { bootstrapDemo, getHealth } from "./lib/api";
+import { bootstrapDemo, getHealth, isPreview } from "./lib/api";
 import DashboardPage from "./pages/DashboardPage";
 import EventsPage from "./pages/EventsPage";
 import AlertsPage from "./pages/AlertsPage";
@@ -180,7 +180,15 @@ export default function App() {
 
         <div className="mt-auto space-y-3 px-4 pb-5">
           <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-            {apiOffline ? (
+            {isPreview ? (
+              <div className="flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <div>
+                  <p className="text-[11px] font-medium text-amber-300">PREVIEW DATA</p>
+                  <p className="text-[10px] text-slate-500">bundled demo dataset</p>
+                </div>
+              </div>
+            ) : apiOffline ? (
               <div className="flex items-center gap-2.5">
                 <span className="h-2 w-2 rounded-full bg-amber-400" />
                 <div>

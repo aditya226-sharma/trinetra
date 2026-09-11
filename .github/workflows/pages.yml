@@ -1,10 +1,12 @@
 name: Deploy GitHub Pages
 
 # Publishes the React dashboard to GitHub Pages
-# (https://aditya226-sharma.github.io/trinetra/) as an interactive static
-# preview. GitHub Pages cannot host the Python API, so the built app shows the
-# STATIC PREVIEW banner and links the live container (GHCR) for full data.
-# The 404.html copy gives the SPA client-side routing for deep links.
+# (https://aditya226-sharma.github.io/trinetra/) as a fully interactive
+# preview. GitHub Pages cannot host the Python API, so the build embeds the
+# canonical demo corpus (VITE_OFFLINE_DEMO=1, exported by
+# scripts/export_snapshot.py) — every data page, search and drill-down works
+# with realistic data and shows no API errors. The 404.html copy gives the
+# SPA client-side routing for deep links.
 
 on:
   push:
@@ -33,10 +35,11 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci --no-audit --no-fund
-      - name: Build dashboard (sub-path base)
+      - name: Build dashboard (sub-path base + embedded demo data)
         working-directory: frontend
         env:
           VITE_BASE: /trinetra/
+          VITE_OFFLINE_DEMO: "1"
         run: npm run build
       - name: SPA fallback for deep links (GitHub Pages has none)
         working-directory: frontend

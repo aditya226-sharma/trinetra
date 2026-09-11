@@ -104,10 +104,15 @@ events across container restarts.
 
 ### Live preview (GitHub Pages)
 
-The dashboard also deploys as an interactive preview to
-**https://aditya226-sharma.github.io/trinetra/** on every `main` push. Pages
-can only host static files, so the UI shows a STATIC PREVIEW banner there —
-run the container above for the full live pipeline and data.
+The full dashboard — dashboard, event triage + search, alerts, graph, assets
+drill-downs and compliance — is published as an interactive preview to
+**https://aditya226-sharma.github.io/trinetra/** on every `main` push. GitHub
+Pages cannot run the Python API, so the preview build embeds the canonical
+demo corpus (exported with `scripts/export_snapshot.py`, wired via
+`VITE_OFFLINE_DEMO=1`) and serves it with identical response shapes — search
+and drill-downs behave exactly like the live product (a small amber
+`PREVIEW DATA` badge indicates bundled data). Run the container for the live
+pipeline against fresh/ingested data:
 
 ### CLI
 
