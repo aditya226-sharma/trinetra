@@ -6,7 +6,7 @@ import { getToken, setToken } from "./auth";
 // at a deployed FastAPI origin; the default "/api" keeps everything
 // same-origin for the Docker image.
 const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
-api = axios.create({ baseURL: BASE, timeout: 30000 });
+const api = axios.create({ baseURL: BASE, timeout: 30000 });
 
 // The deploy origin the agent config should point at (used by OnboardingPage).
 // Prefer the explicit VITE_API_BASE host when one is set (tunnel / custom
