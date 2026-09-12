@@ -126,6 +126,7 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [authState, setAuthState] = useState(isPreview ? "authed" : "checking");
   const [user, setUser] = useState(null);
+  const liveUrl = useLiveUrl();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -221,8 +222,6 @@ export default function App() {
       </div>
     );
   }
-
-  const liveUrl = useLiveUrl();
 
   return (
     <div className="relative flex min-h-screen">
