@@ -14,6 +14,21 @@ import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
 import OnboardingPage from "./pages/OnboardingPage";
 
+function useLiveUrl() {
+  const [liveUrl, setLiveUrl] = useState(null);
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}live-url.txt`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error("no live-url.txt"))))
+      .then((t) => {
+        const m = t.trim().match(/^https?:\/\/[^\s]+\/?$/);
+        const url = m ? new URL(m[0]) : null;
+        if (url && url.host !== window.location.host) setLiveUrl(url.href.replace(/\/$/, ""));
+      })
+      .catch(() => setLiveUrl(null));
+  }, []);
+  return liveUrl;
+}
+
 const ICONS = {
   Dashboard: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -207,8 +222,27 @@ export default function App() {
     );
   }
 
+  const liveUrl = useLiveUrl();
+
   return (
     <div className="relative flex min-h-screen">
+      {liveUrl && (
+        <a
+          href={liveUrl}
+          target="_blank"
+          rel="noreferrer"
+          title={`Open the live TriNetra instance (${liveUrl})`}
+          className="sticky top-0 z-40 flex items-center justify-center gap-2 border-b border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-center backdrop-blur-xl"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
+          <span className="mono text-[10px] uppercase tracking-widest text-emerald-300">
+            live instance · {liveUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          </span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+            <path d="M7 17L17 7M9 7h8v8" />
+          </svg>
+        </a>
+      )}
       <div className="bg-grid" aria-hidden />
       {/* ambient core glow behind content */}
       <div
