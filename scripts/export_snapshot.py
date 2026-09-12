@@ -11,15 +11,20 @@ snapshot reflects the canonical demo: 232 events / 5 findings / 37 nodes.
 """
 
 import json
+import os
 import sys
 import urllib.request
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000/api"
 OUT = "frontend/src/lib/demo-snapshot.json"
+TOKEN = os.environ.get("TRINETRA_TOKEN", "")  # optional Bearer for authed APIs
 
 
 def get(path):
-    with urllib.request.urlopen(BASE + path, timeout=30) as r:
+    req = urllib.request.Request(BASE + path)
+    if TOKEN:
+        req.add_header("Authorization", "Bearer " + TOKEN)
+    with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())
 
 
