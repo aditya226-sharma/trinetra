@@ -156,7 +156,7 @@ class ClientStore:
                        agent_version = COALESCE(NULLIF(excluded.agent_version, ''), agent_version),
                        ip = COALESCE(NULLIF(excluded.ip, ''), ip),
                        last_seen = ?, last_heartbeat = ?""",
-                    (client_id, hostname or client_id, platform, agent_version,
+                    (client_id, hostname, platform, agent_version,
                      ip, stamp, stamp, stamp, stamp, stamp))
                 self._conn.commit()
             self._staleness_retry(_do)

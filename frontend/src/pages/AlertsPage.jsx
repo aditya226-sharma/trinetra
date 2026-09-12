@@ -92,7 +92,10 @@ export default function AlertsPage() {
           {/* spine */}
           <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
           {visible.map((a, i) => {
-            const key = `${a.flows ?? a.timestamp}_${a.threat_class}_${a.confidence}`;
+            // Alerts carry no unique id; hash their content so identical
+            // (flows/timestamp/threat_class/confidence) rows don't collide
+            // as React keys when `flows` is falsy.
+            const key = hashStr(`${a.threat_class}|${a.timestamp}|${a.confidence}|${a.store_decision}|${JSON.stringify(a.evidence || {})}`);
             const open = expandedId === key;
             return (
               <div key={key} className="relative feed-in" style={{ animationDelay: `${i * 55}ms` }}>
@@ -151,3 +154,12 @@ const dotCls = (sev) => {
   const m = { critical: "bg-rose-500", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
   return m[sev] || "bg-sky-500";
 };
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h << 5) - h + s.charCodeAt(i);
+    h |= 0;
+  }
+  return `a${(h >>> 0).toString(36)}`;
+}

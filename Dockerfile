@@ -20,11 +20,11 @@ RUN pip install --no-cache-dir -r requirements.txt || \
 COPY . .
 
 # ------------------------------------------------------------- dashboard build
-FROM node:20-slim AS ui
+FROM node:22-slim AS ui
 
 WORKDIR /ui
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY frontend/ .
 RUN npm run build
 

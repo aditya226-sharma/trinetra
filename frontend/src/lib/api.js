@@ -6,7 +6,15 @@ import { getToken, setToken } from "./auth";
 // at a deployed FastAPI origin; the default "/api" keeps everything
 // same-origin for the Docker image.
 const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
-const api = axios.create({ baseURL: BASE, timeout: 30000 });
+api = axios.create({ baseURL: BASE, timeout: 30000 });
+
+// The deploy origin the agent config should point at (used by OnboardingPage).
+// Prefer the explicit VITE_API_BASE host when one is set (tunnel / custom
+// domain), falling back to the browser's origin for same-origin deploys.
+export const apiBase = BASE;
+export const apiOrigin = BASE.startsWith("http")
+  ? BASE.replace(/\/api\/?$/, "")
+  : (typeof window !== "undefined" ? window.location.origin : "");
 
 // Attach the dashboard bearer token to every request.
 api.interceptors.request.use((config) => {
@@ -143,7 +151,7 @@ export async function getComplianceMappings() {
 export async function getAlerts(limit = 100) {
   if (OFFLINE) {
     const s = await loadSnapshot();
-    return { alerts: s.alerts.alerts.slice(-limit).reverse(), count: s.alerts.count, sent: s.alerts.sent };
+    return { alerts: s.alerts.alerts.slice(0, limit), count: s.alerts.count, sent: s.alerts.sent };
   }
   const { data } = await api.get("/alerts", { params: { limit } });
   return data;
@@ -152,7 +160,7 @@ export async function getAlerts(limit = 100) {
 export async function getNetworkThreats(limit = 100) {
   if (OFFLINE) {
     const s = await loadSnapshot();
-    return { findings: s.network_threats.findings.slice(-limit).reverse(), count: s.network_threats.count };
+    return { findings: s.network_threats.findings.slice(0, limit), count: s.network_threats.count };
   }
   const { data } = await api.get("/network-threats", { params: { limit } });
   return data;

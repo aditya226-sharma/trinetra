@@ -69,11 +69,11 @@ class EntityGraph:
 
         if nx is not None:
             if src:
-                self.graph.add_node(src, kind="ip", label=src)
+                self._add_node(src, kind="ip", label=src)
             if dst:
-                self.graph.add_node(dst, kind="ip", label=dst)
+                self._add_node(dst, kind="ip", label=dst)
             if domain:
-                self.graph.add_node(self.nid("domain", domain), kind="domain", label=domain)
+                self._add_node(self.nid("domain", domain), kind="domain", label=domain)
             if src and dst:
                 self._bump_comm(src, dst, event)
             if src and domain:
@@ -93,38 +93,81 @@ class EntityGraph:
         if nx is None:
             return
         if user:
-            self.graph.add_node(self.nid("user", user), kind="user", label=user)
+            self._add_node(self.nid("user", user), kind="user", label=user)
             if host:
-                self.graph.add_node(host, kind="ip", label=host)
+                self._add_node(host, kind="ip", label=host)
                 self._bump_edge(self.nid("user", user), host, "auth",
                                 {"user": user, "result": fields.get("result", "attempt")})
         if proc:
-            self.graph.add_node(self.nid("proc", proc), kind="proc", label=proc)
+            self._add_node(self.nid("proc", proc), kind="proc", label=proc)
             if user:
                 self._bump_edge(self.nid("user", user), self.nid("proc", proc), "exec",
                                 {"proc": proc})
             if host:
                 self._bump_edge(host, self.nid("proc", proc), "runs", {"proc": proc})
 
+    def _add_node(self, node_id: str, **attrs: Any) -> None:
+        """Add a node unless it exists or the node cap is reached (bounded
+        in-memory growth on long-running instances)."""
+        if nx is None or self.graph.has_node(node_id):
+            return
+        if len(self.graph) >= self.max_nodes:
+            return
+        self.graph.add_node(node_id, **attrs)
+
+    def _edge_exists(self, u: str, v: str, kind: str) -> bool:
+        if nx is None or u not in self.graph or v not in self.graph[u]:
+            return False
+        return any(d.get("kind") == kind
+                   for d in self.graph[u][v].values())
+
+    def _add_edge(self, u: str, v: str, kind: str, count: int,
+                  extra: Optional[Dict[str, Any]] = None) -> None:
+        """One edge per (u, v, kind): an existing edge gets its weight (and any
+        ``extra`` attrs) refreshed in place, a missing one is added only while
+        under ``max_edges``. Keeps the MultiDiGraph from accumulating an
+        unbounded run of parallel edges — one per event — that would otherwise
+        bloat memory and inflate the dashboard edge list."""
+        if nx is None:
+            return
+        if (self.graph.number_of_edges() >= self.max_edges
+                and not self._edge_exists(u, v, kind)):
+            return
+        if len(self.graph) >= self.max_nodes and (
+                not self.graph.has_node(u) or not self.graph.has_node(v)):
+            return
+        if u in self.graph and v in self.graph[u]:
+            for data in dict(self.graph[u][v]).values():
+                if data.get("kind") == kind:
+                    data["weight"] = count
+                    if extra:
+                        data.update(extra)
+                    return
+        attrs: Dict[str, Any] = {"kind": kind, "threat": 0, "weight": count}
+        if extra:
+            attrs.update(extra)
+        self.graph.add_edge(u, v, **attrs)
+
     def _bump_comm(self, src: str, dst: str, event: Event) -> None:
         key = (src, dst, "comm")
+        if self.graph.number_of_edges() >= self.max_edges and not self._edge_exists(src, dst, "comm"):
+            return
         proto = str(event.fields.get("proto") or "")
         self._edge_counts[key] = self._edge_counts.get(key, 0) + 1
         meta = self._edge_meta.setdefault(key, {"protop": set(), "flows": 0})
         meta["flows"] = meta.get("flows", 0) + 1
         if proto:
             meta["protop"].add(proto)
-        self.graph.add_edge(src, dst, kind="comm", threat=0,
-                            weight=self._edge_counts[key])
+        self._add_edge(src, dst, "comm", self._edge_counts[key])
 
     def _bump_edge(self, a: str, b: str, kind: str, meta: Dict[str, Any]) -> None:
         key = (a, b, kind)
+        if self.graph.number_of_edges() >= self.max_edges and not self._edge_exists(a, b, kind):
+            return
         self._edge_counts[key] = self._edge_counts.get(key, 0) + 1
         self._edge_meta.setdefault(key, meta)
-        edge_key = self.graph.add_edge(a, b, kind=kind, threat=0,
-                                       weight=self._edge_counts[key])
-        if "result" in meta:
-            self.graph[a][b][edge_key]["result"] = meta.get("result")
+        extra = {"result": meta.get("result")} if "result" in meta else None
+        self._add_edge(a, b, kind, self._edge_counts[key], extra=extra)
 
     # -- finding overlay -----------------------------------------------------
     def add_finding(self, finding: Dict[str, Any]) -> None:
@@ -134,8 +177,8 @@ class EntityGraph:
         self._findings.append(finding)
         if nx is None:
             return
-        self.graph.add_node(threat_id, kind="threat", label=threat_class,
-                            severity=finding.get("severity", "high"))
+        self._add_node(threat_id, kind="threat", label=threat_class,
+                       severity=finding.get("severity", "high"))
         if "alert" in finding:
             finding = finding["alert"]
         src = finding.get("src")
@@ -146,11 +189,10 @@ class EntityGraph:
             if val and isinstance(val, str) and re.match(r"^\d{1,3}(\.\d{1,3}){3}$", val):
                 involved.append(val)
         for ip in involved:
-            if not self.graph.has_node(ip):
-                self.graph.add_node(ip, kind="ip", label=ip)
+            self._add_node(ip, kind="ip", label=ip)
             if self.graph.has_edge(ip, threat_id):
                 continue
-            self.graph.add_edge(ip, threat_id, kind="flagged", threat=1, weight=1)
+            self._add_edge(ip, threat_id, "flagged", 1, extra={"threat": 1})
         # escalate threat=1 on comm edges that connect involved entities
         for u, v in zip(involved, involved[1:]):
             if self.graph.has_edge(u, v):

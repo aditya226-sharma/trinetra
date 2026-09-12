@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -72,6 +73,10 @@ class Orchestrator:
     def __init__(self, settings: Settings, backend_name: Optional[str] = None) -> None:
         self.settings = settings
         self._loop = asyncio.new_event_loop()  # dedicated loop for analyzer calls
+        # uvicorn runs sync ingest endpoints on a threadpool: serialize every
+        # run_until_complete on the shared loop or concurrent threads raise
+        # ``RuntimeError: This event loop is already running``.
+        self._loop_lock = threading.Lock()
         self.raw_store = RawStore(settings.path("raw_store"))
         self.event_store = EventStore(settings.path("event_store"))
         self.client_store = ClientStore(settings.path("event_store"))
@@ -246,10 +251,15 @@ class Orchestrator:
         flow_findings = event.module_findings.get("network_threat")
         if flow_findings:
             findings = flow_findings if isinstance(flow_findings, list) else [flow_findings]
-        result = self._loop.run_until_complete(
-            self.analyzer.analyze(event, findings, event.client_id))
+        with self._loop_lock:
+            try:
+                result = self._loop.run_until_complete(
+                    self.analyzer.analyze(event, findings, event.client_id))
+            except Exception as exc:  # noqa: BLE001 — fail soft, never 500
+                log.warning("analyzer failed on %s: %s", event.event_id, exc)
+                result = None
         self.stats["analyzer_calls"] += 1
-        if result.severity_override:
+        if result and result.severity_override:
             event.severity = result.severity_override
         return "stored"
 
@@ -262,10 +272,16 @@ class Orchestrator:
             self.findings_log.append(finding)
             self.graph.add_finding(finding)
             # AI gate: analyze the module finding itself (event=None).
-            result = self._loop.run_until_complete(
-                self.analyzer.analyze(None, [finding], self.graph.client_id))
+            with self._loop_lock:
+                try:
+                    result = self._loop.run_until_complete(
+                        self.analyzer.analyze(None, [finding], self.graph.client_id))
+                except Exception as exc:  # noqa: BLE001 — fail soft, never 500
+                    log.warning("analyzer failed on finding %s: %s",
+                                finding.get("threat_class", "?"), exc)
+                    result = None
             confidence = float(finding.get("confidence", 0))
-            finding["analysis"] = result.as_dict()
+            finding["analysis"] = result.as_dict() if result else {}
             findings_alerts = self.notifier.alert(finding)
             self.stats["alerts_sent"] += sum(
                 1 for r in findings_alerts if r.get("status") == "sent")
@@ -275,15 +291,21 @@ class Orchestrator:
                 "threat_class": finding["threat_class"],
                 "severity": finding.get("severity", "high"),
                 "confidence": round(float(confidence), 3),
-                "verdict": result.verdict,
-                "store_decision": result.store_decision,
+                "verdict": result.verdict if result else "error",
+                "store_decision": result.store_decision if result else "keep",
                 "evidence": finding.get("alert", {}).get("evidence", {}),
                 "flows": (finding.get("alert", {}).get("flows") or
                           finding.get("alert", {}).get("flow_id") or ""),
             })
+            verdict = result.verdict if result else "error"
+            store_decision = result.store_decision if result else "keep"
             alerts.append(f"[{finding.get('severity', 'high').upper()}] "
                           f"{finding['threat_class']} conf={confidence} "
-                          f"verdict={result.verdict} ({result.store_decision})")
+                          f"verdict={verdict} ({store_decision})")
+            if len(self.findings_log) > 2000:
+                self.findings_log.pop(0)
+            if len(self.alerts_log) > 2000:
+                self.alerts_log.pop(0)
         return alerts
 
     # ----------------------------------------------------------------- pcap

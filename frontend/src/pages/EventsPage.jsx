@@ -38,6 +38,10 @@ export default function EventsPage() {
   const closeStream = useRef(() => {});
   const eventsRef = useRef(events);
   eventsRef.current = events;
+  // LIVE-tail matching must read the *current* filter values — the closure
+  // created when LIVE is toggled would otherwise capture stale ones forever.
+  const filtersRef = useRef({ query: "", src: "", sev: "", cat: "", client: "" });
+  filtersRef.current = { query, src, sev, cat, client };
 
   const stopLive = () => {
     closeStream.current?.();
@@ -56,9 +60,10 @@ export default function EventsPage() {
       onEvent: (ev) => {
         setLiveCount((n) => n + 1);
         // Prepend only matching the active filters when live is on.
-        const matches = runFiltersMatch(ev, { query, src, sev, cat, client });
+        const matches = runFiltersMatch(ev, filtersRef.current);
         if (matches) {
-          setEvents((list) => [ev, ...list.filter((e) => e.event_id !== ev.event_id)]);
+          // Cap the prepended tail so a long live session can't balloon the DOM.
+          setEvents((list) => [ev, ...list.filter((e) => e.event_id !== ev.event_id)].slice(0, 200));
           setTotal((t) => t + 1);
         }
       },

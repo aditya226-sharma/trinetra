@@ -14,9 +14,12 @@ import json
 import os
 import sys
 import urllib.request
+from pathlib import Path
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000/api"
-OUT = "frontend/src/lib/demo-snapshot.json"
+# Resolve relative to this script, not the caller's CWD: the watchdog runs it
+# from a different working directory than the repo.
+OUT = str(Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib" / "demo-snapshot.json")
 TOKEN = os.environ.get("TRINETRA_TOKEN", "")  # optional Bearer for authed APIs
 
 

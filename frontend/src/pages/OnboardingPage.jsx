@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { PageHeader, GlassCard, CodeBlock, Empty, PlainBadge, PulseDot } from "../components/ui";
-import { getAgents, mintAgent, revokeAgent, isPreview } from "../lib/api";
+import { getAgents, mintAgent, revokeAgent, isPreview, apiOrigin } from "../lib/api";
 
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
-const HOST_HINT = ORIGIN || "https://<your-trinetra-host>";
+// Point the generated config at the host the API is actually deployed on —
+// window.location.origin is wrong for tunnel/tunnel-fronted deploys and
+// becomes unusable garbage on the GitHub Pages preview.
+const HOST_HINT = apiOrigin || "https://<your-trinetra-host>";
 
 function fmtAgo(iso) {
   if (!iso) return "never used";

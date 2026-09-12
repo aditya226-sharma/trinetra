@@ -101,10 +101,11 @@ _ORCH: Optional[Orchestrator] = None
 _GRAPH: Optional[EntityGraph] = None
 _settings: Settings = get_settings()
 
-# In-memory rate buckets for the agent ingest endpoint (per source IP).
+# In-memory rate buckets for the agent ingest endpoint (per token / source IP).
 _AGENT_WINDOW_SECONDS = 60
 _AGENT_LIMIT_PER_WINDOW = 5000
-_agent_buckets: Dict[str, List[float]] = {}
+# key -> [(monotonic_ts, event_weight), ...]
+_agent_buckets: Dict[str, List[tuple]] = {}
 
 # ------------------------------------------------------------------- models
 
@@ -164,19 +165,24 @@ def _resolve_agent_token(provided: Optional[str]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _rate_limit_ok(key: str) -> bool:
+def _rate_limit_ok(key: str, weight: int = 1) -> bool:
+    """Budget bills **events** per window, not requests: a fleet of agents
+    sharing one NATed source IP breaks the old per-request cap the moment each
+    agent posts its own small batches. The shared-IP budget is now a softer
+    ceiling than the token budget, so one token cannot be starved by another."""
     now = time.monotonic()
     window_start = now - _AGENT_WINDOW_SECONDS
     bucket = _agent_buckets.setdefault(key, [])
-    while bucket and bucket[0] < window_start:
+    while bucket and bucket[0][0] < window_start:
         bucket.pop(0)
-    if len(bucket) >= _AGENT_LIMIT_PER_WINDOW:
+    used = sum(w for _t, w in bucket)
+    if used + weight > _AGENT_LIMIT_PER_WINDOW:
         return False
-    bucket.append(now)
+    bucket.append((now, weight))
     # Opportunistic sweep so steady agent fleets don't grow the dict forever.
     if len(_agent_buckets) > 128:
         for stale_key in [k for k, b in _agent_buckets.items()
-                          if not b or b[-1] < window_start]:
+                          if not b or b[-1][0] < window_start]:
             _agent_buckets.pop(stale_key, None)
     return True
 
@@ -520,7 +526,9 @@ def ingest_events(request: Request,
         raise HTTPException(status_code=413, detail="Too many events per request")
 
     key = request.client.host if request.client else "unknown"
-    if not _rate_limit_ok(key):
+    if x_agent_token:
+        key = "tok:" + hashlib.sha256(x_agent_token.encode("utf-8")).hexdigest()
+    if not _rate_limit_ok(key, len(events)):
         raise HTTPException(status_code=429, detail="Agent ingest rate limit exceeded")
 
     # An unbound per-machine token gets pinned to the first client it speaks

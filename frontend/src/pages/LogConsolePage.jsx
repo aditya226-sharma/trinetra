@@ -44,13 +44,17 @@ export default function LogConsolePage() {
   const closeStream = useRef(() => {});
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  // Events that arrive while FREEZE is on are held here and replayed on resume
+  // (instead of being silently dropped from the live tail).
+  const missedRef = useRef([]);
 
-  // Detect user scroll to pause auto-scroll
+  // Newest lines are PREPENDED, so "following live" means pinned at the TOP.
+  // Scrolling up/down into history disables auto-follow until the user returns.
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    autoScroll.current = atBottom;
+    const atTop = el.scrollTop < 40;
+    autoScroll.current = atTop;
   }, []);
 
   // Load initial history
@@ -91,7 +95,10 @@ export default function LogConsolePage() {
       clientFilter: clientId,
       onEvent: (ev) => {
         setLiveCount((n) => n + 1);
-        if (pausedRef.current) return;
+        if (pausedRef.current) {
+          missedRef.current.push(ev);
+          return;
+        }
         setLines((prev) => {
           const next = [ev, ...prev.filter((e) => e.event_id !== ev.event_id)];
           return next.length > MAX_LINES ? next.slice(0, MAX_LINES) : next;
@@ -101,6 +108,22 @@ export default function LogConsolePage() {
     });
     return () => closeStream.current?.();
   }, [live, clientId]);
+
+  // Resume: replay the events buffered while frozen, most recent first.
+  useEffect(() => {
+    if (paused) return;
+    const missed = missedRef.current;
+    missedRef.current = [];
+    if (missed.length === 0) return;
+    setLines((prev) => {
+      const seen = new Set(prev.map((e) => e.event_id));
+      const fresh = missed.filter((e) => !seen.has(e.event_id));
+      let next = [...fresh.reverse(), ...prev];
+      if (next.length > MAX_LINES) next = next.slice(0, MAX_LINES);
+      return next;
+    });
+    setTotal((t) => t + fresh.length);
+  }, [paused]);
 
   // Auto-scroll
   useEffect(() => {

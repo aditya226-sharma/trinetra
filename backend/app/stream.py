@@ -36,10 +36,19 @@ class EventStreamHub:
             line = line[:_EVENT_LIMIT] + "\n\n"
         with self._lock:
             subs = list(self._subs.items())
+
+        def _offer(queue: asyncio.Queue, line: str) -> None:
+            # A slow subscriber's full queue must not crash the loop: drop the
+            # event for that connection and keep the others flowing.
+            try:
+                queue.put_nowait(line)
+            except asyncio.QueueFull:
+                pass
+
         for queue, loop in subs:
             if loop.is_closed():
                 continue
-            loop.call_soon_threadsafe(queue.put_nowait, line)
+            loop.call_soon_threadsafe(_offer, queue, line)
 
     def subscribe(self, queue: asyncio.Queue,
                   loop: asyncio.AbstractEventLoop) -> None:

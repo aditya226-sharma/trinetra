@@ -12,6 +12,7 @@ makes the rest of the platform source-agnostic (PS26156-b/c/d).
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import parsers  # noqa: F401  (importing registers all parsers)
@@ -26,6 +27,22 @@ log = logging.getLogger("trinetra.normalizer")
 #: but produced no event (e.g. a CSV header row). Not ``None`` so the
 #: orchestrator can tell "skip" apart from "invalid (blank)".
 SKIPPED = object()
+
+
+def _clamp_ts(value: object) -> str:
+    """Normalize an ISO timestamp to UTC ``Z`` form, clamping values more than
+    10 minutes ahead of the wall clock (a fast client clock otherwise pollutes
+    ``last_seen`` and the dashboard sort order with future dates). Mirrors
+    ``orchestrator._parse_utc_ts`` without the import cycle."""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt > datetime.now(timezone.utc) + timedelta(minutes=10):
+            return utc_now()
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, AttributeError):
+        return utc_now()
 
 
 class Normalizer:
@@ -60,7 +77,7 @@ class Normalizer:
         message = parsed.get("message") or raw.strip()
         return Event(
             event_id=new_uuid(),
-            timestamp=str(parsed.get("timestamp") or utc_now()),
+            timestamp=_clamp_ts(parsed.get("timestamp")),
             source_type=source_type,
             client_id=client_id,
             client_ip=parsed.get("client_ip"),

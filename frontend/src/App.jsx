@@ -286,7 +286,7 @@ export default function App() {
                   <p className="text-[10px] text-slate-500">demo corpus on-line</p>
                 </div>
               </div>
-            ) : (
+            ) : user?.role === "admin" ? (
               <button
                 onClick={handleBootstrap}
                 disabled={loading}
@@ -294,6 +294,11 @@ export default function App() {
               >
                 {loading ? "BOOTING…" : "RUN DEMO DATASET"}
               </button>
+            ) : (
+              <div>
+                <p className="text-[11px] font-medium text-amber-300">AWAITING DATASET</p>
+                <p className="text-[10px] text-slate-500">ask an admin to run the demo dataset</p>
+              </div>
             )}
           </div>
           <div className="mono text-[10px] leading-relaxed tracking-wide text-slate-600">
