@@ -106,17 +106,29 @@ Images are multi-arch (`linux/amd64`, `linux/arm64`). Semver tags (`vX.Y.Z`)
 are published whenever a `v*` tag is pushed. Bind-mount `/app/data` to keep
 events across container restarts.
 
-### Live preview (GitHub Pages)
+### Live preview (GitHub Pages) — near-live mirror
 
 The full dashboard — dashboard, event triage + search, alerts, graph, assets
 drill-downs and compliance — is published as an interactive preview to
 **https://aditya226-sharma.github.io/trinetra/** on every `main` push. GitHub
-Pages cannot run the Python API, so the preview build embeds the canonical
-demo corpus (exported with `scripts/export_snapshot.py`, wired via
-`VITE_OFFLINE_DEMO=1`) and serves it with identical response shapes — search
-and drill-downs behave exactly like the live product (a small amber
-`PREVIEW DATA` badge indicates bundled data). Run the container for the live
-pipeline against fresh/ingested data:
+Pages cannot run the Python API, so the preview build embeds a snapshot
+(exported with `scripts/export_snapshot.py`, wired via `VITE_OFFLINE_DEMO=1`)
+and serves it with identical response shapes — search and drill-downs behave
+exactly like the live product (a small amber `PREVIEW DATA` badge indicates
+bundled data).
+
+The snapshot is kept fresh automatically: the production watchdog re-exports
+it from the live instance roughly every 20 minutes and pushes it (only when
+data changed), so the Pages URL is a stable, always-reachable **near-live
+mirror**. The live sink changes its tunnel URL on restart, but the Pages
+mirror is permanent.
+
+```bash
+# refresh the snapshot manually (auth needed for authed endpoints):
+TRINETRA_TOKEN=<jwt> python3 scripts/export_snapshot.py http://127.0.0.1:8000/api
+```
+
+Run the container for the live pipeline against fresh/ingested data:
 
 ### Central log forwarding (log-agent → dashboard)
 
