@@ -116,24 +116,40 @@ export default function EventsPage() {
     }
   };
 
-  const loadMore = () => { if (!loading) run(true, false); };
+  const loadingRef = useRef(false);
+  const loadMore = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try { await run(true, false); } finally { loadingRef.current = false; }
+  };
   const hasMore = offset < total;
   const sentinelRef = useRef(null);
 
   // Infinite scroll: fetch the next page as the sentinel nears the viewport.
-  // Iterate over the full corpus — with no filter selected that's everything
-  // the backend holds, newest first, page after page.
+  // IntersectionObserver is primary; a passive scroll/resize fallback catches
+  // throttled or unavailable IO (background tabs, older engines). Iterate over
+  // the full corpus — with no filter selected that's everything the backend
+  // holds, newest first, page after page.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) loadMore();
-      },
-      { rootMargin: "700px" }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
+    const near = () => el.getBoundingClientRect().top < window.innerHeight + 700;
+    const check = () => { if (near() && hasMore && !loading) loadMore(); };
+    let obs = null;
+    if (typeof IntersectionObserver !== "undefined") {
+      obs = new IntersectionObserver(
+        (entries) => { if (entries[0].isIntersecting) check(); },
+        { rootMargin: "700px" }
+      );
+      obs.observe(el);
+    }
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check, { passive: true });
+    return () => {
+      if (obs) obs.disconnect();
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, offset]);
 
