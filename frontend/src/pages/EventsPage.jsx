@@ -21,6 +21,8 @@ const CAT_GLYPH = {
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const PAGE = 60;
   const [query, setQuery] = useState("");
   const [src, setSrc] = useState("");
   const [sev, setSev] = useState("");
@@ -80,8 +82,9 @@ export default function EventsPage() {
       .catch(() => {});
   }, []);
 
-  const run = async (keepDetail = false) => {
+  const run = async (keepDetail = false, reset = true) => {
     setLoading(true);
+    const nextOffset = reset ? 0 : offset;
     try {
       const data = await searchEvents({
         query,
@@ -89,10 +92,21 @@ export default function EventsPage() {
         severity: sev,
         category: cat,
         client_id: client,
-        limit: 60,
+        limit: PAGE,
+        offset: nextOffset,
       });
-      setEvents(data.events);
+      if (reset) {
+        setEvents(data.events);
+      } else {
+        // Append the next page, dropping any rows already shown (the LIVE
+        // tail may have prepended some of them in the meantime).
+        setEvents((prev) => {
+          const seen = new Set(prev.map((e) => e.event_id));
+          return [...prev, ...data.events.filter((e) => !seen.has(e.event_id))];
+        });
+      }
       setTotal(data.total);
+      setOffset(nextOffset + data.events.length);
       if (!keepDetail) setDetail(null);
       setError(null);
     } catch (e) {
@@ -101,6 +115,9 @@ export default function EventsPage() {
       setLoading(false);
     }
   };
+
+  const loadMore = () => { if (!loading) run(true, false); };
+  const hasMore = offset < total;
 
   useEffect(() => {
     // Live filtering: refresh whenever the search/filter inputs change
@@ -265,6 +282,23 @@ export default function EventsPage() {
                 </div>
               </button>
             ))
+          )}
+          {events.length > 0 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="mono text-[10px] uppercase tracking-widest text-slate-600">
+                showing {events.length} of {total.toLocaleString()}
+              </p>
+              {hasMore && (
+                <button
+                  onClick={loadMore}
+                  disabled={loading}
+                  className="chip"
+                  style={{ borderColor: "rgba(52,211,153,0.4)", color: "#6ee7b7" }}
+                >
+                  {loading ? "LOADING…" : "LOAD MORE"}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
