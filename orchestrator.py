@@ -149,6 +149,15 @@ class Orchestrator:
         if category not in CATEGORIES:
             category = _CATEGORY_BY_SOURCE.get(source, "system")
 
+        # A live vpn event carries the agent's freshly-assessed tunnel/IPsec
+        # posture; hold it out of the event fields (nested blob) and apply it
+        # to Module B's profile list after the event is finalized.
+        vpn_profiles = None
+        if category == "vpn":
+            vpn_profiles = metadata.get("profiles") or item.get("profiles")
+            if isinstance(vpn_profiles, list) and vpn_profiles:
+                metadata = {k: v for k, v in metadata.items() if k != "profiles"}
+
         client_id = str(default_client_id
                         or item.get("client_id")
                         or metadata.get("host")
@@ -179,7 +188,10 @@ class Orchestrator:
                                       event.source_type, raw_event)
             except Exception as exc:  # noqa: BLE001
                 log.warning("raw store append failed: %s", exc)
-        return self._finalize_event(event)
+        outcome = self._finalize_event(event)
+        if category == "vpn" and vpn_profiles is not None:
+            self.set_vpn_profiles(vpn_profiles)
+        return outcome
 
     def _finalize_event(self, event: Event) -> str:
         """Dedup -> annotate stats -> persist -> modules -> analyzer.
@@ -324,6 +336,48 @@ class Orchestrator:
         self.stats["vpn_profiles"] = len(self.vpn_profiles)
         return {"profiles_count": len(self.vpn_profiles),
                 "profiles": self.vpn_profiles}
+
+    # -------------------------------------------------------------- live vpn
+    VPN_PROFILE_KEYS = (
+        "file", "interface", "tunnel", "state", "policy",
+        "ike_version", "encryption", "key_length", "integrity", "prf",
+        "dh_group", "pfs", "mode", "sa_lifetime", "replay",
+        "security_score", "risk_level", "confidence", "recommendations",
+    )
+
+    def set_vpn_profiles(self, profiles: List[Dict],
+                         source_label: str = "live-agent") -> int:
+        """Replace Module B's profile list from a live agent vpn event.
+
+        Sanitizes incoming dicts to the superset of keys the demo path and the
+        dashboard card understand, records a matching graph finding, and keeps
+        ``stats["vpn_profiles"]`` in agreement with the current list.
+        """
+        clean: List[Dict] = []
+        for p in profiles or []:
+            if not isinstance(p, dict):
+                continue
+            entry = {k: p[k] for k in self.VPN_PROFILE_KEYS if k in p}
+            score = entry.get("security_score")
+            entry.setdefault("source", source_label)
+            clean.append(entry)
+            if isinstance(score, (int, float)) and score < 50:
+                self.graph.add_finding({
+                    "threat_class": "weak_ipsec_config",
+                    "severity": "high",
+                    "confidence": entry.get("confidence", 0.85),
+                    "alert": {
+                        "flow_id": f"vpn::{entry.get('interface') or entry.get('file', '?')}",
+                        "threat_class": "weak_ipsec_config",
+                        "confidence": entry.get("confidence", 0.85),
+                        "severity": "high",
+                        "evidence": dict(entry),
+                    },
+                })
+        if clean:
+            self.vpn_profiles = clean
+            self.stats["vpn_profiles"] = len(clean)
+        return len(clean)
 
     # ---------------------------------------------------------------- report
     def summary(self) -> Dict:

@@ -18,7 +18,12 @@ function fmtAgo(iso) {
 
 export default function LogConsolePage() {
   const { id } = useParams();
-  const clientId = decodeURIComponent(id || "");
+  let clientId = id || "";
+  try {
+    clientId = decodeURIComponent(clientId);
+  } catch {
+    /* malformed escape in route — fall back to the raw id */
+  }
 
   const [lines, setLines] = useState([]);
   const [total, setTotal] = useState(0);
@@ -37,6 +42,8 @@ export default function LogConsolePage() {
   const linesRef = useRef(lines);
   linesRef.current = lines;
   const closeStream = useRef(() => {});
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // Detect user scroll to pause auto-scroll
   const handleScroll = useCallback(() => {
@@ -84,6 +91,7 @@ export default function LogConsolePage() {
       clientFilter: clientId,
       onEvent: (ev) => {
         setLiveCount((n) => n + 1);
+        if (pausedRef.current) return;
         setLines((prev) => {
           const next = [ev, ...prev.filter((e) => e.event_id !== ev.event_id)];
           return next.length > MAX_LINES ? next.slice(0, MAX_LINES) : next;
@@ -135,8 +143,12 @@ export default function LogConsolePage() {
             {clientMeta?.platform && <PlainBadge cls="!text-cyan-300">{clientMeta.platform}</PlainBadge>}
             {clientMeta?.agent_version && <PlainBadge>v{clientMeta.agent_version}</PlainBadge>}
             {clientMeta?.ip && <PlainBadge>{clientMeta.ip}</PlainBadge>}
+            {clientMeta?.source_types?.map((st) => (
+              <PlainBadge key={st}>{st}</PlainBadge>
+            ))}
             <span className="mono text-[11px] text-slate-500">
               {total.toLocaleString()} events · {isOnline ? "online" : `last seen ${fmtAgo(clientMeta?.last_seen)}`}
+              {" · "}first {fmtAgo(clientMeta?.first_seen)}
             </span>
           </span>
         }
@@ -223,14 +235,15 @@ function LogLine({ event: e, showRaw }) {
     low: "text-slate-400",
   }[e.severity] || "text-slate-300";
 
-  const ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString("en-GB", { hour12: false }) : "";
+  const ts = e.timestamp ? new Date(e.timestamp) : null;
+  const time = ts && !Number.isNaN(ts.getTime()) ? ts.toLocaleTimeString("en-GB", { hour12: false }) : "";
   const text = showRaw
-    ? (e.raw || e.message || JSON.stringify(e.fields || {}))
+    ? (e.raw_event || e.raw || e.message || (e.fields ? JSON.stringify(e.fields) : ""))
     : e.message || "(no message)";
 
   return (
     <div className="flex gap-3 py-0.5 hover:bg-white/[0.02] group">
-      <span className="shrink-0 text-slate-600">{ts}</span>
+      <span className="shrink-0 text-slate-600">{time}</span>
       <SeverityDot severity={e.severity} />
       <span className="min-w-0 flex-1 break-all text-slate-300">
         {text}

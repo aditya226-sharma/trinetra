@@ -32,9 +32,10 @@ export default function AlertsPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const out = { critical: 0, high: 0, warning: 0, info: 0, malicious: 0, suspicious: 0 };
+    const out = { critical: 0, high: 0, warning: 0, info: 0, other: 0, malicious: 0, suspicious: 0 };
     alerts.forEach((a) => {
-      if (out[a.severity] !== undefined) out[a.severity] += 1;
+      if (["critical", "high", "warning", "info"].includes(a.severity)) out[a.severity] += 1;
+      else out.other += 1;
       if (a.verdict === "malicious") out.malicious += 1;
       if (a.verdict === "suspicious") out.suspicious += 1;
     });
@@ -59,6 +60,11 @@ export default function AlertsPage() {
         <Tile label="malicious · quarantine" value={stats.malicious} tone="tone-danger" />
         <Tile label="suspicious · review" value={stats.suspicious} tone="tone-warn" />
       </div>
+      {stats.other > 0 && (
+        <p className="text-[11px] text-slate-500">
+          +{stats.other} with other severities ({["medium", "error", "low"].join("/")})
+        </p>
+      )}
 
       {error && <div className="text-sm text-rose-400">{error}</div>}
 
@@ -86,7 +92,7 @@ export default function AlertsPage() {
           {/* spine */}
           <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
           {visible.map((a, i) => {
-            const key = `${a.timestamp}_${a.threat_class}_${i}`;
+            const key = `${a.flows ?? a.timestamp}_${a.threat_class}_${a.confidence}`;
             const open = expandedId === key;
             return (
               <div key={key} className="relative feed-in" style={{ animationDelay: `${i * 55}ms` }}>

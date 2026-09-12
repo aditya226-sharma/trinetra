@@ -152,9 +152,14 @@ class EventStore:
                category: str = "", client_id: str = "") -> tuple[str, list]:
         clauses, params = [], []
         if query:
-            clauses.append("(message LIKE ? OR trace_id LIKE ? OR client_ip LIKE ?"
-                           " OR fields_json LIKE ?)")
-            params += [f"%{query}%"] * 4
+            # Treat % _ \ literally so user input can't degenerate into SQL
+            # LIKE wildcards (q="%" previously matched the whole corpus).
+            esc = (query.replace("\\", "\\\\")
+                   .replace("%", "\\%").replace("_", "\\_"))
+            clauses.append("(message LIKE ? ESCAPE '\\' OR trace_id LIKE ?"
+                           " ESCAPE '\\' OR client_ip LIKE ? ESCAPE '\\'"
+                           " OR fields_json LIKE ? ESCAPE '\\')")
+            params += [f"%{esc}%"] * 4
         for column, value in (("source_type", source_type), ("severity", severity),
                               ("category", category), ("client_id", client_id)):
             if value:

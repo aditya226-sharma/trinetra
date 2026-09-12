@@ -173,6 +173,11 @@ def _rate_limit_ok(key: str) -> bool:
     if len(bucket) >= _AGENT_LIMIT_PER_WINDOW:
         return False
     bucket.append(now)
+    # Opportunistic sweep so steady agent fleets don't grow the dict forever.
+    if len(_agent_buckets) > 128:
+        for stale_key in [k for k, b in _agent_buckets.items()
+                          if not b or b[-1] < window_start]:
+            _agent_buckets.pop(stale_key, None)
     return True
 
 
@@ -255,6 +260,8 @@ def assets() -> Dict[str, Any]:
     for edge in payload["edges"]:
         if edge["kind"] == "comm":
             comm_counts[edge["source"]] = comm_counts.get(edge["source"], 0) + 1
+            if edge.get("target"):
+                comm_counts[edge["target"]] = comm_counts.get(edge["target"], 0) + 1
     for node in nodes:
         node["threatened"] = node["id"] in threatened
         node["degree"] = comm_counts.get(node["id"], 0)

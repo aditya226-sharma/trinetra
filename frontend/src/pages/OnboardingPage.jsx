@@ -248,7 +248,7 @@ export default function OnboardingPage() {
                           : (a.client_id ? `bound to ${a.client_id}` : "unbound")}
                       </p>
                     </div>
-                    <span className="mono text-[10px] text-slate-600">used {fmtAgo(a.last_used_at || a.created_at)}</span>
+                    <span className="mono text-[10px] text-slate-600">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
                     {revoked ? (
                       <PlainBadge cls="!text-rose-300">revoked</PlainBadge>
                     ) : (

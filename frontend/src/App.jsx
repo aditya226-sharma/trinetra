@@ -147,17 +147,25 @@ export default function App() {
   };
 
   useEffect(() => {
-    const int = setInterval(() => setClock(new Date()), 1000);
-    getHealth()
-      .then((h) => {
-        setReady(h.demo_ready === true);
-        setHealth(h);
-      })
-      .catch(() => {
-        setReady(false);
-        setApiOffline(true);
-      });
-    return () => clearInterval(int);
+    const clock = setInterval(() => setClock(new Date()), 1000);
+    const check = () => {
+      getHealth()
+        .then((h) => {
+          setReady(h.demo_ready === true);
+          setHealth(h);
+          setApiOffline(false);
+        })
+        .catch(() => {
+          setReady(false);
+          setApiOffline(true);
+        });
+    };
+    check();
+    const healthInt = setInterval(check, 30000);
+    return () => {
+      clearInterval(clock);
+      clearInterval(healthInt);
+    };
   }, []);
 
   const handleBootstrap = async () => {
@@ -324,7 +332,7 @@ export default function App() {
                 </>
               )}
               <div className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
-                <span className={`h-2 w-2 rounded-full ${health?.analyzer?.healthy ? "bg-emerald-400 pulse-dot" : "bg-amber-400 pulse-dot-red"}`} />
+                <span className={`h-2 w-2 rounded-full ${health?.analyzer?.backend?.healthy ? "bg-emerald-400 pulse-dot" : "bg-amber-400 pulse-dot-red"}`} />
                 <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
                   {health ? `analyzer · ${health?.analyzer?.configured_backend || "…"}` : "api · offline"}
                 </span>

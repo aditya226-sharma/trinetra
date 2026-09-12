@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { searchEvents, getClients, streamEvents } from "../lib/api";
+import { searchEvents, getClients, getEvent, streamEvents } from "../lib/api";
 import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
 // Live agent sources (my log-agent collectors) are shown alongside the demo ones.
 const SOURCES = ["", "netflow", "syslog", "json", "cef", "csv", "windows",
-                 "windows_event_log", "macos_unified_log", "macos_system_log", "file_log"];
+                 "windows_event_log", "macos_unified_log", "macos_system_log", "file_log",
+                 "live_flow", "live_vpn"];
 const SEV = ["", "critical", "error", "warning", "info"];
 
 const CAT_GLYPH = {
@@ -105,6 +106,16 @@ export default function EventsPage() {
   }, [query, src, sev, cat, client]);
 
   const filtersActive = Boolean(query || src || sev || cat || client);
+
+  async function openDetail(e) {
+    setDetail(null);
+    try {
+      const full = await getEvent(e.event_id);
+      setDetail({ ...e, ...full, raw: full.raw ?? e.raw_event ?? null });
+    } catch {
+      setDetail(e);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -221,7 +232,7 @@ export default function EventsPage() {
             events.map((e, i) => (
               <button
                 key={e.event_id}
-                onClick={() => setDetail(e)}
+                onClick={() => openDetail(e)}
                 className="glass-row group flex w-full items-center gap-3 p-3 text-left feed-in"
                 style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
               >
@@ -300,7 +311,7 @@ function Row({ k, v, mono }) {
 }
 
 const stripCls = (sev) => {
-  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
+  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", warning: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
   return m[sev] || "sev-info";
 };
 

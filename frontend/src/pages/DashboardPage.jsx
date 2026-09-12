@@ -43,7 +43,7 @@ export default function DashboardPage() {
   const findings = (data.findings || []).slice(-6).reverse();
   const vpn = data.vpn?.profiles || [];
   const g = data.graph_summary || {};
-  const top = clients.slice().sort((a, b) => b.events - a.events);
+  const top = clients.slice().sort((a, b) => (b.events ?? 0) - (a.events ?? 0));
 
   const eventsSpark = top.map((c) => c.events);
   const threatVals = Object.values(threats).map(Number);
@@ -102,7 +102,6 @@ export default function DashboardPage() {
           sub="fingerprint-based corpus"
           tone="cyan"
           icon={<DedupIcon />}
-          spark={{ values: [70, 76, 74, 80, 79, 78, 82].map((v) => 0), color: "#22d3ee" }}
           delay={60}
         />
         <KpiCard
@@ -136,7 +135,7 @@ export default function DashboardPage() {
               Threat radar
             </SectionTitle>
             {Object.keys(threats).length === 0 ? (
-              <Empty title="No detections recorded" hint="Run the demo dataset to arm the radar." />
+              <Empty title="No detections recorded" hint="Detections appear here as flow heuristics fire on live agent traffic." />
             ) : (
               <div className="space-y-3">
                 {Object.entries(threats).map(([threat, count], i) => {
@@ -172,13 +171,16 @@ export default function DashboardPage() {
               Latest findings
             </SectionTitle>
             {findings.length === 0 ? (
-              <Empty title="No findings yet" hint="Run the demo dataset to populate the analyzer feed." />
+              <Empty title="No findings yet" hint="Verdicts appear here as the analyzer resolves module findings." />
             ) : (
               <div className="space-y-2">
                 {findings.map((f, i) => {
                   const alert = f.alert || f;
+                  const verdict = f.analysis?.verdict || alert.verdict;
+                  const storeDecision = f.analysis?.store_decision || alert.store_decision;
+                  const key = f.flow_id || f.alert?.flow_id || `${f.threat_class}-${f.timestamp}-${i}`;
                   return (
-                    <div key={i} className="glass-row flex items-center gap-3 p-3 feed-in" style={{ animationDelay: `${i * 60}ms` }}>
+                    <div key={key} className="glass-row flex items-center gap-3 p-3 feed-in" style={{ animationDelay: `${i * 60}ms` }}>
                       <span className={`sev-strip ${sevStrip(alert.severity)}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -186,7 +188,7 @@ export default function DashboardPage() {
                           <span className="mono text-[10px] text-slate-500">conf {alert.confidence}</span>
                         </div>
                         <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
-                          {alert.verdict} · {alert.store_decision}
+                          {verdict ? `${verdict} · ${storeDecision}` : "awaiting analyzer verdict"}
                         </p>
                       </div>
                       <SeverityBadge severity={alert.severity} />
@@ -214,7 +216,7 @@ export default function DashboardPage() {
                   centerValue={s.events ?? 0}
                   centerLabel="events"
                   segments={top.map((c, i) => ({
-                    value: c.events,
+                    value: c.events ?? 0,
                     color: DONUT_COLORS[i % DONUT_COLORS.length],
                   }))}
                 />
@@ -225,7 +227,7 @@ export default function DashboardPage() {
                     <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length], boxShadow: `0 0 8px ${DONUT_COLORS[i % DONUT_COLORS.length]}` }} />
                     <span className="mono truncate text-slate-300">{c.client_id}</span>
                     <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
-                    <span className="ml-auto mono tabular-nums text-slate-500">{c.events}</span>
+                    <span className="ml-auto mono tabular-nums text-slate-500">{c.events ?? 0}</span>
                   </div>
                 ))}
               </div>
@@ -240,13 +242,15 @@ export default function DashboardPage() {
           VPN / IPsec gateway assessment
         </SectionTitle>
         {vpn.length === 0 ? (
-          <Empty title="No PCAP captures assessed" hint="Feed ipsec_*.pcap captures through Module B." />
+          <Empty title="No tunnel/IPsec posture yet" hint="Live agent tunnel posture or Module B PCAP assessments populate this." />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {vpn.map((p, i) => {
-              const tone = p.risk_level === "critical" ? "#f43f5e" : p.risk_level === "high" ? "#fb923c" : "#34d399";
+              const tone = p.risk_level === "critical" ? "#f43f5e"
+                : p.risk_level === "high" ? "#fb923c"
+                : p.risk_level === "medium" ? "#fbbf24" : "#34d399";
               return (
-                <div key={i} className="glass-row flex items-center gap-4 p-4 feed-in" style={{ animationDelay: `${i * 70}ms` }}>
+                <div key={p.interface || p.file || i} className="glass-row flex items-center gap-4 p-4 feed-in" style={{ animationDelay: `${i * 70}ms` }}>
                   <ScoreRing score={p.security_score ?? p.score ?? 0} tone={tone} label="score" />
                   <div className="min-w-0 flex-1">
                     <p className="mono truncate text-[13px] text-slate-100">{p.file}</p>

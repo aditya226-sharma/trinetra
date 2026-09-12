@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getClients } from "../lib/api";
 import { PageHeader, Empty, PulseDot, PlainBadge } from "../components/ui";
 
@@ -32,6 +32,7 @@ export default function ClientsPage() {
   const [error, setError] = useState(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all"); // all | online | offline
+  const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
@@ -47,7 +48,8 @@ export default function ClientsPage() {
   if (error) return <div className="text-sm text-rose-400">Failed to load fleet: {error}</div>;
   if (!data) return <div className="text-slate-500">Loading fleet…</div>;
 
-  const { totals = {}, clients = [] } = data;
+  const totals = data?.totals ?? {};
+  const clients = Array.isArray(data?.clients) ? data.clients : [];
   const filtered = clients
     .filter((c) => {
       if (filter === "online" && c.status !== "online") return false;
@@ -124,7 +126,12 @@ export default function ClientsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c, i) => (
-            <ClientCard key={c.client_id} c={c} delay={i * 40} />
+            <ClientCard
+              key={c.client_id}
+              c={c}
+              delay={i * 40}
+              onOpen={() => navigate(`/clients/${encodeURIComponent(c.client_id)}`)}
+            />
           ))}
         </div>
       )}
@@ -132,11 +139,22 @@ export default function ClientsPage() {
   );
 }
 
-function ClientCard({ c, delay }) {
+function ClientCard({ c, delay, onOpen }) {
   const isOnline = c.status === "online";
+  const handleKey = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen();
+    }
+  };
   return (
     <div
-      className="glass-row group relative overflow-hidden p-4 anim-fadeup"
+      onClick={onOpen}
+      onKeyDown={handleKey}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open details for ${c.client_id}`}
+      className="glass-row group relative cursor-pointer overflow-hidden p-4 anim-fadeup transition hover:border-emerald-500/40"
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* status stripe */}
@@ -157,12 +175,9 @@ function ClientCard({ c, delay }) {
               {c.hostname || c.client_id}
             </p>
           </div>
-          <Link
-            to={`/clients/${encodeURIComponent(c.client_id)}`}
-            className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition hover:bg-emerald-500/20"
-          >
+          <span className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition group-hover:bg-emerald-500/20">
             Open Logs
-          </Link>
+          </span>
         </div>
 
         {/* metadata row */}
@@ -194,11 +209,11 @@ function ClientCard({ c, delay }) {
         {/* stats */}
         <div className="mt-3 grid grid-cols-3 gap-3 border-t border-white/5 pt-3">
           <div>
-            <p className="mono text-[18px] font-bold text-slate-100">{c.events.toLocaleString()}</p>
+            <p className="mono text-[18px] font-bold text-slate-100">{(c.events ?? 0).toLocaleString()}</p>
             <p className="text-[10px] uppercase tracking-widest text-slate-600">total</p>
           </div>
           <div>
-            <p className="mono text-[18px] font-bold text-cyan-300">{c.events_recent}</p>
+            <p className="mono text-[18px] font-bold text-cyan-300">{c.events_recent ?? 0}</p>
             <p className="text-[10px] uppercase tracking-widest text-slate-600">recent</p>
           </div>
           <div>

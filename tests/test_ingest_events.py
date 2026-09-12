@@ -144,6 +144,62 @@ def test_disabled_when_no_token_configured(client, monkeypatch):
     assert resp.status_code == 401
 
 
+def test_vpn_event_updates_vpn_profiles(client):
+    """A live vpn-category agent event replaces Module B's profile list."""
+    entry = _agent_entry(
+        source="live_net",
+        message="VPN posture sample",
+        category="vpn",
+        metadata={
+            "host": "vpn-host",
+            "profiles": [
+                {"file": "live", "interface": "utun3", "mode": "tunnel",
+                 "ike_version": 2, "encryption": "AES-GCM-256",
+                 "key_length": 256, "pfs": "yes", "security_score": 92,
+                 "risk_level": "low", "confidence": 0.95,
+                 "recommendations": [], "junk_key": True, "nested": {"a": 1}},
+                {"interface": "utun9", "security_score": 30,
+                 "risk_level": "high"},
+            ],
+        },
+    )
+    resp = client.post("/api/ingest-events", json={"events": [entry]},
+                       headers={"X-Agent-Token": AGENT_TOKEN})
+    assert resp.status_code == 200, resp.text
+    profiles = api_module._ORCH.vpn_profiles
+    assert len(profiles) == 2
+    assert profiles[0]["interface"] == "utun3"
+    assert profiles[0]["security_score"] == 92
+    assert "junk_key" not in profiles[0]
+    assert "nested" not in profiles[0]
+    assert profiles[0]["source"] == "live-agent"
+    assert api_module._ORCH.stats["vpn_profiles"] == 2
+
+
+def test_flow_event_feeds_threat_radar(client):
+    """flow-category agent events must reach Module A's detector counts."""
+    entries = [
+        _agent_entry(
+            source="live_flow",
+            message=f"tcp 192.168.1.5:5192{i} -> 203.0.113.{i}:443 (1 pkts, 0 bytes)",
+            category="flow",
+            metadata={"host": "radar-host", "src_ip": "192.168.1.5",
+                     "dst_ip": f"203.0.113.{i}", "proto": "tcp",
+                     "sport": 51920 + i, "dport": 443, "pkts": 1, "bytes": 0},
+        )
+        for i in range(1, 9)
+    ]
+    resp = client.post("/api/ingest-events", json={"events": entries},
+                       headers={"X-Agent-Token": AGENT_TOKEN})
+    assert resp.status_code == 200, resp.text
+    counts = api_module._ORCH.threats.detection_counts
+    assert counts, "radar must not be empty"
+    assert counts.get("port_scan", 0) >= 1, counts
+    assert any(f["threat_class"] == "port_scan"
+               and f.get("evidence", {}).get("src") == "192.168.1.5"
+               for f in api_module._ORCH.findings_log)
+
+
 def test_clients_include_last_seen():
     from pipeline.event_store import EventStore
     import tempfile
