@@ -118,6 +118,24 @@ export default function EventsPage() {
 
   const loadMore = () => { if (!loading) run(true, false); };
   const hasMore = offset < total;
+  const sentinelRef = useRef(null);
+
+  // Infinite scroll: fetch the next page as the sentinel nears the viewport.
+  // Iterate over the full corpus — with no filter selected that's everything
+  // the backend holds, newest first, page after page.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) loadMore();
+      },
+      { rootMargin: "700px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loading, offset]);
 
   useEffect(() => {
     // Live filtering: refresh whenever the search/filter inputs change
@@ -286,17 +304,12 @@ export default function EventsPage() {
           {events.length > 0 && (
             <div className="flex items-center justify-between pt-2">
               <p className="mono text-[10px] uppercase tracking-widest text-slate-600">
-                showing {events.length} of {total.toLocaleString()}
+                showing {events.length.toLocaleString()} of {total.toLocaleString()}
               </p>
               {hasMore && (
-                <button
-                  onClick={loadMore}
-                  disabled={loading}
-                  className="chip"
-                  style={{ borderColor: "rgba(52,211,153,0.4)", color: "#6ee7b7" }}
-                >
-                  {loading ? "LOADING…" : "LOAD MORE"}
-                </button>
+                <span ref={sentinelRef} className="mono text-[10px] uppercase tracking-widest text-emerald-300/70">
+                  {loading ? "LOADING…" : "SCROLL FOR MORE…"}
+                </span>
               )}
             </div>
           )}
