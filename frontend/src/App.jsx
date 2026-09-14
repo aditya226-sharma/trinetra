@@ -257,12 +257,8 @@ export default function App() {
 
         <div className="relative px-5 pb-5 pt-6">
           <Link to="/" className="group flex items-center gap-3">
-            <div className="relative grid h-10 w-10 place-items-center rounded-xl border border-emerald-500/40 bg-gradient-to-br from-emerald-500/30 to-cyan-500/10 shadow-[0_0_24px_-4px_rgba(52,211,153,0.7)]">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-emerald-300">
-                <path d="M12 3a9 9 0 019 9v1l-2-1.5L20 15l-2-1.5V12" strokeWidth="1.5" fill="none" />
-                <path d="M12 21a9 9 0 01-9-9v-1l2 1.5L4 9l2 1.5V12" strokeWidth="1.5" fill="none" />
-                <circle cx="12" cy="12" r="2.2" />
-              </svg>
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_24px_-4px_rgba(52,211,153,0.7)]">
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="TriNetra" className="h-full w-full object-cover" />
             </div>
             <div>
               <p className="text-[17px] font-bold leading-none tracking-tight">
