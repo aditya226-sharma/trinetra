@@ -99,7 +99,7 @@ export default function AlertsPage() {
             const open = expandedId === key;
             return (
               <div key={key} className="relative feed-in" style={{ animationDelay: `${i * 55}ms` }}>
-                <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-(--bg) ${dotCls(a.severity)} ${a.severity === "critical" ? "pulse-dot-red" : ""}`} />
+                <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(a.severity)} ${a.severity === "critical" ? "pulse-dot-red" : ""}`} />
                 <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
                   <button onClick={() => setExpandedId(open ? null : key)} className="flex w-full items-center gap-3 p-4 text-left">
                     <span className={`sev-strip ${stripCls(a.severity)}`} />

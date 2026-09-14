@@ -197,7 +197,7 @@ export default function GraphPage() {
                     fontWeight={isSel ? 700 : 400}
                     fill={isSel ? "#f8fafc" : "#a7b6c9"}
                     className="mono"
-                    style={{ paintOrder: "stroke", stroke: "var(--bg)", strokeWidth: 3 }}
+                    style={{ paintOrder: "stroke", stroke: "#05080f", strokeWidth: 3 }}
                   >
                     {n.label && String(n.label).length > 18 ? String(n.label).slice(0, 17) + "…" : n.label}
                   </text>
