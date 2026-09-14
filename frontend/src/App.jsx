@@ -257,9 +257,9 @@ export default function App() {
       />
 
       {/* ------------------------------------------------------- nav rail */}
-      <aside className="sticky top-0 z-20 flex h-screen w-60 shrink-0 flex-col border-r border-white/5 bg-[#070b15]/80 backdrop-blur-xl">
+      <aside className="sticky top-0 z-20 flex h-screen w-60 shrink-0 flex-col border-r border-[var(--line)] bg-(--bg-2) backdrop-blur-xl">
         {/* glow seat */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-500/[0.07] to-transparent" aria-hidden />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-500/[0.05] to-transparent" aria-hidden />
 
         <div className="relative px-5 pb-5 pt-6">
           <Link to="/" className="group flex items-center gap-3">
@@ -345,7 +345,7 @@ export default function App() {
       {/* ------------------------------------------------------- main column */}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         {/* top bar */}
-        <header className="sticky top-0 z-30 border-b border-white/5 bg-[#05080f]/70 px-7 py-3 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-(--bg-2) px-7 py-3 backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <p className="eyebrow">/{TITLES[location.pathname]

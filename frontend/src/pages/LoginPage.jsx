@@ -26,13 +26,13 @@ export default function LoginPage({ onSuccess }) {
       <div className="bg-grid" aria-hidden />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="mx-auto h-14 w-14 overflow-hidden rounded-2xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_32px_-6px_rgba(52,211,153,0.7)]">
+          <div className="mx-auto h-16 w-16 overflow-hidden rounded-2xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_36px_-8px_rgba(52,211,153,0.55)] ring-1 ring-emerald-400/10 ring-offset-2 ring-offset-transparent">
             <img src={`${import.meta.env.BASE_URL}logo.png`} alt="TriNetra" className="h-full w-full object-cover" />
           </div>
-          <h1 className="mt-5 text-2xl font-bold tracking-tight">
+          <h1 className="mt-5 text-[26px] font-bold tracking-tight">
             Tri<span className="text-grad-emerald">Netra</span>
           </h1>
-          <p className="eyebrow mt-2">Universal Log Pre-processing · live console</p>
+          <p className="eyebrow mt-2.5">Universal Log Pre-processing · live console</p>
         </div>
 
         <form onSubmit={submit} className="glass space-y-4 p-6">

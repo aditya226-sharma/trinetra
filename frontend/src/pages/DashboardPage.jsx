@@ -287,8 +287,15 @@ function KpiCard({ label, value, sub, tone, icon, spark, delay }) {
     danger: "glow-red",
     violet: "glow-cyan",
   };
+  const accents = {
+    emerald: "linear-gradient(90deg, rgba(52,211,153,0.9), rgba(52,211,153,0.05))",
+    cyan: "linear-gradient(90deg, rgba(34,211,238,0.9), rgba(34,211,238,0.05))",
+    danger: "linear-gradient(90deg, rgba(244,63,94,0.9), rgba(244,63,94,0.05))",
+    violet: "linear-gradient(90deg, rgba(129,140,248,0.9), rgba(129,140,248,0.05))",
+  };
   return (
-    <div className={`glass p-4 anim-fadeup ${tones[tone]}`} style={{ animationDelay: `${delay}ms` }}>
+    <div className={`glass kpi p-4 anim-fadeup ${tones[tone]}`} style={{ animationDelay: `${delay}ms` }}>
+      <span aria-hidden className="kpi-accent" style={{ background: accents[tone] }} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow truncate">{label}</p>
