@@ -467,7 +467,9 @@ select.field option {
 [data-theme="light"] .bg-slate-950 { background-color: var(--bg-2); }
 
 [data-theme="light"] .bg-\[\#05080f\],
+[data-theme="light"] .bg-\[\#05080f\]\/70,
 [data-theme="light"] .bg-\[\#070b15\],
+[data-theme="light"] .bg-\[\#070b15\]\/80 { background-color: var(--bg-2); }
 [data-theme="light"] .bg-\[\#0a101d\],
 [data-theme="light"] .bg-\[\#0a121a\],
 [data-theme="light"] .bg-\[\#0b1522\],
