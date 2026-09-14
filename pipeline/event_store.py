@@ -149,7 +149,8 @@ class EventStore:
         return _row_to_event(row)
 
     def _where(self, query: str = "", source_type: str = "", severity: str = "",
-               category: str = "", client_id: str = "") -> tuple[str, list]:
+               category: str = "", client_id: str = "", threat_class: str = "",
+               ts_from: str = "", ts_to: str = "") -> tuple[str, list]:
         clauses, params = [], []
         if query:
             # Treat % _ \ literally so user input can't degenerate into SQL
@@ -165,13 +166,30 @@ class EventStore:
             if value:
                 clauses.append(f"{column} = ?")
                 params.append(value)
+        if threat_class:
+            # threat_class lives in the serialized UES fields blob (module
+            # findings / detections). Match the exact JSON key/value so the
+            # filter is stable regardless of surrounding field order.
+            # (json.dumps default separators put a space after the colon.)
+            esc = (threat_class.replace("\\", "\\\\")
+                   .replace("%", "\\%").replace("_", "\\_"))
+            clauses.append(f'fields_json LIKE ? ESCAPE \'\\\'')
+            params.append(f'%"threat_class": "{esc}"%')
+        if ts_from:
+            clauses.append("timestamp >= ?")
+            params.append(ts_from)
+        if ts_to:
+            clauses.append("timestamp <= ?")
+            params.append(ts_to)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         return where, params
 
     def search(self, query: str = "", source_type: str = "", severity: str = "",
-               category: str = "", client_id: str = "", limit: int = 100,
+               category: str = "", client_id: str = "", threat_class: str = "",
+               ts_from: str = "", ts_to: str = "", limit: int = 100,
                offset: int = 0) -> List[Event]:
-        where, params = self._where(query, source_type, severity, category, client_id)
+        where, params = self._where(query, source_type, severity, category,
+                                    client_id, threat_class, ts_from, ts_to)
         sql = (f"SELECT * FROM events {where} ORDER BY timestamp DESC, event_id "
                f"LIMIT ? OFFSET ?")
         params += [limit, offset]
@@ -183,8 +201,10 @@ class EventStore:
 
     def count_filtered(self, query: str = "", source_type: str = "",
                        severity: str = "", category: str = "",
-                       client_id: str = "") -> int:
-        where, params = self._where(query, source_type, severity, category, client_id)
+                       client_id: str = "", threat_class: str = "",
+                       ts_from: str = "", ts_to: str = "") -> int:
+        where, params = self._where(query, source_type, severity, category,
+                                    client_id, threat_class, ts_from, ts_to)
         with self._lock:
             def _do() -> sqlite3.Row:
                 return self._conn.execute(

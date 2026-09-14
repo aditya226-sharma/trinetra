@@ -54,8 +54,9 @@ async function loadSnapshot() {
   return snapshot;
 }
 
-function offlineSearch(list, { query = "", source_type = "", severity = "", category = "", client_id = "" } = {}) {
+function offlineSearch(list, { query = "", source_type = "", severity = "", category = "", client_id = "", threat_class = "", ts_from = "", ts_to = "" } = {}) {
   const q = query.trim().toLowerCase();
+  const tc = threat_class.trim().toLowerCase();
   return list.filter((e) => {
     if (q) {
       // Same fields the backend /api/events/search matches against:
@@ -72,6 +73,16 @@ function offlineSearch(list, { query = "", source_type = "", severity = "", cate
     if (severity && e.severity !== severity) return false;
     if (category && e.category !== category) return false;
     if (client_id && e.client_id !== client_id) return false;
+    if (tc) {
+      const f = e.fields || {};
+      const mf = f.module_findings || {};
+      const evtc = String(mf?.find?.((m) => m.threat_class)?.threat_class ||
+                          mf?.network_threat?.threat_class ||
+                          f.threat_class || "").toLowerCase();
+      if (!evtc.includes(tc)) return false;
+    }
+    if (ts_from && e.timestamp && e.timestamp < ts_from) return false;
+    if (ts_to && e.timestamp && e.timestamp > ts_to) return false;
     return true;
   });
 }
@@ -178,12 +189,36 @@ export async function getClients() {
 export async function searchEvents(params = {}) {
   if (OFFLINE) {
     const s = await loadSnapshot();
-    const { query = "", source_type = "", severity = "", category = "", client_id = "", limit = 50, offset = 0 } = params;
-    const filtered = offlineSearch(s.events, { query, source_type, severity, category, client_id });
+    const { query = "", source_type = "", severity = "", category = "", client_id = "", threat_class = "", ts_from = "", ts_to = "", limit = 50, offset = 0 } = params;
+    const filtered = offlineSearch(s.events, { query, source_type, severity, category, client_id, threat_class, ts_from, ts_to });
     return { total: filtered.length, limit, offset, events: filtered.slice(offset, offset + limit) };
   }
   const { data } = await api.get("/events/search", { params });
   return data;
+}
+
+// CSV export over the same filters /api/events/search honours. Returns a
+// downloadable Blob; callers do the anchor click + revoke dance.
+export async function exportCsv(params = {}) {
+  if (OFFLINE) {
+    const s = await loadSnapshot();
+    const go = (s.events || []).filter((e) => {
+      const f = e.fields || {};
+      const tc = String(f?.threat_class || "").toLowerCase();
+      return (!params.threat_class || tc.includes(params.threat_class.toLowerCase()))
+        && (!params.client_id || e.client_id === params.client_id)
+        && (!params.ts_from || !e.timestamp || e.timestamp >= params.ts_from)
+        && (!params.ts_to || !e.timestamp || e.timestamp <= params.ts_to);
+    });
+    const rows = [["event_id", "timestamp", "source_type", "client_id", "client_ip", "category", "severity", "threat_class", "message", "trace_id"]];
+    for (const e of go) rows.push([e.event_id, e.timestamp, e.source_type, e.client_id, e.client_ip || "", e.category, e.severity, e.fields?.threat_class || "", String(e.message).replace(/\n/g, " "), e.trace_id || ""]);
+    return new Blob([rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+  }
+  const { data } = await api.get("/events/search", {
+    params: { ...params, limit: 5000, offset: 0, format: "csv" },
+    responseType: "blob",
+  });
+  return new Blob([data], { type: "text/csv" });
 }
 
 export async function getEvent(id) {

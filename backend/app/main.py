@@ -401,19 +401,72 @@ def clients() -> Dict[str, Any]:
 @app.get("/api/events/search", tags=["store"], dependencies=[Depends(require_auth)])
 def search_events(
     query: str = "", source_type: str = "", severity: str = "",
-    category: str = "", client_id: str = "",
+    category: str = "", client_id: str = "", threat_class: str = "",
+    ts_from: str = "", ts_to: str = "",
     limit: int = Query(50, le=500), offset: int = 0,
+    format: str = "",
 ) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
+    if format == "csv":
+        # Exports sweep the full matching set (capped so a runaway corpus
+        # can't blow out memory); live triage keeps the paginated fetch below.
+        rows = _ORCH.event_store.search(query=query, source_type=source_type,
+                                        severity=severity, category=category,
+                                        client_id=client_id, threat_class=threat_class,
+                                        ts_from=ts_from, ts_to=ts_to,
+                                        limit=5000, offset=0)
+        return export_events_csv(events_to_rows(rows))
     events = _ORCH.event_store.search(query=query, source_type=source_type,
                                       severity=severity, category=category,
-                                      client_id=client_id, limit=limit, offset=offset)
+                                      client_id=client_id, threat_class=threat_class,
+                                      ts_from=ts_from, ts_to=ts_to,
+                                      limit=limit, offset=offset)
     total = _ORCH.event_store.count_filtered(
         query=query, source_type=source_type, severity=severity,
-        category=category, client_id=client_id)
+        category=category, client_id=client_id, threat_class=threat_class,
+        ts_from=ts_from, ts_to=ts_to)
     return {"total": total, "limit": limit, "offset": offset,
             "events": [e.to_dict() for e in events]}
+
+
+def events_to_rows(events: List[Any]) -> List[List[str]]:
+    """Flatten normalized UES events to CSV-safe rows (header + data)."""
+    rows: List[List[str]] = [["event_id", "timestamp", "source_type", "client_id",
+                              "client_ip", "category", "severity", "threat_class",
+                              "message", "trace_id"]]
+    for e in events:
+        fields = getattr(e, "fields", None) or {}
+        tc = ""
+        mf = fields.get("module_findings") or {}
+        nt = mf.get("network_threat") or {}
+        tc = (nt.get("threat_class") or fields.get("threat_class") or "")
+        rows.append([
+            str(getattr(e, "event_id", "") or ""),
+            str(getattr(e, "timestamp", "") or ""),
+            str(getattr(e, "source_type", "") or ""),
+            str(getattr(e, "client_id", "") or ""),
+            str(getattr(e, "client_ip", "") or ""),
+            str(getattr(e, "category", "") or ""),
+            str(getattr(e, "severity", "") or ""),
+            str(tc),
+            (getattr(e, "message", "") or "").replace("\n", " "),
+            str(getattr(e, "trace_id", "") or ""),
+        ])
+    return rows
+
+
+def export_events_csv(rows: List[List[str]]) -> StreamingResponse:
+    import csv
+    import io as _io
+    buf = _io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerows(rows)
+    return StreamingResponse(
+        iter([buf.getvalue().encode("utf-8")]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="trinetra-events.csv"'},
+    )
 
 
 @app.get("/api/events/stream", tags=["store"])

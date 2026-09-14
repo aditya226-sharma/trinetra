@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { bootstrapDemo, getHealth, isPreview, authMe, logoutUser } from "./lib/api";
+import { bootstrapDemo, getHealth, getAlerts, isPreview, authMe, logoutUser } from "./lib/api";
 import { getToken, setToken } from "./lib/auth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -13,6 +13,9 @@ import IngestPage from "./pages/IngestPage";
 import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
 import OnboardingPage from "./pages/OnboardingPage";
+import ConsolePage from "./pages/ConsolePage";
+import CommandPalette from "./components/CommandPalette";
+import { SeverityDot } from "./components/ui";
 
 function useLiveUrl() {
   const [liveUrl, setLiveUrl] = useState(null);
@@ -93,6 +96,12 @@ const ICONS = {
       <path d="M17.5 15.5l1 1 1.5-1.5" strokeWidth="1.4" />
     </svg>
   ),
+  Console: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6l5 5-5 5M11 17h9" />
+      <circle cx="19" cy="17" r="0" />
+    </svg>
+  ),
 };
 
 const navItems = [
@@ -104,6 +113,7 @@ const navItems = [
   { to: "/assets", label: "Assets" },
   { to: "/compliance", label: "Compliance" },
   { to: "/ingest", label: "Ingest" },
+  { to: "/console", label: "Console" },
 ];
 
 const TITLES = {
@@ -116,6 +126,7 @@ const TITLES = {
   "/assets": "Asset registry",
   "/compliance": "Compliance briefs",
   "/ingest": "Live ingest",
+  "/console": "Live console",
 };
 
 export default function App() {
@@ -127,9 +138,30 @@ export default function App() {
   const [authState, setAuthState] = useState(isPreview ? "authed" : "checking");
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("trinetra_theme") || "dark" : "dark"));
+  const [bell, setBell] = useState({ alerts: [], open: false });
   const liveUrl = useLiveUrl();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Header alert bell — latest alerts, refreshed on a slow poll (a live
+  // "unread" badge lands with the alert lifecycle feature).
+  useEffect(() => {
+    let alive = true;
+    const poll = () =>
+      getAlerts(12)
+        .then((d) => { if (alive) setBell((b) => ({ ...b, alerts: d.alerts || [] })); })
+        .catch(() => {});
+    poll();
+    const t = setInterval(poll, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  useEffect(() => {
+    if (!bell.open) return;
+    const close = () => setBell((b) => ({ ...b, open: false }));
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [bell.open]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -231,6 +263,7 @@ export default function App() {
 
   return (
     <div className="relative flex min-h-screen">
+      <CommandPalette theme={theme} setTheme={setTheme} />
       {liveUrl && (
         <a
           href={liveUrl}
@@ -353,6 +386,51 @@ export default function App() {
                   || "console"}</p>
             </div>
             <div className="flex items-center gap-5">
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setBell((b) => ({ ...b, open: !b.open })); }}
+                  title="Recent alerts"
+                  className="relative grid h-9 w-9 place-items-center rounded-full border border-white/5 bg-white/[0.03] transition hover:border-emerald-500/40"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+                    <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.7 21a2 2 0 01-3.4 0" />
+                  </svg>
+                  {bell.alerts.length > 0 && (
+                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                      {bell.alerts.length}
+                    </span>
+                  )}
+                </button>
+                {bell.open && (
+                  <div className="glass absolute right-0 top-11 z-50 w-80 p-2 anim-fadeup">
+                    <p className="eyebrow px-2 pb-2">Latest alerts</p>
+                    {bell.alerts.length === 0 ? (
+                      <p className="px-2 py-3 text-[12px] text-slate-500">No alerts yet.</p>
+                    ) : (
+                      <div className="max-h-80 space-y-1 overflow-y-auto">
+                        {bell.alerts.map((a) => (
+                          <button
+                            key={a.alert_id || a.id || a.timestamp + a.threat_class}
+                            onClick={() => { setBell((b) => ({ ...b, open: false })); navigate("/alerts"); }}
+                            className="glass-row flex w-full items-center gap-2 p-2 text-left"
+                          >
+                            <SeverityDot severity={a.severity} />
+                            <span className="mono min-w-0 flex-1 truncate text-[11px] text-slate-200">{a.threat_class}</span>
+                            <span className="mono text-[10px] text-slate-500">{fmtClock(a.timestamp)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => { setBell((b) => ({ ...b, open: false })); navigate("/alerts"); }}
+                      className="btn-ghost mt-2 w-full text-center !py-1.5 text-[11px]"
+                    >
+                      open alert fan-out →
+                    </button>
+                  </div>
+                )}
+              </div>
               {!isPreview && (
                 <>
                   <div className="hidden items-center gap-2.5 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
@@ -424,6 +502,7 @@ export default function App() {
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/ingest" element={<IngestPage />} />
+            <Route path="/console" element={<ConsolePage />} />
             <Route path="/login" element={authState === "authed"
               ? <Navigate to="/" replace />
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />
@@ -439,4 +518,10 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+function fmtClock(iso) {
+  const ts = new Date(iso);
+  if (Number.isNaN(ts.getTime())) return "";
+  return ts.toLocaleTimeString("en-GB", { hour12: false, hour: "2-digit", minute: "2-digit" });
 }

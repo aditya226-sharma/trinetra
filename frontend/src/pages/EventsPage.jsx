@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { searchEvents, getClients, getEvent, streamEvents } from "../lib/api";
+import { searchEvents, getClients, getEvent, streamEvents, exportCsv } from "../lib/api";
 import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
@@ -8,6 +8,7 @@ const SOURCES = ["", "netflow", "syslog", "json", "cef", "csv", "windows",
                  "windows_event_log", "macos_unified_log", "macos_system_log", "file_log",
                  "live_flow", "live_vpn"];
 const SEV = ["", "critical", "error", "warning", "info"];
+const THREATS = ["", "port_scan", "ddos", "c2_beaconing", "dga", "exfiltration"];
 
 const CAT_GLYPH = {
   flow: <DiamondGlyph />,
@@ -28,10 +29,35 @@ export default function EventsPage() {
   const [sev, setSev] = useState("");
   const [cat, setCat] = useState("");
   const [client, setClient] = useState("");
+  const [threat, setThreat] = useState("");
+  const [fromTs, setFromTs] = useState("");
+  const [toTs, setToTs] = useState("");
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
+
+  // Saved searches (persisted per-browser via localStorage).
+  const [saved, setSaved] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("trinetra_saved_searches") || "[]"); }
+    catch { return []; }
+  });
+  const persistSaved = (next) => {
+    setSaved(next);
+    try { localStorage.setItem("trinetra_saved_searches", JSON.stringify(next)); } catch {}
+  };
+  const saveSearch = () => {
+    const f = { query, src, sev, cat, client, threat, fromTs, toTs };
+    const name = window.prompt("Name this saved search:", query ? `search · ${query}` : `filter · ${threat || cat || "all"}`);
+    if (!name) return;
+    const next = [...saved.filter((s) => s.name !== name), { name, f }];
+    persistSaved(next);
+  };
+  const applySaved = (f) => {
+    setQuery(f.query || ""); setSrc(f.src || ""); setSev(f.sev || ""); setCat(f.cat || "");
+    setClient(f.client || ""); setThreat(f.threat || ""); setFromTs(f.fromTs || ""); setToTs(f.toTs || "");
+  };
+  const dropSaved = (name) => persistSaved(saved.filter((s) => s.name !== name));
 
   // Live tail via the SSE /api/events/stream endpoint.
   const [live, setLive] = useState(false);
@@ -42,8 +68,8 @@ export default function EventsPage() {
   eventsRef.current = events;
   // LIVE-tail matching must read the *current* filter values — the closure
   // created when LIVE is toggled would otherwise capture stale ones forever.
-  const filtersRef = useRef({ query: "", src: "", sev: "", cat: "", client: "" });
-  filtersRef.current = { query, src, sev, cat, client };
+  const filtersRef = useRef({ query: "", src: "", sev: "", cat: "", client: "", threat: "", fromTs: "", toTs: "" });
+  filtersRef.current = { query, src, sev, cat, client, threat, fromTs, toTs };
 
   const stopLive = () => {
     closeStream.current?.();
@@ -92,6 +118,9 @@ export default function EventsPage() {
         severity: sev,
         category: cat,
         client_id: client,
+        threat_class: threat,
+        ts_from: normTs(fromTs),
+        ts_to: normTs(toTs),
         limit: PAGE,
         offset: nextOffset,
       });
@@ -159,9 +188,32 @@ export default function EventsPage() {
     const t = setTimeout(() => run(true), 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, src, sev, cat, client]);
+  }, [query, src, sev, cat, client, threat, fromTs, toTs]);
 
-  const filtersActive = Boolean(query || src || sev || cat || client);
+  const filtersActive = Boolean(query || src || sev || cat || client || threat || fromTs || toTs);
+
+  const doExportCsv = async () => {
+    try {
+      const blob = await exportCsv({
+        query,
+        source_type: src,
+        severity: sev,
+        category: cat,
+        client_id: client,
+        threat_class: threat,
+        ts_from: normTs(fromTs),
+        ts_to: normTs(toTs),
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `trinetra-events-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    }
+  };
 
   async function openDetail(e) {
     setDetail(null);
@@ -182,6 +234,9 @@ export default function EventsPage() {
         actions={
           <div className="flex items-center gap-3">
             <LiveBadge text={`${total} matched`} />
+            <button onClick={doExportCsv} className="btn-ghost" title="Export all matching events to CSV">
+              <span className="mr-1.5 inline-block align-[-1px]">↓</span>CSV
+            </button>
             <button
               onClick={toggleLive}
               className={`chip ${live ? "chip-on" : ""}`}
@@ -263,9 +318,24 @@ export default function EventsPage() {
               <option key={c.client_id} value={c.client_id}>{c.client_id}</option>
             ))}
           </select>
+          <span className="eyebrow mx-1">THREAT</span>
+          {THREATS.map((t) => (
+            <button key={t || "t-none"} onClick={() => setThreat(t)} className={`chip ${threat === t ? "chip-on" : ""}`}>
+              {t || "all"}
+            </button>
+          ))}
+          <span className="eyebrow mx-1">TIME</span>
+          <input type="datetime-local" value={fromTs} onChange={(e) => setFromTs(e.target.value)}
+            className="field mono px-3 py-1.5 text-[11px]" title="From (UTC)" />
+          <span className="text-[10px] text-slate-600">→</span>
+          <input type="datetime-local" value={toTs} onChange={(e) => setToTs(e.target.value)}
+            className="field mono px-3 py-1.5 text-[11px]" title="To (UTC)" />
+          <button onClick={saveSearch} className="btn-ghost !px-3 !py-1.5 text-[11px]" title="Save this filter for later">
+            ⊕ save
+          </button>
           {filtersActive && (
             <button
-              onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setTimeout(run, 0); }}
+              onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setThreat(""); setFromTs(""); setToTs(""); setTimeout(run, 0); }}
               className="ml-auto text-[11px] text-slate-500 hover:text-emerald-300"
             >
               reset filters ×
@@ -273,6 +343,22 @@ export default function EventsPage() {
           )}
         </div>
       </div>
+
+      {saved.length > 0 && (
+        <div className="glass p-3">
+          <p className="eyebrow px-1 pb-2">Saved searches</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {saved.map((s) => (
+              <span key={s.name} className="flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1">
+                <button onClick={() => applySaved(s.f)} className="mono text-[11px] text-emerald-300 hover:text-emerald-200">
+                  {s.name}
+                </button>
+                <button onClick={() => dropSaved(s.name)} className="text-[11px] text-slate-500 hover:text-rose-300" title="Delete saved search">×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && <div className="text-sm text-rose-400">{error}</div>}
 
@@ -385,7 +471,7 @@ const stripCls = (sev) => {
 
 // Mirrors the backend /api/events/search matching so live SSE events respect
 // the currently active filters.
-function runFiltersMatch(ev, { query = "", src = "", sev = "", cat = "", client = "" } = {}) {
+function runFiltersMatch(ev, { query = "", src = "", sev = "", cat = "", client = "", threat = "", fromTs = "", toTs = "" } = {}) {
   if (query) {
     const q = query.toLowerCase();
     const hay = [
@@ -400,7 +486,23 @@ function runFiltersMatch(ev, { query = "", src = "", sev = "", cat = "", client 
   if (sev && ev.severity !== sev) return false;
   if (cat && ev.category !== cat) return false;
   if (client && ev.client_id !== client) return false;
+  if (threat) {
+    const f = ev.fields || {};
+    const mf = f.module_findings || {};
+    const evtc = String(mf?.find?.((m) => m.threat_class)?.threat_class ||
+                        mf?.network_threat?.threat_class ||
+                        f.threat_class || "").toLowerCase();
+    if (!evtc.includes(threat.toLowerCase())) return false;
+  }
+  if (fromTs && ev.timestamp && ev.timestamp < normTs(fromTs)) return false;
+  if (toTs && ev.timestamp && ev.timestamp > normTs(toTs)) return false;
   return true;
+}
+
+// datetime-local values arrive as "YYYY-MM-DDTHH:mm"; normalize to the store's
+// second-resolution UTC timestamps so range comparisons stay lexicographic.
+function normTs(value) {
+  return value ? `${value}:00` : "";
 }
 
 function fmtAgo(iso) {
