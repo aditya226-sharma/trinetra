@@ -13,6 +13,10 @@ on:
   push:
     branches: [main, master]
     tags: ["v*"]
+    paths-ignore:
+      - "frontend/src/lib/demo-snapshot.json"
+      - "frontend/public/live.html"
+      - "frontend/public/live-url.txt"
   workflow_dispatch:
 
 env:

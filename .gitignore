@@ -8,3 +8,4 @@ frontend/dist/
 *.db
 *.egg-info/
 .DS_Store
+/logo.png
