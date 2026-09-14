@@ -359,3 +359,123 @@ select.field option {
 /* helpers */
 .grow-x { transition: transform 0.2s ease; }
 .grow-x:hover { transform: translateX(3px); }
+
+/* ================================================================
+   LIGHT THEME
+   Toggled via <html data-theme="light"> (default is dark). Flips the
+   palette variables and remaps the dark-mode-authored Tailwind bands
+   to light equivalents so both skins share one component tree.
+   ================================================================ */
+[data-theme="light"] {
+  --bg: #eef2f7;
+  --bg-2: #e5ebf3;
+  --panel: rgba(255, 255, 255, 0.76);
+  --panel-strong: rgba(255, 255, 255, 0.92);
+  --line: rgba(15, 23, 42, 0.10);
+  --line-strong: rgba(15, 23, 42, 0.18);
+  --text: #0f172a;
+  --muted: #5b6b82;
+  color-scheme: light;
+}
+
+[data-theme="light"] body {
+  background:
+    radial-gradient(1000px 640px at 88% -12%, rgba(52, 211, 153, 0.14), transparent 55%),
+    radial-gradient(900px 600px at -12% 108%, rgba(34, 211, 238, 0.12), transparent 55%),
+    radial-gradient(800px 520px at 52% 118%, rgba(129, 140, 248, 0.10), transparent 55%),
+    var(--bg);
+}
+
+[data-theme="light"] .bg-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #c7d2e0, #a9b8ca);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #b6c3d3, #95a7bd);
+}
+
+[data-theme="light"] .glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(242, 246, 250, 0.8));
+}
+[data-theme="light"] .glass-row {
+  background: rgba(255, 255, 255, 0.68);
+}
+[data-theme="light"] .glass-row:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+[data-theme="light"] .panel-strong {
+  background: var(--panel-strong);
+}
+
+[data-theme="light"] .btn-ghost {
+  color: #4b5a72;
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(255, 255, 255, 0.7);
+}
+[data-theme="light"] .btn-ghost:hover {
+  color: #12263a;
+  border-color: rgba(52, 211, 153, 0.55);
+}
+[data-theme="light"] .field {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.18);
+}
+[data-theme="light"] select.field option {
+  background: #ffffff;
+  color: #0f172a;
+}
+[data-theme="light"] .chip {
+  background: rgba(255, 255, 255, 0.72);
+  color: #4b5a72;
+  border-color: rgba(15, 23, 42, 0.16);
+}
+[data-theme="light"] .chip:hover {
+  color: #12263a;
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+[data-theme="light"] .rail-link {
+  color: #51617a;
+}
+[data-theme="light"] .rail-link:hover {
+  color: #12263a;
+  background: rgba(15, 23, 42, 0.06);
+}
+[data-theme="light"] .rail-link.active {
+  color: #059669;
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.22), rgba(52, 211, 153, 0.07));
+}
+
+/* remap the dark-mode-authored Tailwind bands to light equivalents */
+[data-theme="light"] .text-slate-50,
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200,
+[data-theme="light"] .text-slate-300 { color: #0f172a; }
+[data-theme="light"] .text-slate-400 { color: #39495f; }
+[data-theme="light"] .text-slate-500 { color: #5b6b82; }
+[data-theme="light"] .text-slate-600 { color: #8090a6; }
+[data-theme="light"] .text-slate-700 { color: #98a6b9; }
+[data-theme="light"] .text-slate-950 { color: #f8fafc; }
+
+[data-theme="light"] .bg-slate-900,
+[data-theme="light"] .bg-slate-950 { background-color: var(--bg-2); }
+
+[data-theme="light"] .bg-\[\#05080f\],
+[data-theme="light"] .bg-\[\#070b15\],
+[data-theme="light"] .bg-\[\#0a101d\],
+[data-theme="light"] .bg-\[\#0a121a\],
+[data-theme="light"] .bg-\[\#0b1522\],
+[data-theme="light"] .bg-\[\#0d1426\],
+[data-theme="light"] .bg-\[\#0b1222\] { background-color: var(--bg-2); }
+
+[data-theme="light"] .border-white\/5 { border-color: rgba(15, 23, 42, 0.08); }
+[data-theme="light"] .border-white\/10 { border-color: rgba(15, 23, 42, 0.12); }
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/\[0\.02\],
+[data-theme="light"] .bg-white\/\[0\.03\] { background-color: rgba(15, 23, 42, 0.04); }

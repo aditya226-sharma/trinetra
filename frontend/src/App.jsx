@@ -126,9 +126,15 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [authState, setAuthState] = useState(isPreview ? "authed" : "checking");
   const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("trinetra_theme") || "dark" : "dark"));
   const liveUrl = useLiveUrl();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("trinetra_theme", theme); } catch (e) {}
+  }, [theme]);
 
   // -------- session -----------------------------------------------------
   useEffect(() => {
@@ -371,6 +377,22 @@ export default function App() {
                   {health ? `analyzer · ${health?.analyzer?.configured_backend || "…"}` : "api · offline"}
                 </span>
               </div>
+              <button
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                  className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 transition hover:border-emerald-500/40 lg:flex"
+                >
+                  {theme === "dark" ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-amber-300">
+                      <circle cx="12" cy="12" r="4.5" />
+                      <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                      <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
+                    </svg>
+                  )}
+                </button>
               <div className="mono text-right">
                 <p className="text-sm font-semibold tabular-nums tracking-widest text-slate-200">
                   {clock.toLocaleTimeString("en-GB", { hour12: false })}
