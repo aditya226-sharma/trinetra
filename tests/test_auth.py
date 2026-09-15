@@ -90,3 +90,125 @@ def test_tampered_token_rejected(client):
     tampered = token[:-2] + ("!!" if not token.endswith("==") else "AA")
     resp = client.get("/api/clients", headers={"Authorization": f"Bearer {tampered}"})
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------- analyst role
+
+
+def test_register_accepts_analyst_role(client):
+    who = f"analyst-{uuid.uuid4().hex[:8]}"
+    admin_headers = _login(client)
+    reg = client.post("/api/auth/register", headers=admin_headers,
+                      json={"username": who, "password": "analyst-pass", "role": "analyst"})
+    assert reg.status_code == 200, reg.text
+    assert reg.json()["role"] == "analyst"
+    ah = _login(client, username=who, password="analyst-pass")
+    assert client.get("/api/auth/me", headers=ah).json()["role"] == "analyst"
+    # analysts read the queue + policy lists
+    assert client.get("/api/cases/stats", headers=ah).status_code == 200
+    assert client.get("/api/rules", headers=ah).status_code == 200
+    assert client.get("/api/watchlist", headers=ah).status_code == 200
+    # but cannot mutate policy or create users
+    assert client.post("/api/watchlist", headers=ah,
+                       json={"list": "watchlist", "kind": "ip",
+                             "value": "203.0.113.9", "reason": "analyst?"}).status_code == 403
+    assert client.post("/api/rules", headers=ah,
+                       json={"name": "nope", "min_severity": "warning",
+                             "action": "alert", "match": []}).status_code == 403
+    assert client.post("/api/auth/register", headers=ah,
+                       json={"username": "x2", "password": "x2-x2-x2-x2",
+                             "role": "analyst"}).status_code == 403
+
+
+def test_role_validation_on_register(client):
+    admin_headers = _login(client)
+    for bad in ("root", "superadmin", ""):
+        resp = client.post("/api/auth/register", headers=admin_headers,
+                           json={"username": f"u-{uuid.uuid4().hex[:6]}",
+                                 "password": "pass-12345", "role": bad})
+        assert resp.status_code == 400, resp.text
+
+
+def _seed_case(seed):
+    case = api_module._SOC.record_flow_finding({
+        "severity": "high",
+        "threat_class": f"flow-{seed}",
+        "flow_id": f"flow-{seed}",
+        "timestamp": "2026-09-15T00:00:00Z",
+        "evidence": {"src": seed},
+    })
+    assert case is not None, "failed to seed a triage case"
+    return case["id"]
+
+
+def test_case_triage_role_gate(client):
+    cid = _seed_case("rbac")
+    who = f"analyst-{uuid.uuid4().hex[:8]}"
+    who_v = f"viewer-{uuid.uuid4().hex[:8]}"
+    admin = _login(client)
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "analyst-pass", "role": "analyst"})
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who_v, "password": "viewer-pass", "role": "viewer"})
+    ah = _login(client, username=who, password="analyst-pass")
+    vh = _login(client, username=who_v, password="viewer-pass")
+
+    # analyst can ack a case
+    assert client.patch(f"/api/cases/{cid}", headers=ah,
+                        json={"action": "ack"}).status_code == 200
+    # viewer is read-only: PATCH is refused before it reaches the policy
+    assert client.patch(f"/api/cases/{cid}", headers=vh,
+                        json={"action": "unack"}).status_code == 403
+    # analysts can also resolve / assign / annotate
+    assert client.patch(f"/api/cases/{cid}", headers=ah,
+                        json={"action": "assign", "assignee": "irfan"}).status_code == 200
+    assert client.patch(f"/api/cases/{cid}", headers=ah,
+                        json={"action": "resolve", "note": "closed out"}).status_code == 200
+    # admin can reopen
+    assert client.patch(f"/api/cases/{cid}", headers=admin,
+                        json={"action": "reopen"}).status_code == 200
+
+
+def test_users_admin_only(client):
+    admin = _login(client)
+    who = f"analyst-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "analyst-pass", "role": "analyst"})
+    # analysts and strangers cannot list users
+    assert client.get("/api/auth/users").status_code == 401
+    ah = _login(client, username=who, password="analyst-pass")
+    assert client.get("/api/auth/users", headers=ah).status_code == 403
+    # admin can, and the roster includes the seeds + new analyst
+    roster = client.get("/api/auth/users", headers=admin)
+    assert roster.status_code == 200
+    usernames = [u["username"] for u in roster.json()["users"]]
+    assert "admin" in usernames and who in usernames
+    assert "password_hash" not in roster.json()["users"][0]
+
+
+def test_delete_user_rules(client):
+    admin = _login(client)
+    who = f"analyst-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "analyst-pass", "role": "analyst"})
+    # cannot delete yourself
+    assert client.delete("/api/auth/users/admin", headers=admin).status_code == 400
+    # a second admin can be removed by the first (two admins exist at that point)
+    other = f"admin2-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": other, "password": "admin-pass-2", "role": "admin"})
+    assert client.delete(f"/api/auth/users/{other}", headers=admin).status_code == 200
+    assert client.post("/api/auth/login",
+                       json={"username": other, "password": "admin-pass-2"}).status_code == 401
+    # delete the analyst — gone afterwards
+    assert client.delete(f"/api/auth/users/{who}", headers=admin).status_code == 200
+    assert client.post("/api/auth/login",
+                       json={"username": who, "password": "analyst-pass"}).status_code == 401
+    # analysts cannot delete anyone (require_admin fires first)
+    again = f"analyst-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": again, "password": "analyst-pass", "role": "analyst"})
+    ah = _login(client, username=again, password="analyst-pass")
+    assert client.delete(f"/api/auth/users/{again}", headers=ah).status_code == 403
+    # missing user
+    assert client.delete("/api/auth/users/ghost-404", headers=admin).status_code == 404

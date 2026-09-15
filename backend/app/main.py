@@ -54,8 +54,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from analyzer.llm_analyzer import LLMAnalyzer  # noqa: F401  (type surface)
-from backend.app.auth import (ensure_admin, require_admin, require_auth,
-                              require_token_query)
+from backend.app.auth import (ensure_admin, require_admin, require_analyst,
+                              require_auth, require_token_query)
 from backend.app.auth import router as auth_router
 from backend.app.services.audit import audit_log, audit_recent
 from backend.app.stream import hub
@@ -1157,7 +1157,8 @@ def _compliance_report_html(asset_id: str, compliance: Dict[str, Any],
 # ------------------------------------------------------- PHASE 3 :: SOC policy
 # Watchlist / blocklist, custom detection rules, alert-case lifecycle and
 # external delivery. Policy mutations are admin-only; case triage reads and
-# transitions are open to any authenticated SOC analyst with a bearer token.
+# Transitions require an SOC analyst (admin or analyst role); plain viewers
+# keep a read-only queue.
 # -----------------------------------------------------------------------------
 
 
@@ -1277,9 +1278,9 @@ def cases_detail(case_id: str) -> Dict[str, Any]:
     return {"case": case}
 
 
-@app.patch("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_auth)])
+@app.patch("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_analyst)])
 def cases_action(case_id: str, body: CaseActionRequest,
-                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+                 payload: Dict[str, Any] = Depends(require_analyst)) -> Dict[str, Any]:
     try:
         case = _soc().transition(case_id, body.action, str(payload.get("sub", "?")),
                                  assignee=body.assignee, note=body.note)

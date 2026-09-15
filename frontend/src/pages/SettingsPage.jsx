@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { changePassword, getAudit, getCollectors, getNotifications, getStorageStats, runDigest, saveNotifications, setCollectors, setRetention, testNotifications } from "../lib/api";
+import { changePassword, deleteUser, getAudit, getCollectors, getNotifications, getStorageStats, getUsers, registerUser, runDigest, saveNotifications, setCollectors, setRetention, testNotifications } from "../lib/api";
 import { PageHeader, PlainBadge } from "../components/ui";
 
 const VALID = [1, 7, 30, 90, 365, 0];
@@ -49,6 +49,18 @@ export default function SettingsPage() {
   const [testBusy, setTestBusy] = useState(false);
   const [digestBusy, setDigestBusy] = useState(false);
 
+  // users & roles (RBAC)
+  const [roster, setRoster] = useState(null);
+  const [uName, setUName] = useState("");
+  const [uPass, setUPass] = useState("");
+  const [uRole, setURole] = useState("analyst");
+  const [uMsg, setUMsg] = useState(null);
+  const [uErr, setUErr] = useState(null);
+  const [uBusy, setUBusy] = useState(false);
+
+  const refreshRoster = () =>
+    getUsers().then((d) => { setRoster(d.users || []); setUErr(null); }).catch(() => {});
+
   const refreshCollectors = () =>
     getCollectors().then(({ config, running }) => {
       setCollectorsState(running);
@@ -88,6 +100,7 @@ export default function SettingsPage() {
     refreshStorage();
     refreshCollectors();
     refreshNotif();
+    refreshRoster();
     getAudit(100).then((d) => setAudit(d.entries || [])).catch(() => {});
   }, []);
 
@@ -174,14 +187,92 @@ export default function SettingsPage() {
 
   const session = decodeSession();
 
+  const createUser = async (e) => {
+    e.preventDefault();
+    if (!uName.trim() || uPass.length < 6) { setUErr("Username required and password min 6 chars."); return; }
+    setUBusy(true); setUMsg(null); setUErr(null);
+    try {
+      await registerUser(uName.trim(), uPass, uRole);
+      setUMsg(`Created ${uName.trim()} (${uRole}).`);
+      setUName(""); setUPass("");
+      refreshRoster();
+    } catch (ex) {
+      setUErr(ex.response?.data?.detail || ex.message);
+    } finally {
+      setUBusy(false);
+    }
+  };
+
+  const deleteUser = async (username) => {
+    if (!window.confirm(`Delete account ${username}? This cannot be undone.`)) return;
+    try {
+      await deleteUser(username);
+      setUMsg(`Deleted ${username}.`);
+      refreshRoster();
+    } catch (ex) {
+      setUErr(ex.response?.data?.detail || ex.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="admin · storage · audit"
         title="Settings & admin"
         sub="Retention policy, your sign-in credentials, and the trail of privileged actions — all recorded in the audit store."
-        actions={<PlainBadge cls="!text-cyan-300">phase-4 admin console</PlainBadge>}
+        actions={<PlainBadge cls="!text-cyan-300">admin console</PlainBadge>}
       />
+
+      {/* users & roles (RBAC) */}
+      <section className="glass overflow-hidden anim-fadeup">
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+          <p className="mono text-[11px] tracking-widest text-slate-500">users &amp; roles :: rbac</p>
+          <PlainBadge cls="!text-emerald-300">{roster ? `${roster.length} accounts` : "…"}</PlainBadge>
+        </div>
+        <div className="p-5">
+          <form onSubmit={createUser} className="flex flex-wrap items-end gap-3">
+            <label className="block min-w-[160px] flex-1">
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">username</span>
+              <input value={uName} onChange={(e) => setUName(e.target.value)} placeholder="soc-analyst" className="field mono w-full px-3 py-2" />
+            </label>
+            <label className="block min-w-[160px] flex-1">
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">password</span>
+              <input value={uPass} onChange={(e) => setUPass(e.target.value)} type="password" placeholder="min 6 chars" className="field mono w-full px-3 py-2" />
+            </label>
+            <label className="block">
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">role</span>
+              <select value={uRole} onChange={(e) => setURole(e.target.value)} className="field mono px-3 py-2">
+                <option value="analyst">analyst</option>
+                <option value="admin">admin</option>
+                <option value="viewer">viewer</option>
+              </select>
+            </label>
+            <button type="submit" disabled={uBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
+              {uBusy ? "CREATING…" : "CREATE USER"}
+            </button>
+            {uMsg && <span className="mono text-[11px] text-emerald-400">✓ {uMsg}</span>}
+            {uErr && <span className="mono text-[11px] text-rose-400">✗ {uErr}</span>}
+          </form>
+
+          <div className="mt-4 divide-y divide-white/[0.04]">
+            {(roster || []).map((u) => (
+              <div key={u.username} className="flex items-center gap-3 py-2.5">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500/20 text-[11px] font-bold text-emerald-300">
+                  {(u.username || "?")[0]?.toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="mono text-[13px] text-slate-100">{u.username}{u.username === session?.username && <span className="text-slate-500"> (you)</span>}</p>
+                  <p className="mono text-[10px] text-slate-600">{u.created_at}</p>
+                </div>
+                <PlainBadge cls={u.role === "admin" ? "!text-emerald-300" : u.role === "analyst" ? "!text-cyan-300" : "!text-slate-400"}>{u.role}</PlainBadge>
+                {u.username !== session?.username && (
+                  <button onClick={() => deleteUser(u.username)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* -------------------------------------------- storage & retention */}

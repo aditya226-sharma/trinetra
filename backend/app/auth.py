@@ -224,6 +224,13 @@ def require_admin(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, 
     return payload
 
 
+def require_analyst(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    """Admins and SOC analysts may triage cases; pure viewers stay read-only."""
+    if payload.get("role") not in ("admin", "analyst"):
+        raise HTTPException(status_code=403, detail="Analyst privileges required")
+    return payload
+
+
 async def require_token_query(request: Request,
                               settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
     """SSE (EventSource) can't set an Authorization header, so accept the
@@ -268,12 +275,54 @@ def me(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, str]:
 def register(body: RegisterRequest,
              payload: Dict[str, Any] = Depends(require_admin),
              settings: Settings = Depends(get_settings)) -> Dict[str, str]:
-    if body.role not in ("admin", "viewer"):
-        raise HTTPException(status_code=400, detail="role must be 'admin' or 'viewer'")
+    if body.role not in ("admin", "analyst", "viewer"):
+        raise HTTPException(status_code=400,
+                            detail="role must be 'admin', 'analyst' or 'viewer'")
     create_user(settings, body.username, body.password, body.role)
     audit_log(settings, str(payload.get("sub", "admin")), "auth.register",
               f"created user {body.username} (role={body.role})")
     return {"username": body.username, "role": body.role}
+
+
+@router.get("/users", response_model=dict, dependencies=[Depends(require_admin)])
+def users_list(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    """Admin view of the dashboard accounts (no password material)."""
+    conn = _connect(settings)
+    try:
+        rows = conn.execute(
+            "SELECT username, role, created_at FROM users ORDER BY created_at").fetchall()
+    finally:
+        conn.close()
+    return {"users": [dict(r) for r in rows]}
+
+
+@router.delete("/users/{username}", response_model=dict,
+               dependencies=[Depends(require_admin)])
+def users_delete(username: str,
+                 payload: Dict[str, Any] = Depends(require_admin),
+                 settings: Settings = Depends(get_settings)) -> Dict[str, bool]:
+    """Remove an account; you cannot delete yourself or the last admin."""
+    if username == str(payload.get("sub", "")):
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    conn = _connect(settings)
+    try:
+        target = conn.execute("SELECT role FROM users WHERE username = ?",
+                              (username,)).fetchone()
+        if target is None:
+            raise HTTPException(status_code=404, detail="user not found")
+        if str(target["role"]) == "admin":
+            admins = conn.execute(
+                "SELECT COUNT(*) AS c FROM users WHERE role = 'admin'").fetchone()
+            if int(admins["c"]) <= 1:
+                raise HTTPException(status_code=400,
+                                    detail="Cannot delete the last admin account")
+        conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+    finally:
+        conn.close()
+    audit_log(settings, str(payload.get("sub", "admin")), "auth.delete_user",
+              f"deleted user {username}")
+    return {"deleted": True}
 
 
 @router.post("/change-password", response_model=dict)

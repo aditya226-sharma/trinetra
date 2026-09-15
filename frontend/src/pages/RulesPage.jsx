@@ -8,7 +8,8 @@ const SEV_FLORS = ["info", "warning", "error", "critical"];
 
 const BLANK = { name: "", description: "", source_types: [], categories: [], min_severity: "warning", action: "alert", match: [{ field: "severity", op: "eq", value: "error" }], enabled: true };
 
-export default function RulesPage() {
+export default function RulesPage({ role }) {
+  const isAdmin = role === "admin";
   const [rules, setRules] = useState([]);
   const [form, setForm] = useState(BLANK);
   const [editingId, setEditingId] = useState(null);
@@ -64,7 +65,14 @@ export default function RulesPage() {
         actions={<PlainBadge cls="!text-emerald-300">{rules.length} rules</PlainBadge>}
       />
 
-      {/* editor */}
+      {!isAdmin && (
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-[12px] text-slate-400 anim-fadeup">
+          Read-only view — <span className="mono text-slate-200">admins</span> enable, edit, and delete rules.
+        </div>
+      )}
+
+      {/* editor (admin only) */}
+      {isAdmin && (
       <form onSubmit={save} className="glass space-y-4 p-5 anim-fadeup">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block min-w-[220px] flex-1">
@@ -123,6 +131,7 @@ export default function RulesPage() {
           {err && <span className="mono text-[11px] text-rose-400">✗ {err}</span>}
         </div>
       </form>
+      )}
 
       {/* rules table */}
       {rules.length === 0 ? (
@@ -142,14 +151,18 @@ export default function RulesPage() {
                   <PlainBadge cls="!text-slate-400">{r.action}</PlainBadge>
                   {r.categories?.length > 0 && <PlainBadge cls="!text-cyan-300">{r.categories.join("/")}</PlainBadge>}
                   <div className="ml-auto flex items-center gap-2">
-                    <button
-                      onClick={() => toggle(r.id, r.enabled)}
-                      className={`chip mono !px-2 !py-1 text-[10px] ${r.enabled ? "chip-on" : ""}`}
-                    >
-                      {r.enabled ? "ENABLED" : "DISABLED"}
-                    </button>
-                    <button onClick={() => startEdit(r)} className="btn-ghost mono !px-3 !py-1.5 text-[10.5px]">edit</button>
-                    <button onClick={() => remove(r.id)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => toggle(r.id, r.enabled)}
+                          className={`chip mono !px-2 !py-1 text-[10px] ${r.enabled ? "chip-on" : ""}`}
+                        >
+                          {r.enabled ? "ENABLED" : "DISABLED"}
+                        </button>
+                        <button onClick={() => startEdit(r)} className="btn-ghost mono !px-3 !py-1.5 text-[10.5px]">edit</button>
+                        <button onClick={() => remove(r.id)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                      </>
+                    )}
                   </div>
                 </div>
                 {r.description && <p className="text-[11px] text-slate-500">{r.description}</p>}

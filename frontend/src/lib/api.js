@@ -271,6 +271,18 @@ export function logoutUser() {
   setToken(null);
 }
 
+export async function getUsers() {
+  if (OFFLINE) return { users: [] };
+  const { data } = await api.get("/auth/users");
+  return data;
+}
+
+export async function deleteUser(username) {
+  if (OFFLINE) return { deleted: true };
+  const { data } = await api.delete(`/auth/users/${encodeURIComponent(username)}`);
+  return data;
+}
+
 // ------------------------------------------------------------------
 // live event stream (SSE)
 // ------------------------------------------------------------------
@@ -512,6 +524,12 @@ export async function getCases(params = {}) {
 export async function caseAction(id, { action, assignee = "", note = "" }) {
   if (OFFLINE) return { case: { id, status: "open" } };
   const { data } = await api.patch(`/cases/${encodeURIComponent(id)}`, { action, assignee, note });
+  return data;
+}
+
+export async function getCaseStats() {
+  if (OFFLINE) return { total: 0, by_status: {}, by_severity: {}, unresolved_by_severity: {} };
+  const { data } = await api.get("/cases/stats");
   return data;
 }
 

@@ -4,7 +4,8 @@ import { PageHeader, PlainBadge, Empty } from "../components/ui";
 
 const KINDS = ["ip", "client", "user", "domain", "asset"];
 
-export default function WatchlistPage() {
+export default function WatchlistPage({ role }) {
+  const isAdmin = role === "admin";
   const [tab, setTab] = useState("watchlist");
   const [entries, setEntries] = useState([]);
   const [kind, setKind] = useState("ip");
@@ -71,6 +72,12 @@ export default function WatchlistPage() {
       </div>
 
       <form onSubmit={submit} className="glass flex flex-wrap items-end gap-3 p-4 anim-fadeup">
+        {!isAdmin && (
+          <div className="w-full rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-[12px] text-slate-400">
+            Read-only view — <span className="mono text-slate-200">admins</span> maintain the reference lists.
+          </div>
+        )}
+        {isAdmin && (<>
         <label className="block">
           <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">entity kind</span>
           <select value={kind} onChange={(e) => setKind(e.target.value)} className="field mono px-3 py-2">
@@ -90,6 +97,7 @@ export default function WatchlistPage() {
         </button>
         {msg && <span className="mono text-[11px] text-emerald-400">✓ {msg}</span>}
         {err && <span className="mono text-[11px] text-rose-400">✗ {err}</span>}
+        </>)}
       </form>
 
       {entries.length === 0 ? (
@@ -106,10 +114,12 @@ export default function WatchlistPage() {
                 <span className={`mono min-w-0 flex-1 truncate text-[13px] ${en.active ? "text-slate-100" : "text-slate-500 line-through"}`}>{en.value}</span>
                 <span className="hidden max-w-[220px] truncate text-[11px] text-slate-500 lg:block" title={en.reason}>{en.reason || "—"}</span>
                 <span className="mono hidden shrink-0 text-[10px] text-slate-600 md:block">{en.created_by}</span>
-                <button onClick={() => toggle(en.kind, en.value, !en.active)} className={`chip mono !px-2 !py-1 text-[10px] ${en.active ? "chip-on" : ""}`}>
-                  {en.active ? "ON" : "OFF"}
-                </button>
-                <button onClick={() => remove(en.kind, en.value)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                {isAdmin && (<>
+                  <button onClick={() => toggle(en.kind, en.value, !en.active)} className={`chip mono !px-2 !py-1 text-[10px] ${en.active ? "chip-on" : ""}`}>
+                    {en.active ? "ON" : "OFF"}
+                  </button>
+                  <button onClick={() => remove(en.kind, en.value)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                </>)}
               </div>
             ))}
           </div>

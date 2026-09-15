@@ -4,12 +4,13 @@ import { useNavigate } from "react-router-dom";
 // Global command palette — ⌘K / Ctrl-K. Jumps between pages and runs a few
 // headless actions. Zero dependencies; rendered inside the app shell so it
 // inherits the existing dark/light theming.
-export default function CommandPalette({ theme, setTheme }) {
+export default function CommandPalette({ theme, setTheme, role }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
   const navigate = useNavigate();
+  const isAdmin = role === "admin";
 
   const ACTIONS = useMemo(() => ({
     pages: [
@@ -24,9 +25,11 @@ export default function CommandPalette({ theme, setTheme }) {
       { label: "Compliance", hint: "/compliance", run: () => navigate("/compliance") },
       { label: "Analytics", hint: "/analytics", run: () => navigate("/analytics") },
       { label: "Fleet", hint: "/fleet", run: () => navigate("/fleet") },
-      { label: "Ingest", hint: "/ingest", run: () => navigate("/ingest") },
       { label: "Live console", hint: "/console", run: () => navigate("/console") },
-      { label: "Settings & admin", hint: "/settings", run: () => navigate("/settings") },
+      ...(isAdmin ? [
+        { label: "Ingest", hint: "/ingest", run: () => navigate("/ingest") },
+        { label: "Settings & admin", hint: "/settings", run: () => navigate("/settings") },
+      ] : []),
     ],
     quick: [
       {
@@ -36,7 +39,7 @@ export default function CommandPalette({ theme, setTheme }) {
       },
       { label: "Export events as CSV", hint: "→ /events", run: () => navigate("/events") },
     ],
-  }), [navigate, theme, setTheme]);
+  }), [navigate, theme, setTheme, isAdmin]);
 
   useEffect(() => {
     const onKey = (e) => {

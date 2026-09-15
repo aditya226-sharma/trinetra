@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { bootstrapDemo, getHealth, getAlerts, isPreview, authMe, logoutUser } from "./lib/api";
+import { bootstrapDemo, getHealth, getAlerts, getCaseStats, isPreview, authMe, logoutUser } from "./lib/api";
 import { getToken, setToken } from "./lib/auth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -173,6 +173,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [theme, setTheme] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("trinetra_theme") || "dark" : "dark"));
   const [bell, setBell] = useState({ alerts: [], open: false });
+  const [openCaseCount, setOpenCaseCount] = useState(0);
   const liveUrl = useLiveUrl();
   const navigate = useNavigate();
   const location = useLocation();
@@ -189,6 +190,23 @@ export default function App() {
         .catch(() => {});
     poll();
     const t = setInterval(poll, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, [authState]);
+
+  // Open-case badge on the Alerts rail item — quick heartbeat so the queue
+  // count stays honest without opening the page.
+  useEffect(() => {
+    if (authState !== "authed") return;
+    let alive = true;
+    const poll = () =>
+      getCaseStats()
+        .then((s) => {
+          if (!alive) return;
+          setOpenCaseCount((s?.by_status?.open || 0) + (s?.by_status?.acknowledged || 0));
+        })
+        .catch(() => {});
+    poll();
+    const t = setInterval(poll, 5000);
     return () => { alive = false; clearInterval(t); };
   }, [authState]);
 
@@ -299,7 +317,7 @@ export default function App() {
 
   return (
     <div className={`relative flex min-h-screen ${location.pathname.startsWith("/report") ? "report-mode" : ""}`}>
-      <CommandPalette theme={theme} setTheme={setTheme} />
+      <CommandPalette theme={theme} setTheme={setTheme} role={user?.role} />
       {liveUrl && (
         <a
           href={liveUrl}
@@ -347,7 +365,13 @@ export default function App() {
         <div className="px-1.5 pb-2 pt-1">
           <p className="eyebrow px-4 pb-2">Command</p>
           <nav className="space-y-0.5">
-            {navItems.map((item) => (
+            {navItems
+              .filter((item) => {
+                if (!user) return true;
+                if (item.to === "/settings" || item.to === "/ingest") return user.role === "admin";
+                return true;
+              })
+              .map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -356,8 +380,10 @@ export default function App() {
               >
                 <span className="grid h-6 w-6 place-items-center opacity-80">{ICONS[item.label]}</span>
                 {item.label}
-                {item.label === "Alerts" && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" />
+                {item.label === "Alerts" && openCaseCount > 0 && (
+                  <span className={`ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white ${openCaseCount > 0 ? "pulse-dot-red" : ""}`}>
+                    {openCaseCount > 99 ? "99+" : openCaseCount}
+                  </span>
                 )}
               </NavLink>
             ))}
@@ -533,18 +559,18 @@ export default function App() {
             <Route path="/clients/:id" element={<LogConsolePage />} />
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/rules" element={<RulesPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
+            <Route path="/alerts" element={<AlertsPage role={user?.role} />} />
+            <Route path="/rules" element={<RulesPage role={user?.role} />} />
+            <Route path="/watchlist" element={<WatchlistPage role={user?.role} />} />
             <Route path="/graph" element={<GraphPage />} />
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/fleet" element={<FleetPage />} />
             <Route path="/report/:assetId" element={<ReportPage />} />
-            <Route path="/ingest" element={<IngestPage />} />
+            <Route path="/ingest" element={user?.role === "admin" ? <IngestPage /> : <Navigate to="/" replace />} />
             <Route path="/console" element={<ConsolePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings" element={user?.role === "admin" ? <SettingsPage role={user.role} /> : <Navigate to="/" replace />} />
             <Route path="/login" element={authState === "authed"
               ? <Navigate to="/" replace />
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />

@@ -5,21 +5,29 @@ import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } fr
 const POLL_MS = 5000;
 const STATUS_FILTERS = ["", "unresolved", "open", "acknowledged", "resolved"];
 const SEVERS = ["", "critical", "high", "warning", "info"];
+const KINDS = ["", "flow", "watch", "block", "rule"];
+const SORTS = ["newest", "oldest", "severity", "hits"];
 
-export default function AlertsPage() {
+export default function AlertsPage({ role }) {
+  const canTriage = role === "admin" || role === "analyst";
   const [data, setData] = useState({ cases: [], stats: null });
   const [statusFilter, setStatusFilter] = useState("");
   const [sevFilter, setSevFilter] = useState("");
+  const [kindFilter, setKindFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  const [sel, setSel] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [assignees, setAssignees] = useState({});
   const [notes, setNotes] = useState({});
   const [busy, setBusy] = useState({});
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let alive = true;
     const tick = () =>
-      getCases({ limit: 200, status: statusFilter || undefined, severity: sevFilter || undefined })
+      getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
         .then((d) => { if (alive) { setData(d); setError(null); } })
         .catch((e) => alive && setError(e.message));
     tick();
@@ -30,6 +38,13 @@ export default function AlertsPage() {
   const { cases, stats } = data;
   const statsSev = stats?.unresolved_by_severity || {};
 
+  const refresh = (fresh) => {
+    if (fresh) { setData(fresh); return; }
+    getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
+      .then((d) => { setData(d); setError(null); })
+      .catch((e) => setError(e.message));
+  };
+
   const act = async (id, action, extra = {}) => {
     setBusy((b) => ({ ...b, [id]: action }));
     try {
@@ -39,11 +54,58 @@ export default function AlertsPage() {
     } finally {
       setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
     }
-    const fresh = await getCases({ limit: 200, status: statusFilter || undefined, severity: sevFilter || undefined }).catch(() => null);
-    if (fresh) setData(fresh);
+    refresh();
   };
 
-  const visible = (statusFilter ? cases : cases.filter((c) => c.status !== "resolved"));
+  const actAll = async (action, extra = {}) => {
+    const ids = Object.keys(sel).filter((k) => sel[k]);
+    if (!ids.length) return;
+    setBulkBusy(true);
+    let failed = 0;
+    for (const id of ids) {
+      try { await caseAction(id, { action, ...extra }); } catch { failed += 1; }
+    }
+    setBulkBusy(false);
+    setSel({});
+    if (failed) setError(`${failed} case(s) failed — check permission.`);
+    refresh();
+  };
+
+  const baseQueue = statusFilter ? cases : cases.filter((c) => c.status !== "resolved");
+
+  const visible = useMemo(() => {
+    let out = baseQueue;
+    if (kindFilter) out = out.filter((c) => (c.source_kind || "") === kindFilter);
+    if (assigneeFilter) {
+      if (assigneeFilter === "unassigned") out = out.filter((c) => !c.assignee);
+      else out = out.filter((c) => (c.assignee || "") === assigneeFilter);
+    }
+    const sevRank = { critical: 0, high: 1, warning: 2, error: 3, info: 4, low: 5 };
+    const ts = (c) => (c.last_seen || c.timestamp || "");
+    const sorted = [...out];
+    if (sortBy === "newest") sorted.sort((a, b) => ts(b).localeCompare(ts(a)));
+    else if (sortBy === "oldest") sorted.sort((a, b) => ts(a).localeCompare(ts(b)));
+    else if (sortBy === "severity") sorted.sort((a, b) => (sevRank[a.severity] ?? 6) - (sevRank[b.severity] ?? 6));
+    else if (sortBy === "hits") sorted.sort((a, b) => (b.hits || 0) - (a.hits || 0));
+    return sorted;
+  }, [baseQueue, kindFilter, assigneeFilter, sortBy]);
+
+  const selectedIds = Object.keys(sel).filter((k) => sel[k]);
+  const assigneeChoices = [...new Set(cases.map((c) => c.assignee).filter(Boolean))];
+
+  const exportCsv = () => {
+    const head = ["id", "threat_class", "severity", "status", "kind", "source_value", "assignee", "hits", "created", "last_seen", "message"];
+    const rows = [head];
+    for (const c of visible) {
+      rows.push([c.id, c.threat_class, c.severity, c.status, c.source_kind || "", c.source_value || "", c.assignee || "", c.hits || "", c.timestamp || "", c.last_seen || "", String(c.message || "").replace(/\n/g, " ")]);
+    }
+    const blob = new Blob([rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `trinetra-cases-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   return (
     <div className="space-y-6">
@@ -51,7 +113,12 @@ export default function AlertsPage() {
         eyebrow="soc · alert cases · triage lifecycle"
         title="Alert queue"
         sub="Every pipeline verdict and policy hit becomes a durable case — acknowledge, assign, resolve, and annotate. External delivery fans out at your configured severity floor."
-        actions={<LiveBadge text={`Poll 5s · ${stats?.total ?? 0} cases`} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <LiveBadge text={`Poll 5s · ${stats?.total ?? 0} cases`} />
+            {!canTriage && <PlainBadge cls="!text-slate-400">read-only</PlainBadge>}
+          </div>
+        }
       />
 
       {/* case counters */}
@@ -79,6 +146,33 @@ export default function AlertsPage() {
             {s === "" ? "all" : s}
           </button>
         ))}
+        <span className="eyebrow ml-4 mr-1">KIND</span>
+        <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className="field mono px-2 py-1.5 text-[10.5px]">
+          {KINDS.map((k) => <option key={k} value={k}>{k === "" ? "all kinds" : k}</option>)}
+        </select>
+        <span className="eyebrow ml-3 mr-1">ASSIGNEE</span>
+        <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="field mono px-2 py-1.5 text-[10.5px]">
+          <option value="">anyone</option>
+          {assigneeChoices.map((a) => <option key={a} value={a}>@{a}</option>)}
+          <option value="unassigned">unassigned</option>
+        </select>
+        <span className="eyebrow ml-3 mr-1">SORT</span>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="field mono px-2 py-1.5 text-[10.5px]">
+          {SORTS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <div className="ml-auto flex items-center gap-2">
+          {canTriage && selectedIds.length > 0 && (
+            <>
+              <button onClick={() => actAll("ack")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px]">
+                {bulkBusy ? "…" : `ack ${selectedIds.length}`}
+              </button>
+              <button onClick={() => actAll("resolve")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400">
+                {bulkBusy ? "…" : `resolve ${selectedIds.length}`}
+              </button>
+            </>
+          )}
+          <button onClick={exportCsv} className="btn-ghost mono !px-3 !py-1.5 text-[10.5px]">export csv ({visible.length})</button>
+        </div>
       </div>
 
       {visible.length === 0 ? (
@@ -93,6 +187,19 @@ export default function AlertsPage() {
                 <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(c.severity)} ${c.severity === "critical" ? "pulse-dot-red" : ""}`} />
                 <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
                   <button onClick={() => setExpandedId(open ? null : c.id)} className="flex w-full items-center gap-3 p-4 text-left">
+                    {canTriage && (
+                      <span
+                        role="checkbox"
+                        aria-checked={!!sel[c.id]}
+                        tabIndex={0}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setSel((s) => ({ ...s, [c.id]: !s[c.id] })); } }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[9px] ${sel[c.id] ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20"}`}
+                      >
+                        {sel[c.id] ? "✓" : ""}
+                      </span>
+                    )}
                     <span className={`sev-strip ${stripCls(c.severity)}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +210,7 @@ export default function AlertsPage() {
                         {c.hits > 1 && <PlainBadge cls="!text-slate-300">hits {c.hits}</PlainBadge>}
                       </div>
                       <p className="mono mt-1 text-[11px] uppercase tracking-widest text-slate-500">
-                        {c.message || c.threat_class} · {c.source_value || "—"} {c.timestamp && `· ${c.timestamp}`}
+                        {c.message || c.threat_class} · {c.source_value || "—"} {c.timestamp && ` · ${c.timestamp}`}
                         {c.assignee && <span className="text-emerald-300"> · @{c.assignee}</span>}
                       </p>
                     </div>
@@ -113,29 +220,35 @@ export default function AlertsPage() {
                   {open && (
                     <div className="border-t border-white/5 bg-black/30 p-4">
                       <div className="mb-3 flex flex-wrap items-center gap-2">
-                        {c.status === "open" && <ActionBtn onClick={() => act(c.id, "ack")} busy={busy[c.id]} label="Acknowledge" />}
-                        {c.status === "acknowledged" && (
+                        {!canTriage ? (
+                          <span className="mono text-[10.5px] uppercase tracking-widest text-slate-500">read-only queue — an admin or analyst owns this case</span>
+                        ) : (
                           <>
-                            <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />
-                            <ActionBtn onClick={() => act(c.id, "unack")} busy={busy[c.id]} label="Reopen" variant="ghost" />
+                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "ack")} busy={busy[c.id]} label="Acknowledge" />}
+                            {c.status === "acknowledged" && (
+                              <>
+                                <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />
+                                <ActionBtn onClick={() => act(c.id, "unack")} busy={busy[c.id]} label="Reopen" variant="ghost" />
+                              </>
+                            )}
+                            {c.status === "resolved" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
+                            {c.status !== "resolved" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
+                            <input
+                              value={assignees[c.id] || ""}
+                              onChange={(e) => setAssignees((a) => ({ ...a, [c.id]: e.target.value }))}
+                              placeholder="assign to…"
+                              className="field mono w-40 px-3 py-1.5 text-[11px]"
+                            />
+                            <ActionBtn onClick={() => act(c.id, "assign", { assignee: assignees[c.id] || "" })} label="Assign" variant="ghost" />
+                            <input
+                              value={notes[c.id] || ""}
+                              onChange={(e) => setNotes((a) => ({ ...a, [c.id]: e.target.value }))}
+                              placeholder="add note…"
+                              className="field mono w-56 px-3 py-1.5 text-[11px]"
+                              onKeyDown={(e) => { if (e.key === "Enter" && notes[c.id]) { act(c.id, "note", { note: notes[c.id] }); setNotes((a) => ({ ...a, [c.id]: "" })); } }}
+                            />
                           </>
                         )}
-                        {c.status === "resolved" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
-                        {c.status !== "resolved" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
-                        <input
-                          value={assignees[c.id] || ""}
-                          onChange={(e) => setAssignees((a) => ({ ...a, [c.id]: e.target.value }))}
-                          placeholder="assign to…"
-                          className="field mono w-40 px-3 py-1.5 text-[11px]"
-                        />
-                        <ActionBtn onClick={() => act(c.id, "assign", { assignee: assignees[c.id] || "" })} label="Assign" variant="ghost" />
-                        <input
-                          value={notes[c.id] || ""}
-                          onChange={(e) => setNotes((a) => ({ ...a, [c.id]: e.target.value }))}
-                          placeholder="add note…"
-                          className="field mono w-56 px-3 py-1.5 text-[11px]"
-                          onKeyDown={(e) => { if (e.key === "Enter" && notes[c.id]) { act(c.id, "note", { note: notes[c.id] }); setNotes((a) => ({ ...a, [c.id]: "" })); } }}
-                        />
                       </div>
 
                       <p className="eyebrow mb-2">Supporting evidence</p>
