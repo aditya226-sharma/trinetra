@@ -144,8 +144,10 @@ export default function App() {
   const location = useLocation();
 
   // Header alert bell — latest alerts, refreshed on a slow poll (a live
-  // "unread" badge lands with the alert lifecycle feature).
+  // "unread" badge lands with the alert lifecycle feature). Only run once a
+  // session exists so the pre-login mount can't fire unauthenticated 401s.
   useEffect(() => {
+    if (authState !== "authed") return;
     let alive = true;
     const poll = () =>
       getAlerts(12)
@@ -154,7 +156,7 @@ export default function App() {
     poll();
     const t = setInterval(poll, 30000);
     return () => { alive = false; clearInterval(t); };
-  }, []);
+  }, [authState]);
 
   useEffect(() => {
     if (!bell.open) return;
