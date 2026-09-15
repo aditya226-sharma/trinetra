@@ -785,11 +785,11 @@ async def ingest_bulk(file: UploadFile = File(...),
     default_source = str(source or "file_log")
     default_client = str(client_id or "")
 
-    accepted = duplicates = failed = raw_accepted = 0
+    accepted = duplicates = failed = ignored = raw_accepted = 0
     alerts: List[str] = []
 
     def _record(rec: Any, fallback_source: str) -> None:
-        nonlocal accepted, duplicates, failed, raw_accepted
+        nonlocal accepted, duplicates, failed, ignored, raw_accepted
         try:
             if isinstance(rec, dict):
                 r = rec.get("raw")
@@ -810,6 +810,8 @@ async def ingest_bulk(file: UploadFile = File(...),
                 accepted += 1
             elif outcome == "duplicate":
                 duplicates += 1
+            elif outcome == "ignored":
+                ignored += 1
             else:
                 failed += 1
         except Exception as exc:  # noqa: BLE001
@@ -842,11 +844,11 @@ async def ingest_bulk(file: UploadFile = File(...),
 
     alerts = _ORCH.flush_batch()
     summary = {"accepted": accepted, "failed": failed, "duplicates": duplicates,
-               "raw_records": raw_accepted, "lines": raw_accepted,
+               "ignored": ignored, "raw_records": raw_accepted, "lines": raw_accepted,
                "alerts": alerts, "total": _ORCH.event_store.count()}
     audit_log(_settings, str(payload.get("sub", "admin")), "ingest.bulk",
-              f"uploaded {name or '?'} ({summary['lines']} records): "
-              f"{accepted} accepted, {duplicates} dup, {failed} failed")
+              f"uploaded {name or '?'} ({summary['raw_records']} lines): "
+              f"{accepted} accepted, {duplicates} dup, {ignored} ignored, {failed} failed")
     return summary
 
 
