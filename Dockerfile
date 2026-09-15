@@ -15,7 +15,7 @@ WORKDIR /app
 # without them; networkx powers Module C when present).
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt || \
-    pip install --no-cache-dir fastapi uvicorn pyyaml requests
+    pip install --no-cache-dir fastapi uvicorn pyyaml requests python-multipart
 
 COPY . .
 
