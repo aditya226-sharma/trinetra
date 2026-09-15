@@ -46,7 +46,8 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import (Body, Depends, FastAPI, File, Form, Header, HTTPException,
+                     Query, Request, UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -55,11 +56,13 @@ from analyzer.llm_analyzer import LLMAnalyzer  # noqa: F401  (type surface)
 from backend.app.auth import (ensure_admin, require_admin, require_auth,
                               require_token_query)
 from backend.app.auth import router as auth_router
+from backend.app.services.audit import audit_log, audit_recent
 from backend.app.stream import hub
 from config.settings import Settings, get_settings
 from orchestrator import Orchestrator
 from modules.entity_graph import EntityGraph
-from pipeline.retention import start_retention_loop
+from pipeline.retention import (prune, set_retention, start_retention_loop,
+                                storage_snapshot)
 
 log = logging.getLogger("trinetra.api")
 
@@ -137,6 +140,18 @@ class MintAgentRequest(BaseModel):
     client_id: str = ""
 
 
+class RetentionRequest(BaseModel):
+    """Admin retention change — validated against the allowed policy set."""
+    days: int
+    prune_now: bool = False
+
+
+# Bulk upload size caps: guards /api/ingest/bulk against paging the whole
+# filesystem into memory or a runaway parse.
+_BULK_MAX_BYTES = 8_000_000
+_BULK_MAX_RECORDS = 10_000
+
+
 # ------------------------------------------------------------------ agent auth
 
 
@@ -191,7 +206,8 @@ def _rate_limit_ok(key: str, weight: int = 1) -> bool:
 
 
 @app.post("/api/demo/run", tags=["bootstrap"], dependencies=[Depends(require_admin)])
-def run_demo(reset: bool = Query(False)) -> Dict[str, Any]:
+def run_demo(reset: bool = Query(False),
+             payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
     """Run the offline demo storyline once, then serve its data."""
     global _ORCH, _GRAPH
     if reset:
@@ -212,6 +228,8 @@ def run_demo(reset: bool = Query(False)) -> Dict[str, Any]:
         _ORCH.ingest(raw, source, client, host)
     _ORCH.flush_batch()
     _ORCH.stats["bootstrapped"] = True
+    audit_log(_settings, str(payload.get("sub", "admin")), "bootstrap.demo",
+              f"ran demo storyline (reset={reset})")
     return {"status": "ok", **dashboard()}
 
 
@@ -514,7 +532,8 @@ def event_detail(event_id: str) -> Dict[str, Any]:
 
 
 @app.post("/api/ingest", tags=["ingest"], dependencies=[Depends(require_admin)])
-def ingest(body: IngestRequest) -> Dict[str, Any]:
+def ingest(body: IngestRequest,
+           payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
     global _ORCH, _GRAPH
     if _ORCH is None:
         _ORCH = Orchestrator(_settings)
@@ -538,6 +557,9 @@ def ingest(body: IngestRequest) -> Dict[str, Any]:
         else:
             failed += 1
     alerts = _ORCH.flush_batch()
+    audit_log(_settings, str(payload.get("sub", "admin")), "ingest.raw",
+              f"{len(body.lines)} lines: {accepted} accepted, "
+              f"{duplicates} dup, {ignored} ignored, {failed} failed")
     return {"accepted": accepted, "failed": failed, "duplicates": duplicates,
             "ignored": ignored, "alerts": alerts,
             "total": _ORCH.event_store.count()}
@@ -667,7 +689,8 @@ def agent_heartbeat(request: Request, body: HeartbeatRequest,
 
 
 @app.post("/api/agents", tags=["agents"], dependencies=[Depends(require_admin)])
-def mint_agent(body: MintAgentRequest) -> Dict[str, Any]:
+def mint_agent(body: MintAgentRequest,
+               payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
     """Mint a per-machine agent token (admin only). The raw token is returned
     exactly once; only its sha256 is persisted. ``client_id`` may be pre-bound
     or left for the agent's first heartbeat to bind."""
@@ -675,6 +698,8 @@ def mint_agent(body: MintAgentRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=428, detail="Bootstrap first")
     token_id, token = _ORCH.client_store.mint_token(
         label=str(body.label or ""), client_id=str(body.client_id or ""))
+    audit_log(_settings, str(payload.get("sub", "admin")), "agents.mint",
+              f"minted token {token_id} (client={body.client_id or 'unbound'})")
     return {"token_id": token_id, "token": token,
             "client_id": str(body.client_id or "") or None}
 
@@ -688,12 +713,141 @@ def list_agents() -> Dict[str, Any]:
 
 @app.delete("/api/agents/{token_id}", tags=["agents"],
             dependencies=[Depends(require_admin)])
-def revoke_agent(token_id: str) -> Dict[str, Any]:
+def revoke_agent(token_id: str,
+                 payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
     if not _ORCH.client_store.revoke_token(token_id):
         raise HTTPException(status_code=404, detail="token not found")
+    audit_log(_settings, str(payload.get("sub", "admin")), "agents.revoke",
+              f"revoked token {token_id}")
     return {"status": "revoked", "token_id": token_id}
+
+
+# ------------------------------------------------------------------ admin
+# Storage, retention, audit + bulk upload (Phase 2). Admin-gated; every
+# mutation is recorded to the audit trail.
+
+
+@app.get("/api/admin/storage", tags=["admin"], dependencies=[Depends(require_auth)])
+def admin_storage() -> Dict[str, Any]:
+    """Store volumes, sizes and the effective retention policy."""
+    return storage_snapshot(_settings)
+
+
+@app.put("/api/admin/retention", tags=["admin"],
+         dependencies=[Depends(require_admin)])
+def admin_retention(body: RetentionRequest,
+                    payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    try:
+        days = set_retention(_settings, body.days)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    result: Dict[str, Any] = {"retention_days": days}
+    if body.prune_now or days and body.prune_now:
+        result.update(prune(_settings, days))
+    audit_log(_settings, str(payload.get("sub", "admin")), "admin.retention",
+              f"set retention to {days}d"
+              + (f"; pruned {result.get('events', 0)} events" if body.prune_now else ""))
+    return result
+
+
+@app.get("/api/admin/audit", tags=["admin"], dependencies=[Depends(require_auth)])
+def admin_audit(limit: int = Query(100)) -> Dict[str, Any]:
+    """Newest-first audit trail of privileged actions."""
+    return {"entries": audit_recent(_settings, limit)}
+
+
+@app.post("/api/ingest/bulk", tags=["ingest"], dependencies=[Depends(require_admin)])
+async def ingest_bulk(file: UploadFile = File(...),
+                      source: str = Form(""),
+                      client_id: str = Form(""),
+                      payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    """Bulk upload: CSV / JSON / JSONL into the pipeline, same normalize →
+    dedup → modules → analyzer path as the raw ingester.
+
+    CSV and plain-text files feed each line as raw (source hint + optional
+    ``client_id``). JSON accepts either raw-line objects (``{"raw": ...,
+    "source": ...}``) or pre-normalized event dicts, mirrored by JSONL.
+    """
+    global _ORCH
+    if _ORCH is None:
+        _ORCH = Orchestrator(_settings)
+        _ORCH.stream = hub
+
+    raw = await file.read(_BULK_MAX_BYTES + 1)
+    if len(raw) > _BULK_MAX_BYTES:
+        raise HTTPException(status_code=413,
+                            detail=f"File exceeds {_BULK_MAX_BYTES} byte cap")
+    text = raw.decode("utf-8", errors="replace")
+    name = (file.filename or "").lower()
+
+    default_source = str(source or "file_log")
+    default_client = str(client_id or "")
+
+    accepted = duplicates = failed = raw_accepted = 0
+    alerts: List[str] = []
+
+    def _record(rec: Any, fallback_source: str) -> None:
+        nonlocal accepted, duplicates, failed, raw_accepted
+        try:
+            if isinstance(rec, dict):
+                r = rec.get("raw")
+                if isinstance(r, str) and r.strip():
+                    source_ = str(rec.get("source") or fallback_source) or default_source
+                    client_ = str(rec.get("client_id") or default_client)
+                    outcome = _ORCH.ingest(r.strip(), source_, client_, "")
+                    raw_accepted += 1
+                else:
+                    outcome = _ORCH.ingest_normalized(rec, default_client_id=default_client)
+            else:
+                line = str(rec).strip()
+                if not line:
+                    return
+                outcome = _ORCH.ingest(line, fallback_source, default_client, "")
+                raw_accepted += 1
+            if outcome == "stored":
+                accepted += 1
+            elif outcome == "duplicate":
+                duplicates += 1
+            else:
+                failed += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            log.warning("bulk ingest record failed: %s", exc)
+
+    if name.endswith(".jsonl"):
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                _record(json.loads(line), default_source)
+            except json.JSONDecodeError:
+                _record(line, default_source)
+    elif name.endswith(".json"):
+        try:
+            blob = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid JSON: {exc}")
+        if isinstance(blob, dict):
+            blob = [blob]
+        if not isinstance(blob, list):
+            raise HTTPException(status_code=422, detail="JSON body must be an array")
+        for item in blob:
+            _record(item, default_source)
+    else:
+        for line in text.splitlines():
+            _record(line, name.endswith(".csv") and "csv" or default_source)
+
+    alerts = _ORCH.flush_batch()
+    summary = {"accepted": accepted, "failed": failed, "duplicates": duplicates,
+               "raw_records": raw_accepted, "lines": raw_accepted,
+               "alerts": alerts, "total": _ORCH.event_store.count()}
+    audit_log(_settings, str(payload.get("sub", "admin")), "ingest.bulk",
+              f"uploaded {name or '?'} ({summary['lines']} records): "
+              f"{accepted} accepted, {duplicates} dup, {failed} failed")
+    return summary
 
 
 # ------------------------------------------------------------------- utils

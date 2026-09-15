@@ -14,6 +14,7 @@ import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import ConsolePage from "./pages/ConsolePage";
+import SettingsPage from "./pages/SettingsPage";
 import CommandPalette from "./components/CommandPalette";
 import { SeverityDot } from "./components/ui";
 
@@ -102,6 +103,12 @@ const ICONS = {
       <circle cx="19" cy="17" r="0" />
     </svg>
   ),
+  Settings: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1.11-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1.11 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z" />
+    </svg>
+  ),
 };
 
 const navItems = [
@@ -114,6 +121,7 @@ const navItems = [
   { to: "/compliance", label: "Compliance" },
   { to: "/ingest", label: "Ingest" },
   { to: "/console", label: "Console" },
+  { to: "/settings", label: "Settings" },
 ];
 
 const TITLES = {
@@ -127,6 +135,7 @@ const TITLES = {
   "/compliance": "Compliance briefs",
   "/ingest": "Live ingest",
   "/console": "Live console",
+  "/settings": "Settings & admin",
 };
 
 export default function App() {
@@ -505,6 +514,7 @@ export default function App() {
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/ingest" element={<IngestPage />} />
             <Route path="/console" element={<ConsolePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/login" element={authState === "authed"
               ? <Navigate to="/" replace />
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />

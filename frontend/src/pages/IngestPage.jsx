@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { ingestLines, getClients, searchEvents } from "../lib/api";
+import React, { useEffect, useRef, useState } from "react";
+import { ingestLines, ingestBulkFile, getClients, searchEvents } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, PlainBadge, Empty } from "../components/ui";
 
 const SOURCES = ["syslog", "cef", "json", "csv", "netflow", "windows"];
@@ -25,6 +25,13 @@ export default function IngestPage() {
   const [sending, setSending] = useState(false);
   const [stored, setStored] = useState(0);
   const [stage, setStage] = useState(-1);
+
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkSource, setBulkSource] = useState("");
+  const [bulkResult, setBulkResult] = useState(null);
+  const [bulkError, setBulkError] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const fileRef = useRef(null);
 
   const refreshStored = () =>
     searchEvents({ limit: 1 })
@@ -85,6 +92,22 @@ export default function IngestPage() {
 
   const sample = () =>
     setLines(Array.from({ length: 3 }, (_, i) => SAMPLES[source]).join("\n"));
+
+  const uploadBulk = async () => {
+    if (!bulkFile) return;
+    setBulkBusy(true);
+    setBulkResult(null);
+    setBulkError(null);
+    try {
+      const data = await ingestBulkFile(bulkFile, { source: bulkSource, clientId });
+      setBulkResult(data);
+      refreshStored();
+    } catch (e) {
+      setBulkError(e.response?.data?.detail || e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const lineCount = lines.split("\n").filter((l) => l.trim()).length;
 
@@ -288,6 +311,69 @@ export default function IngestPage() {
           </div>
         </section>
       </div>
+
+      {/* ------------------------------------------------ bulk upload */}
+      <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "140ms" }}>
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 pulse-dot" />
+            <p className="mono text-[11px] tracking-widest text-slate-500">bulk :: file upload</p>
+          </div>
+          <PlainBadge>csv · json · jsonl</PlainBadge>
+        </div>
+        <div className="p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="btn-ghost mono text-[11px]"
+            >
+              {bulkFile ? `✓ ${bulkFile.name}` : "CHOOSE FILE"}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              hidden
+              accept=".csv,.json,.jsonl,.log,.txt"
+              onChange={(e) => { setBulkFile(e.target.files[0] || null); setBulkResult(null); setBulkError(null); }}
+            />
+            <select value={bulkSource} onChange={(e) => setBulkSource(e.target.value)} className="field mono px-3 py-2 text-[11px]">
+              <option value="">source: auto</option>
+              {SOURCES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <button onClick={uploadBulk} disabled={bulkBusy || !bulkFile} className="btn-primary mono">
+              {bulkBusy ? "UPLOADING…" : "↑ UPLOAD"}
+            </button>
+            <span className="mono text-[10px] text-slate-600">
+              client_id from the field above · rows go through the full pipeline
+            </span>
+          </div>
+
+          {bulkError && <p className="mono mt-3 text-[12px] text-rose-400">✗ {bulkError}</p>}
+
+          {bulkResult && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+                <p className="text-grad-emerald text-2xl font-bold leading-none mono">{bulkResult.accepted}</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">accepted</p>
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+                <p className="text-grad-warn text-2xl font-bold leading-none mono">{bulkResult.duplicates ?? 0}</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">duplicates</p>
+              </div>
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-center">
+                <p className="text-grad-danger text-2xl font-bold leading-none mono">{bulkResult.failed}</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">failed</p>
+              </div>
+              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-center">
+                <p className="text-grad-emerald text-2xl font-bold leading-none mono">{bulkResult.total.toLocaleString()}</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">total in store</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

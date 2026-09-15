@@ -312,3 +312,52 @@ export async function revokeAgent(tokenId) {
   const { data } = await api.delete(`/agents/${encodeURIComponent(tokenId)}`);
   return data;
 }
+
+// ------------------------------------------------------------------
+// settings & admin (Phase 2)
+// ------------------------------------------------------------------
+
+export async function changePassword(currentPassword, newPassword) {
+  if (OFFLINE) return { ok: true }; // preview builds are read-only
+  const { data } = await api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+  return data;
+}
+
+export async function getStorageStats() {
+  if (OFFLINE) {
+    const s = await loadSnapshot();
+    return {
+      retention_days: 30, valid_values: [1, 7, 30, 90, 365, 0],
+      events: s.health.events_stored || 0, raw_records: 0,
+      event_db_bytes: 0, raw_store_bytes: 0,
+      event_db_path: "", cutoff: null,
+    };
+  }
+  const { data } = await api.get("/admin/storage");
+  return data;
+}
+
+export async function setRetention(days, pruneNow = false) {
+  if (OFFLINE) return { retention_days: days };
+  const { data } = await api.put("/admin/retention", { days, prune_now: pruneNow });
+  return data;
+}
+
+export async function getAudit(limit = 100) {
+  if (OFFLINE) return { entries: [] };
+  const { data } = await api.get("/admin/audit", { params: { limit } });
+  return data;
+}
+
+export async function ingestBulkFile(file, { source = "", clientId = "" } = {}) {
+  if (OFFLINE) {
+    const s = await loadSnapshot();
+    return { accepted: 0, failed: 0, duplicates: 0, raw_records: 0, total: s.health.events_stored, alerts: [] };
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  if (source) fd.append("source", source);
+  if (clientId) fd.append("client_id", clientId);
+  const { data } = await api.post("/ingest/bulk", fd);
+  return data;
+}

@@ -36,6 +36,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from config.settings import Settings, get_settings
+from backend.app.services.audit import audit_log
 
 log = logging.getLogger("trinetra.auth")
 
@@ -52,6 +53,11 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=6, max_length=128)
     role: str = "viewer"
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -244,8 +250,10 @@ def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> Dic
     finally:
         conn.close()
     if row is None or not _verify_password(body.password, str(row["password_hash"])):
+        audit_log(settings, body.username, "auth.login_failed", "bad credentials")
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = make_token(settings, body.username, str(row["role"]))
+    audit_log(settings, body.username, "auth.login", f"role={row['role']}")
     return {"access_token": token, "token_type": "bearer",
             "username": body.username, "role": str(row["role"])}
 
@@ -257,8 +265,41 @@ def me(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, str]:
 
 @router.post("/register", response_model=dict,
              dependencies=[Depends(require_admin)])
-def register(body: RegisterRequest, settings: Settings = Depends(get_settings)) -> Dict[str, str]:
+def register(body: RegisterRequest,
+             payload: Dict[str, Any] = Depends(require_admin),
+             settings: Settings = Depends(get_settings)) -> Dict[str, str]:
     if body.role not in ("admin", "viewer"):
         raise HTTPException(status_code=400, detail="role must be 'admin' or 'viewer'")
     create_user(settings, body.username, body.password, body.role)
+    audit_log(settings, str(payload.get("sub", "admin")), "auth.register",
+              f"created user {body.username} (role={body.role})")
     return {"username": body.username, "role": body.role}
+
+
+@router.post("/change-password", response_model=dict)
+def change_password(body: ChangePasswordRequest,
+                    payload: Dict[str, Any] = Depends(require_auth),
+                    settings: Settings = Depends(get_settings)) -> Dict[str, bool]:
+    """Rotate your own password after proving the current one.
+
+    Other sessions stay valid until the JWT they carry expires (the secret is
+    session-independent) — expiry is enforced by ``auth.jwt_expiry_hours``.
+    """
+    username = str(payload.get("sub"))
+    conn = _connect(settings)
+    try:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE username = ?",
+            (username,)).fetchone()
+        if row is None or not _verify_password(body.current_password,
+                                               str(row["password_hash"])):
+            audit_log(settings, username, "auth.change_password_failed",
+                      "wrong current password")
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+        conn.execute("UPDATE users SET password_hash = ? WHERE username = ?",
+                     (_hash_password(body.new_password), username))
+        conn.commit()
+    finally:
+        conn.close()
+    audit_log(settings, username, "auth.change_password", "rotated password")
+    return {"ok": True}

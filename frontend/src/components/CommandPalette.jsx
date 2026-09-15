@@ -22,6 +22,7 @@ export default function CommandPalette({ theme, setTheme }) {
       { label: "Compliance", hint: "/compliance", run: () => navigate("/compliance") },
       { label: "Ingest", hint: "/ingest", run: () => navigate("/ingest") },
       { label: "Live console", hint: "/console", run: () => navigate("/console") },
+      { label: "Settings & admin", hint: "/settings", run: () => navigate("/settings") },
     ],
     quick: [
       {
