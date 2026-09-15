@@ -192,7 +192,7 @@ export default function AlertsPage({ role }) {
                         role="checkbox"
                         aria-checked={!!sel[c.id]}
                         tabIndex={0}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setSel((s) => ({ ...s, [c.id]: !s[c.id] })); }}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setSel((s) => ({ ...s, [c.id]: !s[c.id] })); } }}
                         onMouseDown={(e) => e.stopPropagation()}
                         className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[9px] ${sel[c.id] ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20"}`}
