@@ -1,7 +1,6 @@
 """Module A tests — deterministic threat detections from metadata-only flows."""
 
 import sys
-import datetime
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from schema import Event, new_uuid
-from modules.network_threat import ThreatDetector, _dga_score, shannon_entropy
+from modules.network_threat import ThreatDetector, _dga_score
 
 
 def flow(src, dst, sport, dport, pkts=1, bytes_=100, proto="tcp",

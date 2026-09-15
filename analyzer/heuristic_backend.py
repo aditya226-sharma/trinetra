@@ -8,7 +8,6 @@ and CI (no API key, no network).
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
 from analyzer.backend import AnalysisResult

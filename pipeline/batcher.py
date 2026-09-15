@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 from schema import Event
 

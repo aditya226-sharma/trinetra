@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 from alerting.notifier import ConsoleNotifier, EmailNotifier, Notifier
 from backend.app.services.audit import audit_log
 from config.settings import Settings
-from schema import SEVERITY_LEVELS, new_uuid, utc_now
+from schema import SEVERITY_LEVELS, new_uuid
 
 log = logging.getLogger("trinetra.socpolicy")
 

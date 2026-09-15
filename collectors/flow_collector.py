@@ -13,7 +13,6 @@ exactly like any other source — raw preserved, normalized, analyzed.
 from __future__ import annotations
 
 import json
-from itertools import islice
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional
 

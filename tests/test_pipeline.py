@@ -12,7 +12,7 @@ from pipeline.normalizer import Normalizer
 from pipeline.raw_store import RawStore
 from pipeline.batcher import Batcher, DedupCounter
 from pipeline.prefilter import Prefilter
-from schema import Event, new_uuid, make_trace_id
+from schema import Event, new_uuid
 
 
 def _normalizer(tmp_path):

@@ -19,7 +19,6 @@ collector ─▶ raw_store (lossless, trace_id) ─▶ normalizer (UES)
 from __future__ import annotations
 
 import argparse
-import argparse
 import json
 import logging
 import sys
@@ -80,7 +79,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if args.replay:
-        from collectors.flow_collector import FlowCollector, load_flows
+        from collectors.flow_collector import FlowCollector
 
         collector = FlowCollector(replay_path=args.replay)
         started = time.monotonic()

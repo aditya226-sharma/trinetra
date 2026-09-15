@@ -11,13 +11,19 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Base runtime deps (numpy/networkx are optional — pure-Python pipeline works
-# without them; networkx powers Module C when present).
+# All deps are on PyPI with range pins; fail loudly on any problem instead of
+# silently mounting a reduced, unpinned fallback set.
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt || \
-    pip install --no-cache-dir fastapi uvicorn pyyaml requests python-multipart
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# Run as an unprivileged user. /app/data is the volume mount point and is
+# chowned here so the named volume inherits ownership on first creation.
+RUN useradd --create-home --uid 1000 trinetra \
+    && mkdir -p /app/data \
+    && chown -R trinetra:trinetra /app /app/data
+USER trinetra
 
 # ------------------------------------------------------------- dashboard build
 FROM node:22-slim AS ui

@@ -185,9 +185,10 @@ usage: main.py [--demo] [--json] [--pcap DIR] [--replay FILE] [--backend {heuris
                [--max-events N] [--delay SECONDS]
 ```
 
-`--demo` runs a 6-scene LAN story (recon → brute-force → DDoS → C2 beacon →
-exfiltration → DGA) plus the two VPN pcap profiles. With `--json` the machine
-summary goes to stdout and the ALERT console output moves to stderr.
+`--demo` runs a multi-scene intrusion story (recon → brute-force → DDoS → C2
+beaconing → exfiltration → DGA → VPN gateway) plus the two VPN pcap profiles.
+With `--json` the machine summary goes to stdout and the ALERT console output
+moves to stderr.
 
 ## Demo output (reference)
 
@@ -215,22 +216,38 @@ ALERT: [CRITICAL] data_exfiltration conf=0.67 verdict=malicious (quarantine)
 |---|---|
 | `GET /api/health` | store count, configured analyzer backend |
 | `POST /api/auth/login` · `GET /api/auth/me` | dashboard login + session check |
-| `POST /api/auth/register` | create a viewer account (admin-only) |
+| `POST /api/auth/register` | create an admin/analyst/viewer account (admin-only) |
+| `PUT /api/auth/change-password` | rotate your own password (authed) |
+| `GET /api/auth/users` · `DELETE /api/auth/users/{username}` | admin user roster + account removal |
 | `POST /api/demo/run?reset=` | bootstrap the demo story, returns full results (admin) |
 | `GET /api/dashboard` | aggregated stats + graph + latest findings |
 | `GET /api/graph` | full entity graph payload for the SVG view |
 | `GET /api/assets` · `GET /api/assets/{ip}/relations` | impacted asset list + drill-down |
-| `GET /api/compliance` · `GET /api/compliance/{asset}` | CIS/NIST/ATT&CK mapping + markdown brief |
+| `GET /api/compliance` · `GET /api/compliance/{asset_id}/report` | CIS/NIST/ATT&CK mapping + markdown brief + group PDF report |
 | `GET /api/network-threats` | current Module A findings |
+| `GET /api/analytics` | hourly/7-day series + top dimensions for the charts |
+| `GET /api/alerts` · `PATCH /api/alerts/{id}` | case/alerts feed + ack/resolve/assign/annotate lifecycle |
+| `GET /api/cases` · `GET /api/cases/stats` · `PATCH /api/cases/{case_id}` | SOC case queue, status counters, triage transitions (analyst+) |
+| `GET /api/rules` · `GET /api/rules/{rule_id}` | custom detection rules (admin mutates) |
+| `GET /api/watchlist` · `POST /api/watchlist` · `PATCH /api/watchlist/{entry_id}/toggle` | watch/block indicators (admin mutates) |
+| `GET /api/agents` · `POST /api/agents` · `DELETE /api/agents/{token_id}` | fleet token registry (admin mints/revokes) |
+| `POST /api/agent/heartbeat` | agent liveness ping (`X-Agent-Token`) |
+| `GET /api/admin/storage` · `POST /api/admin/retention` | storage panel + retention policy (admin) |
+| `GET /api/admin/audit` | privileged-action audit trail (admin) |
+| `GET /api/admin/collectors` · `POST /api/admin/collectors` | live collector sources (admin) |
+| `GET /api/admin/notifications` · `POST /api/admin/notifications` · tests/digest | alert delivery config + test/digest (admin) |
 | `GET /api/clients` | distinct client ids (each agent host shows live here) |
 | `GET /api/events/search?query=` · `GET /api/events/{id}` | event explorer with raw trace-back |
 | `GET /api/events/stream?token=&client_id=` | SSE live tail for the dashboard |
 | `POST /api/ingest-events` | agent/flocker intake (`X-Agent-Token`; array or `{events:[...]}`) |
-| `POST /api/ingest` | normalize + analyze arbitrary lines (`{source, host, lines[]}`) |
+| `POST /api/ingest` · `POST /api/ingest/bulk` | normalize + analyze arbitrary lines / up to 10k records (admin) |
 
 All routes above the `POST /api/ingest` row require a valid bearer token
-(dashboard pages send it automatically); `POST /api/ingest` and
-`POST /api/demo/run` additionally require the `admin` role.
+(dashboard pages send it automatically); `GET /api/health` is unauthenticated;
+`POST /api/ingest`, `POST /api/ingest/bulk` and `POST /api/demo/run` require
+the `admin` role; case triage (ack/resolve/assign/annotate) requires `admin`
+or `analyst`; `POST /api/ingest-events` and `POST /api/agent/heartbeat` use the
+shared `X-Agent-Token` instead of a dashboard bearer token.
 
 ## Configuration
 
@@ -248,12 +265,16 @@ Environment variables:
 |---|---|
 | `ANTHROPIC_API_KEY` | enables the `anthropic` analyzer backend |
 | `TRINETRA_LOCAL_LLM_URL` | OpenAI-compatible base URL for the `local` backend |
+| `TRINETRA_LOCAL_LLM_MODEL` | model name for the `local` backend (default `qwen2.5-coder:7b`) |
 | `TRINETRA_LLM_BACKEND` | overrides `llm.backend` (used in docker-compose) |
 | `TRINETRA_STORE_PATH` / `TRINETRA_RAW_DIR` | containerized store locations |
+| `TRINETRA_CLIENT_ID` | agent identity for this node (default `trinetra-core`) |
 | `AGENT_TOKEN` | shared `X-Agent-Token` accepted by `/api/ingest-events` + `/api/events/stream`; no ingestion from agents until set |
-| `ADMIN_USER` / `ADMIN_PASSWORD` | first admin account (seeded on start if none exists) |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | first admin account (seeded on start if none exists; defaults to `admin`/`admin` — change for any exposed deployment) |
 | `TRINETRA_RETENTION_DAYS` | event retention (1/7/30/90/365/0); background pruning on start |
 | `TRINETRA_JWT_SECRET` | override the persisted HMAC signing secret (omit to auto-generate) |
+| `TRINETRA_SMTP_HOST/PORT/FROM/TO/USER/PASS` | SMTP credentials for email alert delivery + digest |
+| `VITE_API_BASE` / `VITE_BASE` / `VITE_OFFLINE_DEMO` | frontend build-time: API origin, base path (e.g. `/trinetra/` on Pages), offline demo mode |
 
 ## Repository layout
 
@@ -268,9 +289,10 @@ trinetra/
 ├── analyzer/                   backend protocol, heuristic/anthropic/local, LLMAnalyzer facade
 ├── alerting/notifier.py        console + email fan-out
 ├── orchestrator.py + main.py   pipeline runner + CLI
-├── backend/app/                FastAPI routes + compliance service (serves frontend/dist when present)
-├── frontend/                   React + Tailwind v4 / Vite dashboard (5 pages)
-├── tests/                      33 pytest cases (parsers, pipeline, modules A/B/C, analyzer, API)
+├── socpolicy.py                 SOC policy engine: watch/block lists, rules, case lifecycle, delivery + digest
+├── backend/app/                FastAPI routes + auth/RBAC + compliance service (serves frontend/dist when present)
+├── frontend/                   React + Tailwind v4 / Vite dashboard: dashboard, events, alerts, rules, watchlist, graph, assets, compliance, analytics, fleet, report, ingest, console, settings, clients/onboard/logs
+├── tests/                      106 pytest cases (parsers, pipeline, modules A/B/C, analyzer, SOC policy, auth/RBAC, API)
 ├── Dockerfile (multi-stage) + docker-compose.yml
 └── data/                       runtime artifacts (raw/, trinetra.db, generated pcaps)
 ```
@@ -278,7 +300,7 @@ trinetra/
 ## Testing
 
 ```bash
-python -m pytest tests/ -q      # 33 passed
+python -m pytest tests/ -q      # 106 passed
 ```
 
 ## Problem-statement coverage

@@ -131,10 +131,7 @@ def storage_snapshot(settings: Settings) -> Dict[str, object]:
     finally:
         store.close()
     raw = RawStore(settings.path("raw_store"))
-    try:
-        raw_records = len(raw)
-    finally:
-        pass
+    raw_records = len(raw)
     days = effective_days(settings)
     return {
         "retention_days": days,

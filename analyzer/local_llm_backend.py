@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from urllib.error import HTTPError, URLError
 
 from analyzer.backend import AnalysisResult

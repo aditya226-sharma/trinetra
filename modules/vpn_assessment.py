@@ -22,17 +22,9 @@ from typing import Any, Dict, List, Optional
 from modules.ipsec_ids import (
     CONVENTION_ATTR,
     IKEV1_ATTR,
-    IKEV1_GROUP,
-    IKEV1_HASH,
     IKEV1_MODE,
-    IKEV2_DH,
-    IKEV2_ENCR,
-    IKEV2_ESN,
-    IKEV2_INTEG,
-    IKEV2_PRFR,
     IKEV2_TTYPE,
     encr_lookup,
-    encr_str,
     group_str,
     hash_lookup,
 )

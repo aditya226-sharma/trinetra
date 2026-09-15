@@ -3,7 +3,6 @@ external delivery throttling and the digest builder."""
 
 import json
 import sys
-import time
 from pathlib import Path
 
 import pytest

@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 # event -> framed SSE line length cap (safety valve)
 _EVENT_LIMIT = 1_000_000

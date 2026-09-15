@@ -574,6 +574,16 @@ export default function App() {
             <Route path="/login" element={authState === "authed"
               ? <Navigate to="/" replace />
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />
+            <Route path="*" element={
+              <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-6 text-center">
+                <p className="mono text-3xl font-bold tracking-widest text-slate-700">404</p>
+                <p className="mono text-[13px] uppercase tracking-widest text-slate-400">no such sector — this sector is off the map</p>
+                <p className="max-w-md text-[12px] leading-relaxed text-slate-500">
+                  The address you reached doesn't match any page in this console. Navigate back to the dashboard to keep scanning.
+                </p>
+                <Link to="/" className="btn-primary mono mt-2 !px-4 !py-2 text-[11px]">BACK TO DASHBOARD</Link>
+              </div>
+            } />
           </Routes>
         </main>
 

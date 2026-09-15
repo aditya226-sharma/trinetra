@@ -17,7 +17,6 @@ orphan line, so the system degrades gracefully instead of dropping data.
 
 from __future__ import annotations
 
-import functools
 from typing import Any, Callable, Dict, Optional
 
 from parsers.common import norm_category as _norm_category  # noqa: F401
