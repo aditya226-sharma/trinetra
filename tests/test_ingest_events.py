@@ -240,7 +240,9 @@ def test_retention_prune_skips_when_zero():
         api_module._settings._data["paths"]["event_store"] = str(Path(tmp) / "e.db")
         api_module._settings._data["paths"]["raw_store"] = str(Path(tmp) / "r.jsonl")
         api_module._settings._data["events"]["retention_days"] = 0
-        assert prune(api_module._settings) == {"events": 0, "raw_records": 0}
+        result = prune(api_module._settings)
+        assert result["events"] == 0
+        assert result["raw_records"] == 0
 
 
 def test_retention_prune_removes_expired(tmp_path, monkeypatch):

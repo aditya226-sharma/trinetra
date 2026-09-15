@@ -439,6 +439,9 @@ export default function EventsPage() {
               </dl>
               <p className="eyebrow mb-1.5 mt-5">Parsed fields</p>
               <CodeBlock maxH="max-h-44">{JSON.stringify(detail.fields, null, 2)}</CodeBlock>
+              {detail.trace_id && detail.trace_events && detail.trace_events.length > 0 && (
+                <TraceTimeline events={detail.trace_events} current={detail.event_id} />
+              )}
               {detail.raw && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
@@ -460,6 +463,50 @@ function Row({ k, v, mono }) {
     <div className="grid grid-cols-[84px_1fr] gap-2">
       <dt className="text-slate-500">{k}</dt>
       <dd className={`break-all text-slate-300 ${mono ? "mono text-[11px]" : ""}`}>{v || "—"}</dd>
+    </div>
+  );
+}
+
+function TraceTimeline({ events, current }) {
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+  );
+  const shown = sorted.length > 30 ? sorted.slice(Math.max(0, sorted.length - 30)) : sorted;
+  return (
+    <div className="mt-5">
+      <details open>
+        <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
+          trace timeline · {sorted.length} events
+        </summary>
+        <ol className="mt-3 space-y-0 border-l border-white/10 pl-4">
+          {shown.map((ev) => {
+            const isCurrent = ev.event_id === current;
+            return (
+              <li key={ev.event_id} className="relative pb-3">
+                <span
+                  className={`absolute -left-[19px] top-1 h-2 w-2 rounded-full ${
+                    isCurrent ? "bg-emerald-400 pulse-dot-green" : "bg-slate-600"
+                  }`}
+                />
+                <div className={`flex items-center gap-2 text-[10.5px] ${isCurrent ? "text-emerald-300" : "text-slate-400"}`}>
+                  <span className={`mono ${isCurrent ? "sev-critical" : "sev-info"}`}>
+                    {ev.category || "system"}
+                  </span>
+                  <span className="ml-auto">{(ev.timestamp || "").slice(11, 19)}Z</span>
+                </div>
+                <p className={`mt-0.5 truncate text-[11px] ${isCurrent ? "text-slate-100" : "text-slate-500"}`}>
+                  {ev.message || "—"}
+                </p>
+                {ev.fields && ev.fields.threat_class && (
+                  <p className="text-[9.5px] uppercase tracking-wider text-amber-400/80">
+                    ⚠ {ev.fields.threat_class}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </details>
     </div>
   );
 }

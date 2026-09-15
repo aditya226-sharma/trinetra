@@ -20,6 +20,8 @@ export default function CommandPalette({ theme, setTheme }) {
       { label: "Graph", hint: "/graph", run: () => navigate("/graph") },
       { label: "Assets", hint: "/assets", run: () => navigate("/assets") },
       { label: "Compliance", hint: "/compliance", run: () => navigate("/compliance") },
+      { label: "Analytics", hint: "/analytics", run: () => navigate("/analytics") },
+      { label: "Fleet", hint: "/fleet", run: () => navigate("/fleet") },
       { label: "Ingest", hint: "/ingest", run: () => navigate("/ingest") },
       { label: "Live console", hint: "/console", run: () => navigate("/console") },
       { label: "Settings & admin", hint: "/settings", run: () => navigate("/settings") },

@@ -361,3 +361,56 @@ export async function ingestBulkFile(file, { source = "", clientId = "" } = {}) 
   const { data } = await api.post("/ingest/bulk", fd);
   return data;
 }
+
+// ------------------------------------------------------------------
+// analytics, collectors & fleet ops (Phase 4)
+// ------------------------------------------------------------------
+
+export async function getAnalytics(hours = 48) {
+  if (OFFLINE) {
+    const s = await loadSnapshot();
+    const ev = s.events || [];
+    return {
+      generated_at: new Date().toISOString(), window_hours: hours, step_hours: 1,
+      totals: { events_in_window: ev.length, events_total: ev.length, duplicates_total: 0,
+        findings_total: s.network_threats.count || 0, alerts_total: s.alerts.sent || 0,
+        analyzer_calls_total: 0, dedup_rate: 0 },
+      time_series: [], by_source_type: groupCount(ev, "source_type"),
+      by_severity: groupCount(ev, "severity"), by_category: groupCount(ev, "category"),
+      by_client: groupCount(ev, "client_id"), detections: {},
+    };
+  }
+  const { data } = await api.get("/analytics", { params: { hours } });
+  return data;
+}
+
+function groupCount(list, key) {
+  const out = {};
+  for (const e of list) { const k = e[key] || "other"; out[k] = (out[k] || 0) + 1; }
+  return out;
+}
+
+export async function downloadAnalyticsCsv(hours = 48) {
+  if (OFFLINE) return null;
+  const { data } = await api.get("/analytics", { params: { hours, format: "csv" }, responseType: "blob" });
+  return new Blob([data], { type: "text/csv" });
+}
+
+export async function getCollectors() {
+  if (OFFLINE) {
+    return { config: { syslog: { enabled: false, port: 1514, client_id: "trinetra-core" },
+        tailers: [], demo: { enabled: false, replay_delay_s: 300, client_id: "trinetra-core" } },
+      running: { syslog_active: false, tailer_active: false, demo_active: false, syslog_port: 1514, tailers: [], demo_enabled: false } };
+  }
+  const { data } = await api.get("/admin/collectors");
+  return data;
+}
+
+export async function setCollectors(patch) {
+  const { data } = await api.put("/admin/collectors", patch);
+  return data;
+}
+
+export function complianceReportUrl(assetId) {
+  return `/report/${encodeURIComponent(assetId)}`;
+}

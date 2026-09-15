@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAssets, getCompliance } from "../lib/api";
+import { getAssets, getCompliance, complianceReportUrl } from "../lib/api";
 import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, CodeBlock } from "../components/ui";
 
 export default function CompliancePage() {
@@ -78,11 +78,23 @@ export default function CompliancePage() {
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityBadge severity="critical" />
-                <PlainBadge className="uppercase">action required</PlainBadge>
+                <PlainBadge cls="uppercase">action required</PlainBadge>
                 <span className="mono ml-auto text-[11px] text-slate-500">
                   {compliance.controls.length} threat → control chains
                 </span>
               </div>
+
+              {selected && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.open(complianceReportUrl(compliance.asset_id), "_blank")}
+                    className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/25"
+                  >
+                    PDF report
+                  </button>
+                  <span className="text-[10px] text-slate-500">print-friendly brief · Save as PDF</span>
+                </div>
+              )}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {compliance.controls.length === 0 && (

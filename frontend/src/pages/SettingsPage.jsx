@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { changePassword, getAudit, getStorageStats, setRetention } from "../lib/api";
+import { changePassword, getAudit, getCollectors, getStorageStats, setCollectors, setRetention } from "../lib/api";
 import { PageHeader, PlainBadge } from "../components/ui";
 
 const VALID = [1, 7, 30, 90, 365, 0];
@@ -29,11 +29,53 @@ export default function SettingsPage() {
 
   const [audit, setAudit] = useState([]);
 
+  // collectors
+  const [collectors, setCollectorsState] = useState(null);
+  const [syslogEnabled, setSyslogEnabled] = useState(false);
+  const [syslogPort, setSyslogPort] = useState(1514);
+  const [tailEndpoint, setTailEndpoint] = useState("");
+  const [tailingPaths, setTailingPaths] = useState([]);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoDelay, setDemoDelay] = useState(300);
+  const [colMsg, setColMsg] = useState(null);
+  const [colErr, setColErr] = useState(null);
+  const [colBusy, setColBusy] = useState(false);
+
+  const refreshCollectors = () =>
+    getCollectors().then(({ config, running }) => {
+      setCollectorsState(running);
+      setSyslogEnabled(Boolean(config.syslog?.enabled));
+      setSyslogPort(config.syslog?.port || 1514);
+      setTailingPaths((config.tailers || []).map((t) => t.path).filter(Boolean));
+      setDemoEnabled(Boolean(config.demo?.enabled));
+      setDemoDelay(config.demo?.replay_delay_s || 300);
+    }).catch(() => {});
+
+  const applyCollectors = async () => {
+    setColBusy(true); setColMsg(null); setColErr(null);
+    try {
+      const patch = {
+        syslog: { enabled: syslogEnabled, port: Number(syslogPort) || 1514 },
+        tailers: tailingPaths.filter(Boolean).map((path) => ({ path, source: "file_log" })),
+        demo: { enabled: demoEnabled, replay_delay_s: Math.max(5, Number(demoDelay) || 300) },
+      };
+      const r = await setCollectors(patch);
+      setCollectorsState(r.running);
+      setColMsg("Collectors reconfigured — threads restarted.");
+      refreshStorage();
+    } catch (e) {
+      setColErr(e.response?.data?.detail || e.message);
+    } finally {
+      setColBusy(false);
+    }
+  };
+
   const refreshStorage = () =>
     getStorageStats().then((s) => { setStorage(s); setDays(s.retention_days); }).catch(() => {});
 
   useEffect(() => {
     refreshStorage();
+    refreshCollectors();
     getAudit(100).then((d) => setAudit(d.entries || [])).catch(() => {});
   }, []);
 
@@ -75,7 +117,7 @@ export default function SettingsPage() {
         eyebrow="admin · storage · audit"
         title="Settings & admin"
         sub="Retention policy, your sign-in credentials, and the trail of privileged actions — all recorded in the audit store."
-        actions={<PlainBadge cls="!text-cyan-300">phase-2 console</PlainBadge>}
+        actions={<PlainBadge cls="!text-cyan-300">phase-4 admin console</PlainBadge>}
       />
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -157,6 +199,119 @@ export default function SettingsPage() {
           </div>
         </section>
       </div>
+
+      {/* ------------------------------------------------ collectors */}
+      <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "90ms" }}>
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+          <p className="mono text-[11px] tracking-widest text-slate-500">collectors :: live sources</p>
+          <div className="flex items-center gap-2">
+            {collectors?.syslog_active && <PlainBadge cls="!text-emerald-300">syslog :{collectors.syslog_port}</PlainBadge>}
+            {collectors?.tailer_active && <PlainBadge cls="!text-cyan-300">tail -f</PlainBadge>}
+            {collectors?.demo_active && <PlainBadge cls="!text-amber-300">demo replay</PlainBadge>}
+            {!collectors && <PlainBadge>…</PlainBadge>}
+          </div>
+        </div>
+        <div className="grid gap-5 p-5 lg:grid-cols-3">
+          {/* syslog */}
+          <div className="space-y-3">
+            <p className="eyebrow">Syslog UDP receiver</p>
+            <label className="flex items-center gap-2 text-[12px] text-slate-300">
+              <input
+                type="checkbox"
+                checked={syslogEnabled}
+                onChange={(e) => setSyslogEnabled(e.target.checked)}
+                className="accent-emerald-400"
+              />
+              listener enabled
+            </label>
+            <label className="block">
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">port</span>
+              <input
+                value={syslogPort}
+                disabled={!syslogEnabled}
+                onChange={(e) => setSyslogPort(Number(e.target.value) || 0)}
+                className="field mono w-full px-3 py-2 disabled:opacity-40"
+              />
+            </label>
+            <p className="text-[10.5px] leading-relaxed text-slate-500">
+              RFC 3164/5424 datagrams over UDP, normalized then deduped like any other source.
+            </p>
+          </div>
+
+          {/* tailers */}
+          <div className="space-y-3">
+            <p className="eyebrow">File tailers</p>
+            <div className="flex gap-2">
+              <input
+                value={tailEndpoint}
+                onChange={(e) => setTailEndpoint(e.target.value)}
+                placeholder="/var/log/nginx/access.log"
+                className="field mono w-full px-3 py-2"
+              />
+              <button
+                onClick={() => {
+                  const p = tailEndpoint.trim();
+                  if (p && !tailingPaths.includes(p)) {
+                    setTailingPaths((xs) => [...xs, p]);
+                    setTailEndpoint("");
+                  }
+                }}
+                className="btn-secondary mono !px-3 !py-2 text-[11px]"
+              >
+                ADD
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {tailingPaths.length === 0 && (
+                <p className="text-[10.5px] text-slate-600">No files being followed.</p>
+              )}
+              {tailingPaths.map((p) => (
+                <div key={p} className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
+                  <span className="mono min-w-0 flex-1 truncate text-[11px] text-slate-300">{p}</span>
+                  <button
+                    onClick={() => setTailingPaths((xs) => xs.filter((x) => x !== p))}
+                    className="text-[11px] text-rose-400 hover:text-rose-300"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* demo replay */}
+          <div className="space-y-3">
+            <p className="eyebrow">Demo replay</p>
+            <label className="flex items-center gap-2 text-[12px] text-slate-300">
+              <input
+                type="checkbox"
+                checked={demoEnabled}
+                onChange={(e) => setDemoEnabled(e.target.checked)}
+                className="accent-emerald-400"
+              />
+              replay demo corpus to the live pipeline
+            </label>
+            <label className="block">
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">pause between passes (s)</span>
+              <input
+                value={demoDelay}
+                onChange={(e) => setDemoDelay(Number(e.target.value) || 300)}
+                className="field mono w-full px-3 py-2"
+              />
+            </label>
+            <p className="text-[10.5px] leading-relaxed text-slate-500">
+              Cycles the bundled incident story with a quiet gap so dedup keeps the store healthy.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 border-t border-white/5 px-5 py-3">
+          <button onClick={applyCollectors} disabled={colBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
+            {colBusy ? "RESTARTING…" : "APPLY COLLECTORS"}
+          </button>
+          {colMsg && <span className="mono text-[11px] text-emerald-400">✓ {colMsg}</span>}
+          {colErr && <span className="mono text-[11px] text-rose-400">✗ {colErr}</span>}
+        </div>
+      </section>
 
       {/* ------------------------------------------------ audit trail */}
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "120ms" }}>

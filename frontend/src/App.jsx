@@ -9,6 +9,9 @@ import AlertsPage from "./pages/AlertsPage";
 import GraphPage from "./pages/GraphPage";
 import AssetsPage from "./pages/AssetsPage";
 import CompliancePage from "./pages/CompliancePage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import FleetPage from "./pages/FleetPage";
+import ReportPage from "./pages/ReportPage";
 import IngestPage from "./pages/IngestPage";
 import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
@@ -119,6 +122,8 @@ const navItems = [
   { to: "/graph", label: "Graph" },
   { to: "/assets", label: "Assets" },
   { to: "/compliance", label: "Compliance" },
+  { to: "/analytics", label: "Analytics" },
+  { to: "/fleet", label: "Fleet" },
   { to: "/ingest", label: "Ingest" },
   { to: "/console", label: "Console" },
   { to: "/settings", label: "Settings" },
@@ -133,6 +138,8 @@ const TITLES = {
   "/graph": "Entity graph",
   "/assets": "Asset registry",
   "/compliance": "Compliance briefs",
+  "/analytics": "Performance analytics",
+  "/fleet": "Fleet operations",
   "/ingest": "Live ingest",
   "/console": "Live console",
   "/settings": "Settings & admin",
@@ -273,7 +280,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative flex min-h-screen">
+    <div className={`relative flex min-h-screen ${location.pathname.startsWith("/report") ? "report-mode" : ""}`}>
       <CommandPalette theme={theme} setTheme={setTheme} />
       {liveUrl && (
         <a
@@ -512,6 +519,9 @@ export default function App() {
             <Route path="/graph" element={<GraphPage />} />
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/fleet" element={<FleetPage />} />
+            <Route path="/report/:assetId" element={<ReportPage />} />
             <Route path="/ingest" element={<IngestPage />} />
             <Route path="/console" element={<ConsolePage />} />
             <Route path="/settings" element={<SettingsPage />} />

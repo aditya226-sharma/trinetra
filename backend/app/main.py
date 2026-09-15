@@ -31,6 +31,7 @@ role ``admin``. Run:  uvicorn backend.app.main:app --reload
 from __future__ import annotations
 
 import asyncio
+import csv
 import hashlib
 import logging
 import os
@@ -47,9 +48,9 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from fastapi import (Body, Depends, FastAPI, File, Form, Header, HTTPException,
-                     Query, Request, UploadFile)
+                     Query, Request, Response, UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from analyzer.llm_analyzer import LLMAnalyzer  # noqa: F401  (type surface)
@@ -61,8 +62,8 @@ from backend.app.stream import hub
 from config.settings import Settings, get_settings
 from orchestrator import Orchestrator
 from modules.entity_graph import EntityGraph
-from pipeline.retention import (prune, set_retention, start_retention_loop,
-                                storage_snapshot)
+from pipeline.retention import (prune, set_retention, start_retention_loop, storage_snapshot)
+from pipeline.collectors_runtime import CollectorsManager
 
 log = logging.getLogger("trinetra.api")
 
@@ -76,7 +77,7 @@ async def lifespan(_app: FastAPI):
     events/search, health counts) reflect already-persisted data without a
     demo/ingest bootstrap first.
     """
-    global _ORCH, _GRAPH
+    global _ORCH, _GRAPH, _COLLECTORS
     if _ORCH is None:
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
@@ -90,7 +91,11 @@ async def lifespan(_app: FastAPI):
             pass
     ensure_admin(_settings)
     start_retention_loop(_settings)
+    if _COLLECTORS is None:
+        _COLLECTORS = CollectorsManager(_settings)
+    _COLLECTORS.start_all(_ORCH)
     yield
+    _COLLECTORS.stop_all()
 
 
 app = FastAPI(title="TriNetra ULPF API", version="0.1.0", lifespan=lifespan)
@@ -102,6 +107,7 @@ app.include_router(auth_router)
 # One shared orchestrator + graph for the dashboard after a bootstrap run.
 _ORCH: Optional[Orchestrator] = None
 _GRAPH: Optional[EntityGraph] = None
+_COLLECTORS: Optional[CollectorsManager] = None
 _settings: Settings = get_settings()
 
 # In-memory rate buckets for the agent ingest endpoint (per token / source IP).
@@ -144,6 +150,13 @@ class RetentionRequest(BaseModel):
     """Admin retention change — validated against the allowed policy set."""
     days: int
     prune_now: bool = False
+
+
+class CollectorsRequest(BaseModel):
+    """Admin collector-toggling patch (syslog / file tailers / demo replay)."""
+    syslog: Optional[Dict[str, Any]] = None
+    tailers: Optional[List[Dict[str, Any]]] = None
+    demo: Optional[Dict[str, Any]] = None
 
 
 # Bulk upload size caps: guards /api/ingest/bulk against paging the whole
@@ -758,6 +771,123 @@ def admin_audit(limit: int = Query(100)) -> Dict[str, Any]:
     return {"entries": audit_recent(_settings, limit)}
 
 
+@app.get("/api/admin/collectors", tags=["admin"], dependencies=[Depends(require_auth)])
+def admin_collectors() -> Dict[str, Any]:
+    """Current collector config + which live threads are running."""
+    if _COLLECTORS is None:
+        raise HTTPException(status_code=503, detail="Collectors not initialized")
+    return {"config": _COLLECTORS.effective(), "running": _COLLECTORS.status()}
+
+
+@app.put("/api/admin/collectors", tags=["admin"],
+         dependencies=[Depends(require_admin)])
+def admin_collectors_put(body: CollectorsRequest,
+                         payload: Dict[str, Any] = Depends(require_admin)
+                         ) -> Dict[str, Any]:
+    """Apply a collector patch (syslog port/on-off, file tailers, demo replay)
+    and hot-restart the collector threads."""
+    if _COLLECTORS is None:
+        raise HTTPException(status_code=503, detail="Collectors not initialized")
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="Nothing to change")
+    result = _COLLECTORS.apply(patch)
+    audit_log(_settings, str(payload.get("sub", "admin")), "admin.collectors",
+              "updated collector config")
+    return result
+
+
+@app.get("/api/analytics", tags=["analytics"], dependencies=[Depends(require_auth)])
+def analytics(hours: int = Query(48, ge=1, le=336),
+              format: str = Query("json")) -> Any:
+    """Roll-up analytics over the last ``hours``.
+
+    JSON returns a time-series of hourly event counts plus dimension counts
+    (source_type / severity / category / client). ``format=csv`` streams the
+    same data as flat CSV rows for spreadsheet consumption.
+    """
+    global _ORCH
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+
+    now = datetime.now(timezone.utc).replace(microsecond=0, second=0, minute=0)
+    cut = now - timedelta(hours=hours)
+    store = _ORCH.event_store
+
+    series: List[Dict[str, Any]] = []
+    lo = cut
+    # Bucket at the finest granularity that keeps the query count sane.
+    step = 1 if hours <= 96 else (hours // 96)
+    while lo < now:
+        hi = min(lo + timedelta(hours=step), now)
+        n = store.count_filtered(ts_from=lo.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                 ts_to=hi.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        series.append({"bucket": hi.strftime("%Y-%m-%dT%H:%M:%SZ"), "events": n})
+        lo = hi
+
+    stats = {k: _ORCH.stats.get(k, 0) for k in
+             ("raw_lines", "events", "duplicates", "findings",
+              "analyzer_calls", "alerts_sent")}
+    totals = {"events_in_window": sum(b["events"] for b in series),
+              "events_total": store.count(),
+              "duplicates_total": stats["duplicates"],
+              "findings_total": stats["findings"],
+              "alerts_total": stats["alerts_sent"],
+              "analyzer_calls_total": stats["analyzer_calls"],
+              "dedup_rate": round(
+                  stats["duplicates"] / stats["raw_lines"], 4)
+                  if stats.get("raw_lines") else 0.0}
+    dims = {
+        "by_source_type": store.count_by("source_type"),
+        "by_severity": store.count_by("severity"),
+        "by_category": store.count_by("category"),
+        "by_client": store.count_by("client_id"),
+        "detections": getattr(_ORCH.threats, "detection_counts", {}) or {},
+    }
+    payload: Dict[str, Any] = {
+        "generated_at": _iso_now(),
+        "window_hours": hours,
+        "step_hours": step,
+        "totals": totals,
+        "time_series": series,
+        **dims,
+    }
+    if format.lower() == "csv":
+        import io
+
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["bucket_utc", "events"])
+        for b in series:
+            writer.writerow([b["bucket"], b["events"]])
+        writer.writerow([])
+        for dim in ("by_source_type", "by_severity", "by_category", "by_client",
+                    "detections"):
+            writer.writerow([dim])
+            for k, v in sorted(payload[dim].items(), key=lambda kv: -kv[1]):
+                writer.writerow([k, v])
+            writer.writerow([])
+        return StreamingResponse(
+            iter([out.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition":
+                     f'attachment; filename="analytics_{now:%Y%m%dT%H%M}.csv"'},
+        )
+    return payload
+
+
+@app.get("/api/compliance/{asset_id}/report", tags=["compliance"],
+         dependencies=[Depends(require_auth)])
+def compliance_report(asset_id: str) -> Response:
+    """Standalone HTML compliance report (print / save-as-PDF friendly)."""
+    if _ORCH is None:
+        raise HTTPException(status_code=428, detail="Bootstrap first")
+    findings = [f for f in _ORCH.findings_log if _touches(f, asset_id)]
+    c = compliance_for_asset(asset_id, findings)
+    html = _compliance_report_html(asset_id, c, _iso_now())
+    return HTMLResponse(content=html, media_type="text/html")
+
+
 @app.post("/api/ingest/bulk", tags=["ingest"], dependencies=[Depends(require_admin)])
 async def ingest_bulk(file: UploadFile = File(...),
                       source: str = Form(""),
@@ -863,6 +993,131 @@ def _touches_targets(finding: Dict[str, Any]) -> str:
     alert = finding.get("alert", finding)
     evidence = alert.get("evidence") or {}
     return str(evidence.get("src") or alert.get("src") or "")
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _esc_html(value: Any) -> str:
+    return (str(value)
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def _compliance_report_html(asset_id: str, compliance: Dict[str, Any],
+                            generated_at: str) -> str:
+    controls = compliance.get("controls") or []
+    rows = "".join(
+        f"""
+        <div class="ctrl">
+          <div class="row"><h3>{_esc_html(c.get('threat_class'))}</h3>
+            <span class="sev-{_esc_html(c.get('severity'))}">{_esc_html(c.get('severity'))}</span></div>
+          <p class="dim">{_esc_html(c.get('description') or '')}</p>
+          <p><span class="k">NIST CSF</span> {_esc_html(c.get('nist_csf') or '—')}</p>
+          <p><span class="k">CIS Controls</span> {_esc_html(' · '.join(c.get('cis_controls') or [])) or '—'}</p>
+          <p><span class="k">MITRE ATT&amp;CK</span> {_esc_html(', '.join(c.get('mitre_attack') or [])) or '—'}</p>
+          <p><span class="k">Status</span> <span class="pill">{_esc_html(c.get('status') or 'pending')}</span></p>
+        </div>
+        """
+        for c in controls)
+
+    findings = compliance.get("findings") or []
+    findings_html = "".join(
+        f"""
+        <tr>
+          <td class="mono">{_esc_html(f.get('threat_class'))}</td>
+          <td>{_esc_html(f.get('severity'))}</td>
+          <td class="mono">{_esc_html(f.get('src') or (f.get('evidence') or {}).get('src') or '—')}</td>
+          <td>{_esc_html(f.get('message') or f.get('summary') or '')}</td>
+        </tr>
+        """
+        for f in findings) or (
+        "<tr><td colspan=4 class='dim'>No live findings recorded for this asset in "
+        "the current session.</td></tr>")
+
+    markdown = _esc_html(compliance.get("summary_markdown") or "")
+
+    now_str = generated_at.replace("T", " ").replace("Z", " UTC")
+    return f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compliance report — {_esc_html(asset_id)}</title>
+<style>
+  :root {{ color-scheme: light dark; }}
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: -apple-system, 'Inter', 'Segoe UI', Roboto, sans-serif;
+          margin: 0 auto; max-width: 900px; padding: 40px 48px; color: #0f172a;
+          background: #fff; line-height: 1.5; }}
+  .brand {{ display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 3px solid #0f172a; padding-bottom: 14px; }}
+  .brand h1 {{ font-size: 17px; letter-spacing: .18em; text-transform: uppercase; margin: 0; }}
+  .brand span {{ font-size: 12px; color: #475569; }}
+  h2 {{ font-size: 22px; margin: 26px 0 4px; }}
+  .sub {{ color: #475569; font-size: 13px; margin-bottom: 8px; }}
+  .meta {{ font-size: 12px; color: #64748b; }}
+  .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px 40px;
+           margin: 18px 0 30px; font-size: 13px; }}
+  .grid b {{ display: inline-block; min-width: 120px; color: #64748b; font-weight: 600; }}
+  .ctrl {{ border: 1px solid #e2e8f0; border-left: 4px solid #0ea5e9; border-radius: 8px;
+          padding: 14px 16px; margin-bottom: 14px; page-break-inside: avoid; }}
+  .row {{ display: flex; justify-content: space-between; align-items: center; }}
+  .row h3 {{ margin: 0; font-size: 15px; text-transform: capitalize; }}
+  .sev-critical {{ color: #b91c1c; font-weight: 700; font-size: 12px; text-transform: uppercase; }}
+  .sev-high {{ color: #c2410c; font-weight: 700; font-size: 12px; text-transform: uppercase; }}
+  .sev-medium {{ color: #b45309; font-weight: 700; font-size: 12px; text-transform: uppercase; }}
+  .sev-low {{ color: #475569; font-weight: 700; font-size: 12px; text-transform: uppercase; }}
+  .k {{ display: inline-block; min-width: 120px; color: #64748b; font-size: 12px;
+       font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }}
+  .dim {{ color: #64748b; font-size: 12.5px; }}
+  .mono {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }}
+  .pill {{ border: 1px solid #f59e0b; color: #92400e; background:#fef3c7;
+          font-size: 11px; font-weight: 700; text-transform: uppercase;
+          padding: 2px 8px; border-radius: 999px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0 28px; }}
+  th, td {{ text-align: left; border-bottom: 1px solid #e2e8f0; padding: 8px 10px; vertical-align: top; }}
+  th {{ color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }}
+  pre {{ white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0;
+        border-radius: 8px; padding: 14px 16px; font-size: 12px; }}
+  .toolbar {{ position: sticky; top: 12px; display: flex; gap: 10px; justify-content: flex-end;
+             margin-bottom: 14px; }}
+  .toolbar button {{ border: 1px solid #0f172a; background: #0f172a; color: #fff;
+     padding: 8px 16px; border-radius: 7px; font-size: 13px; cursor: pointer; }}
+  .toolbar button.alt {{ background: #fff; color: #0f172a; }}
+  footer {{ margin-top: 34px; padding-top: 12px; border-top: 1px solid #e2e8f0;
+           font-size: 11px; color: #94a3b8; }}
+  @page {{ margin: 18mm; }}
+  @media print {{ .toolbar {{ display: none; }} }}
+</style></head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">Save as PDF</button>
+    <button class="alt" onclick="window.close()">Close</button>
+  </div>
+  <div class="brand"><h1>TriNetra · Compliance brief</h1><span>SECURITY CONTROLS MAPPING</span></div>
+  <h2>{_esc_html(asset_id)}</h2>
+  <p class="sub">CIS Controls v8 / NIST CSF / MITRE ATT&amp;CK mapping for threat findings
+    attributed to this asset.</p>
+  <div class="grid">
+    <div><b>Generated</b> {_esc_html(now_str)}</div>
+    <div><b>Asset id</b> {_esc_html(asset_id)}</div>
+    <div><b>Threat → control chains</b> {len(controls)}</div>
+    <div><b>Findings in scope</b> {len(findings)}</div>
+    <div><b>Severity</b> critical — action required</div>
+    <div><b>Status</b> <span class="pill">pending</span></div>
+  </div>
+  <h2>Control mappings</h2>
+  {rows}
+  <h2>Attributed findings</h2>
+  <table><thead><tr><th>Threat class</th><th>Severity</th><th>Source</th><th>Summary</th></tr></thead>
+    <tbody>{findings_html}</tbody></table>
+  <h2>Analyst brief</h2>
+  <pre>{markdown}</pre>
+  <footer>TriNetra Unified Logging &amp; Pipeline Framework — generated {_esc_html(now_str)}. 
+    Mapping is advisory; validate against your organisation's current control baseline.</footer>
+</body></html>"""
+
+
 # ------------------------------------------------------- static dashboard
 # In a bundled deployment (Docker image) the React build lives in
 # frontend/dist and is served directly from the API. The catch-all below is
