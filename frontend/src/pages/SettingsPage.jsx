@@ -203,7 +203,7 @@ export default function SettingsPage() {
     }
   };
 
-  const deleteUser = async (username) => {
+  const handleDeleteUser = async (username) => {
     if (!window.confirm(`Delete account ${username}? This cannot be undone.`)) return;
     try {
       await deleteUser(username);
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                 </div>
                 <PlainBadge cls={u.role === "admin" ? "!text-emerald-300" : u.role === "analyst" ? "!text-cyan-300" : "!text-slate-400"}>{u.role}</PlainBadge>
                 {u.username !== session?.username && (
-                  <button onClick={() => deleteUser(u.username)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                  <button onClick={() => handleDeleteUser(u.username)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
                 )}
               </div>
             ))}
