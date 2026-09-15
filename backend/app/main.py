@@ -64,6 +64,7 @@ from orchestrator import Orchestrator
 from modules.entity_graph import EntityGraph
 from pipeline.retention import (prune, set_retention, start_retention_loop, storage_snapshot)
 from pipeline.collectors_runtime import CollectorsManager
+from socpolicy import SocPolicy, SocPolicyError
 
 log = logging.getLogger("trinetra.api")
 
@@ -77,7 +78,7 @@ async def lifespan(_app: FastAPI):
     events/search, health counts) reflect already-persisted data without a
     demo/ingest bootstrap first.
     """
-    global _ORCH, _GRAPH, _COLLECTORS
+    global _ORCH, _GRAPH, _COLLECTORS, _SOC
     if _ORCH is None:
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
@@ -91,6 +92,10 @@ async def lifespan(_app: FastAPI):
             pass
     ensure_admin(_settings)
     start_retention_loop(_settings)
+    if _SOC is None:
+        _SOC = SocPolicy(_settings)
+    _ORCH.soc = _SOC
+    _SOC.start_digest_loop()
     if _COLLECTORS is None:
         _COLLECTORS = CollectorsManager(_settings)
     _COLLECTORS.start_all(_ORCH)
@@ -108,6 +113,7 @@ app.include_router(auth_router)
 _ORCH: Optional[Orchestrator] = None
 _GRAPH: Optional[EntityGraph] = None
 _COLLECTORS: Optional[CollectorsManager] = None
+_SOC: Optional[SocPolicy] = None
 _settings: Settings = get_settings()
 
 # In-memory rate buckets for the agent ingest endpoint (per token / source IP).
@@ -157,6 +163,33 @@ class CollectorsRequest(BaseModel):
     syslog: Optional[Dict[str, Any]] = None
     tailers: Optional[List[Dict[str, Any]]] = None
     demo: Optional[Dict[str, Any]] = None
+
+
+class WatchEntryRequest(BaseModel):
+    """Add a watchlist / blocklist entry (Phase 3 SOC policy)."""
+    list: str = "watchlist"
+    kind: str
+    value: str
+    reason: str = ""
+
+
+class RuleRequest(BaseModel):
+    """Create or update one custom detection rule."""
+    name: str
+    description: str = ""
+    source_types: List[str] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list)
+    min_severity: str = "warning"
+    action: str = "alert"
+    match: List[Dict[str, Any]] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class CaseActionRequest(BaseModel):
+    """Transition on the case ledger: ack/unack/resolve/reopen/assign/note."""
+    action: str
+    assignee: str = ""
+    note: str = ""
 
 
 # Bulk upload size caps: guards /api/ingest/bulk against paging the whole
@@ -232,6 +265,8 @@ def run_demo(reset: bool = Query(False),
                     pass
     _ORCH = Orchestrator(_settings)
     _GRAPH = _ORCH.graph
+    _ORCH.stream = hub
+    _ORCH.soc = _SOC
     _COLLECTORS._orch = _ORCH
     from collectors.demo_feed import DemoFeed
 
@@ -1117,6 +1152,169 @@ def _compliance_report_html(asset_id: str, compliance: Dict[str, Any],
   <footer>TriNetra Unified Logging &amp; Pipeline Framework — generated {_esc_html(now_str)}. 
     Mapping is advisory; validate against your organisation's current control baseline.</footer>
 </body></html>"""
+
+
+# ------------------------------------------------------- PHASE 3 :: SOC policy
+# Watchlist / blocklist, custom detection rules, alert-case lifecycle and
+# external delivery. Policy mutations are admin-only; case triage reads and
+# transitions are open to any authenticated SOC analyst with a bearer token.
+# -----------------------------------------------------------------------------
+
+
+def _soc() -> SocPolicy:
+    if _SOC is None:
+        raise HTTPException(status_code=428, detail="SOC policy not initialized")
+    return _SOC
+
+
+def _soc400(exc: SocPolicyError):
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/watchlist", tags=["soc"], dependencies=[Depends(require_auth)])
+def watchlist(list: str = Query("watchlist")) -> Dict[str, Any]:
+    if list not in ("watchlist", "blocklist"):
+        raise HTTPException(status_code=400, detail="list must be watchlist or blocklist")
+    return {"list": list, "entries": _soc().list_entries(list)}
+
+
+@app.post("/api/watchlist", tags=["soc"], dependencies=[Depends(require_admin)])
+def watchlist_add(body: WatchEntryRequest,
+                  payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    try:
+        entry = _soc().add_entry(body.list, body.kind, body.value, body.reason,
+                                 str(payload.get("sub", "admin")))
+    except SocPolicyError as exc:
+        _soc400(exc)
+    return {"entry": entry}
+
+
+@app.delete("/api/watchlist/{list}/{kind}", tags=["soc"],
+            dependencies=[Depends(require_admin)])
+def watchlist_remove(list: str, kind: str, value: str = Query(...),
+                     payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    removed = _soc().remove_entry(list, kind, value, str(payload.get("sub", "admin")))
+    if not removed:
+        raise HTTPException(status_code=404, detail="entry not found")
+    return {"removed": True}
+
+
+@app.put("/api/watchlist/{list}/{kind}/active", tags=["soc"],
+         dependencies=[Depends(require_admin)])
+def watchlist_toggle(list: str, kind: str, value: str = Query(...),
+                     active: bool = Query(True),
+                     payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    toggled = _soc().set_entry_active(list, kind, value, active,
+                                      str(payload.get("sub", "admin")))
+    if not toggled:
+        raise HTTPException(status_code=404, detail="entry not found")
+    return {"active": active}
+
+
+@app.get("/api/rules", tags=["soc"], dependencies=[Depends(require_auth)])
+def rules_list() -> Dict[str, Any]:
+    return {"rules": _soc().list_rules()}
+
+
+@app.post("/api/rules", tags=["soc"], dependencies=[Depends(require_admin)])
+def rules_create(body: RuleRequest,
+                 payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    try:
+        rule = _soc().upsert_rule(body.model_dump(), str(payload.get("sub", "admin")))
+    except SocPolicyError as exc:
+        _soc400(exc)
+    return {"rule": rule}
+
+
+@app.put("/api/rules/{rule_id}", tags=["soc"], dependencies=[Depends(require_admin)])
+def rules_update(rule_id: str, body: RuleRequest,
+                 payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    try:
+        rule = _soc().upsert_rule(body.model_dump(), str(payload.get("sub", "admin")),
+                                  rule_id=rule_id)
+    except SocPolicyError as exc:
+        _soc400(exc)
+    return {"rule": rule}
+
+
+@app.delete("/api/rules/{rule_id}", tags=["soc"], dependencies=[Depends(require_admin)])
+def rules_delete(rule_id: str,
+                 payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    deleted = _soc().delete_rule(rule_id, str(payload.get("sub", "admin")))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return {"deleted": True}
+
+
+@app.post("/api/rules/{rule_id}/toggle", tags=["soc"],
+          dependencies=[Depends(require_admin)])
+def rules_toggle(rule_id: str, enabled: bool = Query(True),
+                 payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    toggled = _soc().toggle_rule(rule_id, enabled, str(payload.get("sub", "admin")))
+    if not toggled:
+        raise HTTPException(status_code=404, detail="rule not found")
+    return {"enabled": enabled}
+
+
+@app.get("/api/cases", tags=["soc"], dependencies=[Depends(require_auth)])
+def cases_list(status: Optional[str] = Query(None), severity: Optional[str] = Query(None),
+               q: str = Query(""), limit: int = Query(100, le=500)) -> Dict[str, Any]:
+    rows = _soc().list_cases(status=status, severity=severity, q=q, limit=limit)
+    return {"cases": rows, "count": len(rows),
+            "stats": _soc().case_stats()}
+
+
+@app.get("/api/cases/stats", tags=["soc"], dependencies=[Depends(require_auth)])
+def cases_stats() -> Dict[str, Any]:
+    return _soc().case_stats()
+
+
+@app.get("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_auth)])
+def cases_detail(case_id: str) -> Dict[str, Any]:
+    case = _soc().get_case(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="case not found")
+    return {"case": case}
+
+
+@app.patch("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_auth)])
+def cases_action(case_id: str, body: CaseActionRequest,
+                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    try:
+        case = _soc().transition(case_id, body.action, str(payload.get("sub", "?")),
+                                 assignee=body.assignee, note=body.note)
+    except SocPolicyError as exc:
+        _soc400(exc)
+    return {"case": case}
+
+
+@app.get("/api/admin/notifications", tags=["soc"], dependencies=[Depends(require_auth)])
+def notifications_get() -> Dict[str, Any]:
+    return _soc().notifications()
+
+
+@app.put("/api/admin/notifications", tags=["soc"],
+         dependencies=[Depends(require_admin)])
+def notifications_put(body: Dict[str, Any] = Body(...),
+                      payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    try:
+        notif = _soc().save_notifications(body, str(payload.get("sub", "admin")))
+    except SocPolicyError as exc:
+        _soc400(exc)
+    return notif
+
+
+@app.post("/api/admin/notifications/test", tags=["soc"],
+          dependencies=[Depends(require_admin)])
+def notifications_test(payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    return _soc().send_test(str(payload.get("sub", "admin")))
+
+
+@app.post("/api/admin/notifications/digest", tags=["soc"],
+          dependencies=[Depends(require_admin)])
+def notifications_digest(force: bool = Query(False),
+                         payload: Dict[str, Any] = Depends(require_admin)) -> Dict[str, Any]:
+    return _soc().run_digest(force=force, actor=str(payload.get("sub", "admin")))
 
 
 # ------------------------------------------------------- static dashboard

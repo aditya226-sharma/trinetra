@@ -414,3 +414,132 @@ export async function setCollectors(patch) {
 export function complianceReportUrl(assetId) {
   return `/report/${encodeURIComponent(assetId)}`;
 }
+
+// ------------------------------------------------------------------
+// SOC policy: watchlist / blocklist / rules / cases / delivery (Phase 3)
+// ------------------------------------------------------------------
+
+export async function getWatchlist(list = "watchlist") {
+  if (OFFLINE) return { list, entries: [] };
+  const { data } = await api.get("/watchlist", { params: { list } });
+  return data;
+}
+
+export async function addWatchEntry(list, kind, value, reason = "") {
+  if (OFFLINE) return { entry: { kind, value, reason } };
+  const { data } = await api.post("/watchlist", { list, kind, value, reason });
+  return data;
+}
+
+export async function removeWatchEntry(list, kind, value) {
+  if (OFFLINE) return { removed: true };
+  const { data } = await api.delete(`/watchlist/${list}/${encodeURIComponent(kind)}`, {
+    params: { value },
+  });
+  return data;
+}
+
+export async function toggleWatchEntry(list, kind, value, active) {
+  if (OFFLINE) return { active };
+  const { data } = await api.put(`/watchlist/${list}/${encodeURIComponent(kind)}/active`, null, {
+    params: { value, active },
+  });
+  return data;
+}
+
+export async function getRules() {
+  if (OFFLINE) return { rules: [] };
+  const { data } = await api.get("/rules");
+  return data;
+}
+
+export async function createRule(rule) {
+  if (OFFLINE) return { rule: { ...rule, id: "preview" } };
+  const { data } = await api.post("/rules", rule);
+  return data;
+}
+
+export async function updateRule(id, rule) {
+  if (OFFLINE) return { rule: { ...rule, id } };
+  const { data } = await api.put(`/rules/${encodeURIComponent(id)}`, rule);
+  return data;
+}
+
+export async function deleteRule(id) {
+  if (OFFLINE) return { deleted: true };
+  const { data } = await api.delete(`/rules/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export async function toggleRule(id, enabled) {
+  if (OFFLINE) return { enabled };
+  const { data } = await api.post(`/rules/${encodeURIComponent(id)}/toggle`, null, {
+    params: { enabled },
+  });
+  return data;
+}
+
+export async function getCases(params = {}) {
+  if (OFFLINE) {
+    const s = await loadSnapshot();
+    const alerts = (s.alerts.alerts || []).slice(0, params.limit || 100);
+    const cases = alerts.map((a, i) => ({
+      id: `preview-${i}`,
+      threat_class: a.threat_class,
+      severity: a.severity,
+      source_kind: "flow",
+      source_value: a.flows || "",
+      message: a.threat_class,
+      evidence: a.evidence || {},
+      verdict: a.verdict,
+      store_decision: a.store_decision,
+      confidence: a.confidence,
+      timestamp: a.timestamp,
+      last_seen: a.timestamp,
+      hits: 1,
+      status: "open",
+      assignee: "",
+      notes: [],
+      timeline: [],
+      delivery: null,
+    }));
+    return { cases, count: cases.length, stats: { total: cases.length, by_status: { open: cases.length, acknowledged: 0, resolved: 0 }, by_severity: {}, unresolved_by_severity: {} } };
+  }
+  const { data } = await api.get("/cases", { params });
+  return data;
+}
+
+export async function caseAction(id, { action, assignee = "", note = "" }) {
+  if (OFFLINE) return { case: { id, status: "open" } };
+  const { data } = await api.patch(`/cases/${encodeURIComponent(id)}`, { action, assignee, note });
+  return data;
+}
+
+// ------------------------------------------------------------------
+// notifications & digest delivery
+// ------------------------------------------------------------------
+
+export async function getNotifications() {
+  if (OFFLINE) {
+    return { enabled: true, severity_min: "warning",
+      email: { host: "", port: 587, sender: "", recipient: "", username: "", password: "" },
+      webhook: { url: "", secret: "" }, digest: { enabled: false, hour_utc: 8 } };
+  }
+  const { data } = await api.get("/admin/notifications");
+  return data;
+}
+
+export async function saveNotifications(patch) {
+  const { data } = await api.put("/admin/notifications", patch);
+  return data;
+}
+
+export async function testNotifications() {
+  const { data } = await api.post("/admin/notifications/test");
+  return data;
+}
+
+export async function runDigest(force = false) {
+  const { data } = await api.post("/admin/notifications/digest", null, { params: { force } });
+  return data;
+}

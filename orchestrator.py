@@ -209,6 +209,16 @@ class Orchestrator:
             return "duplicate"
         self.stats["events"] += 1
 
+        # SOC policy gate (watchlist / blocklist / custom rules). Runs before
+        # persistence so a blocklist hit can flag the stored event; policy
+        # failures never abort ingestion.
+        soc = getattr(self, "soc", None)
+        if soc is not None:
+            try:
+                soc.evaluate_event(event)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("soc policy run failed: %s", exc)
+
         # Persist the normalized UES event (searchable via API/dashboard).
         try:
             self.event_store.save(event)
@@ -297,6 +307,13 @@ class Orchestrator:
                 "flows": (finding.get("alert", {}).get("flows") or
                           finding.get("alert", {}).get("flow_id") or ""),
             })
+            # SOC triage case + external delivery fan-out for this finding.
+            soc = getattr(self, "soc", None)
+            if soc is not None:
+                try:
+                    soc.record_flow_finding(finding)
+                except Exception as exc:  # noqa: BLE001 — never kill the batch
+                    log.warning("soc finding record failed: %s", exc)
             verdict = result.verdict if result else "error"
             store_decision = result.store_decision if result else "keep"
             alerts.append(f"[{finding.get('severity', 'high').upper()}] "

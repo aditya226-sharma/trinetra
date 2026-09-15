@@ -17,6 +17,8 @@ export default function CommandPalette({ theme, setTheme }) {
       { label: "Dashboard", hint: "/", run: () => navigate("/") },
       { label: "Events", hint: "/events", run: () => navigate("/events") },
       { label: "Alerts", hint: "/alerts", run: () => navigate("/alerts") },
+      { label: "Rules", hint: "/rules", run: () => navigate("/rules") },
+      { label: "Watchlist", hint: "/watchlist", run: () => navigate("/watchlist") },
       { label: "Graph", hint: "/graph", run: () => navigate("/graph") },
       { label: "Assets", hint: "/assets", run: () => navigate("/assets") },
       { label: "Compliance", hint: "/compliance", run: () => navigate("/compliance") },

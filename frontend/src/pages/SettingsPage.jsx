@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { changePassword, getAudit, getCollectors, getStorageStats, setCollectors, setRetention } from "../lib/api";
+import { changePassword, getAudit, getCollectors, getNotifications, getStorageStats, runDigest, saveNotifications, setCollectors, setRetention, testNotifications } from "../lib/api";
 import { PageHeader, PlainBadge } from "../components/ui";
 
 const VALID = [1, 7, 30, 90, 365, 0];
@@ -41,6 +41,14 @@ export default function SettingsPage() {
   const [colErr, setColErr] = useState(null);
   const [colBusy, setColBusy] = useState(false);
 
+  // notifications / delivery
+  const [notif, setNotif] = useState(null);
+  const [notifMsg, setNotifMsg] = useState(null);
+  const [notifErr, setNotifErr] = useState(null);
+  const [notifBusy, setNotifBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+  const [digestBusy, setDigestBusy] = useState(false);
+
   const refreshCollectors = () =>
     getCollectors().then(({ config, running }) => {
       setCollectorsState(running);
@@ -73,11 +81,66 @@ export default function SettingsPage() {
   const refreshStorage = () =>
     getStorageStats().then((s) => { setStorage(s); setDays(s.retention_days); }).catch(() => {});
 
+  const refreshNotif = () =>
+    getNotifications().then((n) => { setNotif(n); setNotifErr(null); }).catch(() => {});
+
   useEffect(() => {
     refreshStorage();
     refreshCollectors();
+    refreshNotif();
     getAudit(100).then((d) => setAudit(d.entries || [])).catch(() => {});
   }, []);
+
+  const applyNotif = async () => {
+    setNotifBusy(true); setNotifMsg(null); setNotifErr(null);
+    try {
+      const patch = {
+        enabled: notif.enabled,
+        severity_min: notif.severity_min,
+        email: {
+          host: notif.email.host, port: notif.email.port,
+          sender: notif.email.sender, recipient: notif.email.recipient,
+          username: notif.email.username, password: notif.email.password,
+        },
+        webhook: { url: notif.webhook.url, secret: notif.webhook.secret },
+        digest: { enabled: notif.digest.enabled, hour_utc: notif.digest.hour_utc },
+      };
+      const saved = await saveNotifications(patch);
+      setNotif(saved);
+      setNotifMsg("Delivery config saved — new alerts and the digest fan out from the next trigger.");
+    } catch (e) {
+      setNotifErr(e.response?.data?.detail || e.message);
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
+  const sendTest = async () => {
+    setTestBusy(true); setNotifMsg(null); setNotifErr(null);
+    try {
+      const r = await testNotifications();
+      const summary = (r.results || [])
+        .map((x) => `${x.transport}=${x.status}${x.http_status ? `(${x.http_status})` : ""}`)
+        .join(" ");
+      setNotifMsg(`Test dispatched — ${summary}.`);
+    } catch (e) {
+      setNotifErr(e.response?.data?.detail || e.message);
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
+  const sendDigest = async () => {
+    setDigestBusy(true); setNotifMsg(null); setNotifErr(null);
+    try {
+      const r = await runDigest(true);
+      setNotifMsg(`Digest sent — ${r.cases_in_window} cases in window (${(r.results || []).map((x) => `${x.transport}=${x.status}`).join(" ")}).`);
+    } catch (e) {
+      setNotifErr(e.response?.data?.detail || e.message);
+    } finally {
+      setDigestBusy(false);
+    }
+  };
 
   const applyRetention = async () => {
     setBusy(true); setRetentMsg(null); setRetentErr(null);
@@ -311,6 +374,77 @@ export default function SettingsPage() {
           {colMsg && <span className="mono text-[11px] text-emerald-400">✓ {colMsg}</span>}
           {colErr && <span className="mono text-[11px] text-rose-400">✗ {colErr}</span>}
         </div>
+      </section>
+
+      {/* ------------------------------------------------ notifications */}
+      <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "110ms" }}>
+        <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+          <p className="mono text-[11px] tracking-widest text-slate-500">delivery :: alert fan-out · digest</p>
+          <div className="flex items-center gap-2">
+            {notif && <PlainBadge cls={notif.enabled ? "!text-emerald-300" : "!text-slate-400"}>{notif.enabled ? "enabled" : "muted"}</PlainBadge>}
+            {notif?.webhook?.url && <PlainBadge cls="!text-cyan-300">webhook</PlainBadge>}
+            {notif?.email?.host && <PlainBadge cls="!text-cyan-300">smtp</PlainBadge>}
+            {notif?.digest?.enabled && <PlainBadge cls="!text-amber-300">digest {notif.digest.hour_utc}:00z</PlainBadge>}
+          </div>
+        </div>
+        {notif ? (
+          <div className="p-5">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <label className="flex items-center gap-2 text-[12px] text-slate-300">
+                <input type="checkbox" checked={notif.enabled} onChange={(e) => setNotif((n) => ({ ...n, enabled: e.target.checked }))} className="accent-emerald-400" />
+                fan-out enabled
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-slate-300">
+                <span className="eyebrow">min severity</span>
+                <select value={notif.severity_min} onChange={(e) => setNotif((n) => ({ ...n, severity_min: e.target.value }))} className="field mono px-3 py-1.5 text-[11px]">
+                  {["info", "warning", "error", "critical"].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-slate-300">
+                <input type="checkbox" checked={notif.digest.enabled} onChange={(e) => setNotif((n) => ({ ...n, digest: { ...n.digest, enabled: e.target.checked } }))} className="accent-emerald-400" />
+                daily digest
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-slate-300">
+                <span className="eyebrow">UTC hour</span>
+                <input type="number" min="0" max="23" value={notif.digest.hour_utc} onChange={(e) => setNotif((n) => ({ ...n, digest: { ...n.digest, hour_utc: Math.max(0, Math.min(23, Number(e.target.value) || 0)) } }))} className="field mono w-16 px-2 py-1.5 text-[11px]" />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="space-y-2">
+                <p className="eyebrow">SMTP</p>
+                <Field label="host"><input value={notif.email.host} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, host: e.target.value } }))} placeholder="smtp.example.com" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="port"><input type="number" value={notif.email.port} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, port: Number(e.target.value) || 587 } }))} className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="sender"><input value={notif.email.sender} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, sender: e.target.value } }))} placeholder="trinetra@acme.io" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="recipient"><input value={notif.email.recipient} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, recipient: e.target.value } }))} placeholder="soc@acme.io" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="username / password"><input value={notif.email.username} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, username: e.target.value } }))} placeholder="username (optional)" className="field mono w-full px-3 py-1.5 text-[11px]" /><input value={notif.email.password} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, password: e.target.value } }))} type="password" placeholder="••••••••" className="field mono mt-1.5 w-full px-3 py-1.5 text-[11px]" /></Field>
+              </div>
+              <div className="space-y-2">
+                <p className="eyebrow">Webhook</p>
+                <Field label="endpoint URL"><input value={notif.webhook.url} onChange={(e) => setNotif((n) => ({ ...n, webhook: { ...n.webhook, url: e.target.value } }))} placeholder="https://alertflow.example.com/hook" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="shared secret"><input value={notif.webhook.secret} onChange={(e) => setNotif((n) => ({ ...n, webhook: { ...n.webhook, secret: e.target.value } }))} type="password" placeholder="X-Trinetra-Secret" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <p className="text-[10.5px] leading-relaxed text-slate-500">
+                  POSTs a JSON envelope {"{type,severity,title,body}"} to the endpoint. Console logging is always on.
+                </p>
+              </div>
+              <div className="flex flex-col justify-end gap-2">
+                <button onClick={applyNotif} disabled={notifBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
+                  {notifBusy ? "SAVING…" : "SAVE DELIVERY CONFIG"}
+                </button>
+                <button onClick={sendTest} disabled={testBusy} className="btn-secondary mono !px-4 !py-2 text-[11px]">
+                  {testBusy ? "SENDING…" : "SEND TEST ALERT"}
+                </button>
+                <button onClick={sendDigest} disabled={digestBusy} className="btn-ghost mono !px-4 !py-2 text-[11px]">
+                  {digestBusy ? "SENDING…" : "RUN DIGEST NOW"}
+                </button>
+                {notifMsg && <span className="mono text-[11px] text-emerald-400">✓ {notifMsg}</span>}
+                {notifErr && <span className="mono text-[11px] text-rose-400">✗ {notifErr}</span>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="px-5 py-6 text-center text-[12px] text-slate-500">Loading delivery config…</p>
+        )}
       </section>
 
       {/* ------------------------------------------------ audit trail */}

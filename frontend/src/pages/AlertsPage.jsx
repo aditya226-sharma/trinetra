@@ -1,124 +1,162 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getAlerts } from "../lib/api";
+import { caseAction, getCases } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
 const POLL_MS = 5000;
+const STATUS_FILTERS = ["", "unresolved", "open", "acknowledged", "resolved"];
 const SEVERS = ["", "critical", "high", "warning", "info"];
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState([]);
-  const [sent, setSent] = useState(0);
+  const [data, setData] = useState({ cases: [], stats: null });
+  const [statusFilter, setStatusFilter] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [assignees, setAssignees] = useState({});
+  const [notes, setNotes] = useState({});
+  const [busy, setBusy] = useState({});
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let alive = true;
     const tick = () =>
-      getAlerts()
-        .then((d) => {
-          if (!alive) return;
-          setAlerts(d.alerts);
-          setSent(d.sent);
-          setError(null);
-        })
+      getCases({ limit: 200, status: statusFilter || undefined, severity: sevFilter || undefined })
+        .then((d) => { if (alive) { setData(d); setError(null); } })
         .catch((e) => alive && setError(e.message));
     tick();
     const id = setInterval(tick, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, []);
+    return () => { alive = false; clearInterval(id); };
+  }, [statusFilter, sevFilter]);
 
-  const stats = useMemo(() => {
-    const out = { critical: 0, high: 0, warning: 0, info: 0, other: 0, malicious: 0, suspicious: 0 };
-    alerts.forEach((a) => {
-      if (["critical", "high", "warning", "info"].includes(a.severity)) out[a.severity] += 1;
-      else out.other += 1;
-      if (a.verdict === "malicious") out.malicious += 1;
-      if (a.verdict === "suspicious") out.suspicious += 1;
-    });
-    return out;
-  }, [alerts]);
+  const { cases, stats } = data;
+  const statsSev = stats?.unresolved_by_severity || {};
 
-  const visible = sevFilter ? alerts.filter((a) => a.severity === sevFilter) : alerts;
+  const act = async (id, action, extra = {}) => {
+    setBusy((b) => ({ ...b, [id]: action }));
+    try {
+      await caseAction(id, { action, ...extra });
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
+    }
+    const fresh = await getCases({ limit: 200, status: statusFilter || undefined, severity: sevFilter || undefined }).catch(() => null);
+    if (fresh) setData(fresh);
+  };
+
+  const visible = (statusFilter ? cases : cases.filter((c) => c.status !== "resolved"));
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Analyzer · notifier fan-out"
-        title="Alert stream"
-        sub="Live export of verdicts pushed by the pipeline every batch — expand a verdict to inspect the raw evidence that fired it."
-        actions={<LiveBadge text={`Poll 5s · ${sent} sent`} />}
+        eyebrow="soc · alert cases · triage lifecycle"
+        title="Alert queue"
+        sub="Every pipeline verdict and policy hit becomes a durable case — acknowledge, assign, resolve, and annotate. External delivery fans out at your configured severity floor."
+        actions={<LiveBadge text={`Poll 5s · ${stats?.total ?? 0} cases`} />}
       />
 
-      {/* verdict tiles */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4 anim-fadeup">
-        <Tile label="Alert events" value={sent} tone="tone-info" />
-        <Tile label="Open verdicts" value={alerts.length} tone="tone-slate" />
-        <Tile label="malicious · quarantine" value={stats.malicious} tone="tone-danger" />
-        <Tile label="suspicious · review" value={stats.suspicious} tone="tone-warn" />
+      {/* case counters */}
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5 anim-fadeup">
+        <Tile label="total cases" value={stats?.total ?? 0} tone="tone-slate" />
+        <Tile label="open" value={stats?.by_status?.open ?? 0} tone="tone-danger" />
+        <Tile label="acknowledged" value={stats?.by_status?.acknowledged ?? 0} tone="tone-warn" />
+        <Tile label="resolved" value={stats?.by_status?.resolved ?? 0} tone="tone-info" />
+        <Tile label="critical open" value={statsSev.critical ?? 0} tone="tone-danger" />
       </div>
-      {stats.other > 0 && (
-        <p className="text-[11px] text-slate-500">
-          +{stats.other} with other severities ({["medium", "error", "low"].join("/")})
-        </p>
-      )}
 
       {error && <div className="text-sm text-rose-400">{error}</div>}
 
-      {/* severity pills */}
+      {/* filters */}
       <div className="flex flex-wrap items-center gap-2 anim-fadeup">
-        <span className="eyebrow mr-1">FILTER</span>
-        {SEVERS.map((s) => (
-          <button key={s || "all"} onClick={() => setSevFilter(s)} className={`chip ${sevFilter === s ? "chip-on" : ""}`}>
-            {s === "" ? "all verdicts" : s}
+        <span className="eyebrow mr-1">STATUS</span>
+        {STATUS_FILTERS.map((s) => (
+          <button key={s || "all"} onClick={() => setStatusFilter(s)} className={`chip ${statusFilter === s ? "chip-on" : ""}`}>
+            {s === "" ? "live queue" : s}
           </button>
         ))}
-        {stats.critical > 0 && (
-          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-rose-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" />
-            {stats.critical} critical inbound
-          </span>
-        )}
+        <span className="eyebrow ml-4 mr-1">SEVERITY</span>
+        {SEVERS.map((s) => (
+          <button key={s || "all"} onClick={() => setSevFilter(s)} className={`chip ${sevFilter === s ? "chip-on" : ""}`}>
+            {s === "" ? "all" : s}
+          </button>
+        ))}
       </div>
 
-      {/* timeline feed */}
       {visible.length === 0 ? (
-        <Empty title="No verdicts in flight" hint="Run the demo dataset to fan out alerts." />
+        <Empty title="Queue is clear" hint="Verdicts and policy hits land here as cases; nothing matches your filters right now." />
       ) : (
         <div className="relative space-y-3 pl-6 anim-fadeup">
-          {/* spine */}
           <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
-          {visible.map((a, i) => {
-            // Alerts carry no unique id; hash their content so identical
-            // (flows/timestamp/threat_class/confidence) rows don't collide
-            // as React keys when `flows` is falsy.
-            const key = hashStr(`${a.threat_class}|${a.timestamp}|${a.confidence}|${a.store_decision}|${JSON.stringify(a.evidence || {})}`);
-            const open = expandedId === key;
+          {visible.map((c, i) => {
+            const open = expandedId === c.id;
             return (
-              <div key={key} className="relative feed-in" style={{ animationDelay: `${i * 55}ms` }}>
-                <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(a.severity)} ${a.severity === "critical" ? "pulse-dot-red" : ""}`} />
+              <div key={c.id} className="relative feed-in" style={{ animationDelay: `${i * 35}ms` }}>
+                <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(c.severity)} ${c.severity === "critical" ? "pulse-dot-red" : ""}`} />
                 <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
-                  <button onClick={() => setExpandedId(open ? null : key)} className="flex w-full items-center gap-3 p-4 text-left">
-                    <span className={`sev-strip ${stripCls(a.severity)}`} />
+                  <button onClick={() => setExpandedId(open ? null : c.id)} className="flex w-full items-center gap-3 p-4 text-left">
+                    <span className={`sev-strip ${stripCls(c.severity)}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="mono text-[13.5px] font-semibold text-slate-100">{a.threat_class}</span>
-                        <SeverityBadge severity={a.severity} />
-                        <PlainBadge>verdict <b className={a.verdict === "malicious" ? "text-rose-300" : "text-amber-300"}>{a.verdict}</b></PlainBadge>
+                        <span className="mono text-[13.5px] font-semibold text-slate-100">{c.threat_class}</span>
+                        <SeverityBadge severity={c.severity} />
+                        <StatusBadge status={c.status} />
+                        <PlainBadge cls="!text-cyan-300">{c.source_kind}</PlainBadge>
+                        {c.hits > 1 && <PlainBadge cls="!text-slate-300">hits {c.hits}</PlainBadge>}
                       </div>
                       <p className="mono mt-1 text-[11px] uppercase tracking-widest text-slate-500">
-                        conf {a.confidence} · store → {a.store_decision} · {a.timestamp}
+                        {c.message || c.threat_class} · {c.source_value || "—"} {c.timestamp && `· ${c.timestamp}`}
+                        {c.assignee && <span className="text-emerald-300"> · @{c.assignee}</span>}
                       </p>
                     </div>
                     <span className="text-slate-600 transition group-hover:text-emerald-300">{open ? "−" : "+"}</span>
                   </button>
+
                   {open && (
                     <div className="border-t border-white/5 bg-black/30 p-4">
-                      <p className="eyebrow mb-2">Supporting evidence · raw flows</p>
-                      <CodeBlock maxH="max-h-64">{JSON.stringify(a.evidence || {}, null, 2)}</CodeBlock>
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        {c.status === "open" && <ActionBtn onClick={() => act(c.id, "ack")} busy={busy[c.id]} label="Acknowledge" />}
+                        {c.status === "acknowledged" && (
+                          <>
+                            <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />
+                            <ActionBtn onClick={() => act(c.id, "unack")} busy={busy[c.id]} label="Reopen" variant="ghost" />
+                          </>
+                        )}
+                        {c.status === "resolved" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
+                        {c.status !== "resolved" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
+                        <input
+                          value={assignees[c.id] || ""}
+                          onChange={(e) => setAssignees((a) => ({ ...a, [c.id]: e.target.value }))}
+                          placeholder="assign to…"
+                          className="field mono w-40 px-3 py-1.5 text-[11px]"
+                        />
+                        <ActionBtn onClick={() => act(c.id, "assign", { assignee: assignees[c.id] || "" })} label="Assign" variant="ghost" />
+                        <input
+                          value={notes[c.id] || ""}
+                          onChange={(e) => setNotes((a) => ({ ...a, [c.id]: e.target.value }))}
+                          placeholder="add note…"
+                          className="field mono w-56 px-3 py-1.5 text-[11px]"
+                          onKeyDown={(e) => { if (e.key === "Enter" && notes[c.id]) { act(c.id, "note", { note: notes[c.id] }); setNotes((a) => ({ ...a, [c.id]: "" })); } }}
+                        />
+                      </div>
+
+                      <p className="eyebrow mb-2">Supporting evidence</p>
+                      <CodeBlock maxH="max-h-48">{JSON.stringify(c.evidence || {}, null, 2)}</CodeBlock>
+
+                      {(c.timeline?.length || 0) > 0 && (
+                        <>
+                          <p className="eyebrow mb-2 mt-4">Timeline</p>
+                          <div className="space-y-1">
+                            {c.timeline.map((t, ti) => (
+                              <p key={ti} className="mono text-[10.5px] text-slate-500">
+                                <span className="text-slate-600">{t.ts}</span>{"  "}
+                                <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
+                                {" by "}<span className="text-slate-400">{t.actor}</span>
+                                {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
+                                {t.note && <span className="text-amber-300/80"> (“{t.note}”)</span>}
+                              </p>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -131,9 +169,35 @@ export default function AlertsPage() {
   );
 }
 
+function ActionBtn({ onClick, busy, label, variant = "primary" }) {
+  const cls = {
+    primary: "btn-primary mono !px-3 !py-1.5 text-[10.5px]",
+    danger: "btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400",
+    ghost: "btn-ghost mono !px-3 !py-1.5 text-[10.5px]",
+  }[variant];
+  return (
+    <button onClick={onClick} disabled={busy} className={cls}>
+      {busy ? "…" : label}
+    </button>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    open: "text-rose-300 border-rose-500/30 bg-rose-500/10",
+    acknowledged: "text-amber-300 border-amber-500/30 bg-amber-500/10",
+    resolved: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
+  };
+  return (
+    <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${map[status] || ""}`}>
+      {status}
+    </span>
+  );
+}
+
 function Tile({ label, value, tone }) {
   const tones = {
-    "tone-danger": "text-grad-danger glow-red",
+    "tone-danger": "text-grad-danger glow-red text-[24px] mono font-bold",
     "tone-warn": "text-[24px] mono font-bold text-amber-300",
     "tone-info": "text-[24px] mono font-bold text-sky-300",
     "tone-slate": "text-[24px] mono font-bold text-slate-200",
@@ -154,12 +218,3 @@ const dotCls = (sev) => {
   const m = { critical: "bg-rose-500", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
   return m[sev] || "bg-sky-500";
 };
-
-function hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i += 1) {
-    h = (h << 5) - h + s.charCodeAt(i);
-    h |= 0;
-  }
-  return `a${(h >>> 0).toString(36)}`;
-}

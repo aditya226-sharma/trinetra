@@ -12,6 +12,8 @@ import CompliancePage from "./pages/CompliancePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import FleetPage from "./pages/FleetPage";
 import ReportPage from "./pages/ReportPage";
+import RulesPage from "./pages/RulesPage";
+import WatchlistPage from "./pages/WatchlistPage";
 import IngestPage from "./pages/IngestPage";
 import ClientsPage from "./pages/ClientsPage";
 import LogConsolePage from "./pages/LogConsolePage";
@@ -77,6 +79,18 @@ const ICONS = {
       <path d="M9 12l2 2 4-4" />
     </svg>
   ),
+  Rules: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4h-4a2 2 0 00-2 2v14a2 2 0 002 2h8a2 2 0 002-2V8l-6-4z" />
+      <path d="M14 4v4h4" />
+      <path d="M9 14h6M9 17h4" />
+    </svg>
+  ),
+  Watchlist: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 8.7l5.4-.8L12 3z" />
+    </svg>
+  ),
   Ingest: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <path d="M4 5h16M4 12h16M4 19h10" />
@@ -119,6 +133,8 @@ const navItems = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/events", label: "Events" },
   { to: "/alerts", label: "Alerts" },
+  { to: "/rules", label: "Rules" },
+  { to: "/watchlist", label: "Watchlist" },
   { to: "/graph", label: "Graph" },
   { to: "/assets", label: "Assets" },
   { to: "/compliance", label: "Compliance" },
@@ -134,7 +150,9 @@ const TITLES = {
   "/clients": "Client fleet",
   "/clients/onboard": "Onboarding",
   "/events": "Event triage",
-  "/alerts": "Alert fan-out",
+  "/alerts": "Alert queue",
+  "/rules": "Rules editor",
+  "/watchlist": "Watchlist · blocklist",
   "/graph": "Entity graph",
   "/assets": "Asset registry",
   "/compliance": "Compliance briefs",
@@ -516,6 +534,8 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/rules" element={<RulesPage />} />
+            <Route path="/watchlist" element={<WatchlistPage />} />
             <Route path="/graph" element={<GraphPage />} />
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
