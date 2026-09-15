@@ -232,6 +232,7 @@ def run_demo(reset: bool = Query(False),
                     pass
     _ORCH = Orchestrator(_settings)
     _GRAPH = _ORCH.graph
+    _COLLECTORS._orch = _ORCH
     from collectors.demo_feed import DemoFeed
 
     pcap_dir = str(_settings.path("pcap"))
