@@ -42,8 +42,9 @@ _CASES_DB = "soc_cases.db"
 
 _SEV_RANK = {s: i for i, s in enumerate(SEVERITY_LEVELS)}  # info < warning < error < critical
 
-_STATUSES = ("open", "acknowledged", "resolved")
-_ACTIONS = ("ack", "unack", "resolve", "reopen", "assign", "note")
+_STATUSES = ("open", "investigation", "closed")
+_ACTIONS = ("investigate", "uninvestigate", "close", "reopen", "assign", "note")
+_LEGACY_ACTIONS = {"ack": "investigate", "unack": "uninvestigate", "resolve": "close"}
 
 _ENTITY_KINDS = ("ip", "client", "user", "domain", "asset")
 _MATCH_OPS = ("eq", "neq", "contains", "regex")
@@ -161,9 +162,19 @@ class SocPolicy:
             " timestamp TEXT NOT NULL, last_seen TEXT NOT NULL, hits INTEGER NOT NULL DEFAULT 1,"
             " status TEXT NOT NULL DEFAULT 'open', assignee TEXT NOT NULL DEFAULT '',"
             " notes TEXT NOT NULL DEFAULT '[]', timeline TEXT NOT NULL DEFAULT '[]',"
+            " client_id TEXT NOT NULL DEFAULT '', involved TEXT NOT NULL DEFAULT '[]',"
             " delivery TEXT NOT NULL DEFAULT 'null')")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_ts ON cases(timestamp DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(client_id)")
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(cases)").fetchall()}
+        if "client_id" not in cols:
+            conn.execute("ALTER TABLE cases ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
+        if "involved" not in cols:
+            conn.execute("ALTER TABLE cases ADD COLUMN involved TEXT NOT NULL DEFAULT '[]'")
+        # Migrate legacy statuses -> open/investigation/closed.
+        conn.execute("UPDATE cases SET status = 'investigation' WHERE status = 'acknowledged'")
+        conn.execute("UPDATE cases SET status = 'closed' WHERE status = 'resolved'")
         conn.commit()
         return conn
 
@@ -183,6 +194,10 @@ class SocPolicy:
                 case[key] = json.loads(case[key]) if case[key] else ([] if key != "evidence" else {})
             except (TypeError, ValueError):
                 case[key] = [] if key != "evidence" else {}
+        try:
+            case["involved"] = json.loads(case["involved"]) if case["involved"] else []
+        except (TypeError, ValueError):
+            case["involved"] = []
         try:
             case["delivery"] = json.loads(case["delivery"]) if case["delivery"] else None
         except (TypeError, ValueError):
@@ -645,6 +660,8 @@ class SocPolicy:
             threat_class = str(finding.get("threat_class") or alert.get("threat_class") or "unknown")
             ts = str(alert.get("timestamp") or finding.get("timestamp") or _iso_now())
             evidence = alert.get("evidence") or {}
+            client_id = str(finding.get("client_id") or alert.get("client_id") or "")
+            involved = self._involved_entities(finding, evidence)
             case = self._throttled_case(
                 threat_class=threat_class,
                 severity=severity,
@@ -660,7 +677,9 @@ class SocPolicy:
                        "store_decision": finding.get("analysis", {}).get("store_decision", "keep"),
                        "confidence": _safe_float(finding.get("confidence", 0)),
                        "flows": flows,
-                       "created_by": "system"},
+                       "created_by": "system",
+                       "client_id": client_id,
+                       "involved": involved},
             )
             if case is None:
                 return None
@@ -669,6 +688,40 @@ class SocPolicy:
         except Exception as exc:  # noqa: BLE001 — never kill the pipeline
             log.warning("record_flow_finding failed: %s", exc)
             return None
+
+    def _involved_entities(self, finding: Dict[str, Any],
+                           evidence: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Extract the parties implicated in a finding (IPs, hosts, users,
+        domains, client) so incident drill-down can attribute involvement."""
+        seen: Dict[tuple, str] = {}  # (kind, value) -> label
+        values: List[Any] = []
+
+        def add(kind: str, value: Any, label: Optional[str] = None) -> None:
+            if value is None or str(value) == "":
+                return
+            text = str(value).strip()
+            key = (kind, text)
+            if key not in seen:
+                seen[key] = label or text
+
+        alert = finding.get("alert") or {}
+        for field in ("src_ip", "src", "dst_ip", "dst", "host"):
+            add("ip", evidence.get(field) or alert.get(field))
+        add("domain", evidence.get("domain") or alert.get("domain")
+            or (evidence.get("dns_query") if isinstance(evidence.get("dns_query"), str) else None))
+        add("user", evidence.get("user") or alert.get("user")
+            or (evidence.get("username") if isinstance(evidence.get("username"), str) else None))
+        add("client", finding.get("client_id") or alert.get("client_id"))
+        # Fan-out lists carried in evidence (#dst_ips, #unique_sources...).
+        for list_field in ("dst_ips", "unique_sources", "srcs", "dsts", "hosts",
+                           "suspicious_queries"):
+            raw = evidence.get(list_field)
+            if isinstance(raw, list):
+                for entry in raw[:10]:
+                    kind = "domain" if list_field == "suspicious_queries" else "ip"
+                    add(kind, entry)
+        return [{"kind": k, "value": v, "label": lbl}
+                for (k, v), lbl in seen.items()]
 
     def _throttled_case(self, threat_class: str, severity: str, source_kind: str,
                         source_value: str, rule_id: str, message: str,
@@ -699,8 +752,9 @@ class SocPolicy:
                     "INSERT INTO cases "
                     "(id, threat_class, severity, source_kind, source_value, rule_id,"
                     " message, evidence, verdict, store_decision, confidence, flows,"
-                    " timestamp, last_seen, hits, status, assignee, notes, timeline, delivery)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " timestamp, last_seen, hits, status, assignee, notes, timeline,"
+                    " client_id, involved, delivery)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (case_id, threat_class, severity, source_kind, source_value, rule_id,
                      message, json.dumps(evidence),
                      str((extra or {}).get("verdict", "n/a")),
@@ -708,7 +762,10 @@ class SocPolicy:
                      float((extra or {}).get("confidence", 0)),
                      str((extra or {}).get("flows", "")),
                      ts, ts, 1, "open", str((extra or {}).get("created_by", "system")) or "",
-                     "[]", json.dumps(timeline), "null"))
+                     "[]", json.dumps(timeline),
+                     str((extra or {}).get("client_id", "")),
+                     json.dumps((extra or {}).get("involved", [])),
+                     "null"))
                 conn.commit()
                 return self._case_row(conn.execute(
                     "SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
@@ -728,7 +785,7 @@ class SocPolicy:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT * FROM cases WHERE status = 'open' "
+                "SELECT * FROM cases WHERE status != 'closed' "
                 "AND source_kind = ? " + where + " ORDER BY timestamp DESC LIMIT 1",
                 (key[0], *args)).fetchone()
             if row is None:
@@ -748,7 +805,8 @@ class SocPolicy:
     # --------------------------------------------------------------- case API
 
     def list_cases(self, status: Optional[str] = None, limit: int = 100,
-                   severity: Optional[str] = None, q: str = "") -> List[Dict[str, Any]]:
+                   severity: Optional[str] = None, q: str = "",
+                   client_id: str = "") -> List[Dict[str, Any]]:
         limit = max(1, min(int(limit), 500))
         conn = self._connect()
         try:
@@ -758,7 +816,10 @@ class SocPolicy:
                 where.append("status = ?")
                 args.append(status)
             elif status == "unresolved":
-                where.append("status != 'resolved'")
+                where.append("status != 'closed'")
+            if client_id:
+                where.append("client_id = ?")
+                args.append(client_id)
             if severity in SEVERITY_LEVELS:
                 where.append("severity = ?")
                 args.append(severity)
@@ -769,7 +830,7 @@ class SocPolicy:
             query = "SELECT * FROM cases"
             if where:
                 query += " WHERE " + " AND ".join(where)
-            query += " ORDER BY (status = 'resolved'), timestamp DESC LIMIT ?"
+            query += " ORDER BY (status = 'closed'), timestamp DESC LIMIT ?"
             args.append(limit)
             rows = conn.execute(query, args).fetchall()
             return [self._case_row(r) for r in rows]
@@ -794,10 +855,28 @@ class SocPolicy:
                     out[status] += count
                 sev = r["severity"] if r["severity"] in by_sev else "info"
                 by_sev[sev] += count
-                if status != "resolved":
+                if status != "closed":
                     open_by_sev[sev] += count
             return {"total": total, "by_status": out, "by_severity": by_sev,
                     "unresolved_by_severity": open_by_sev}
+        finally:
+            conn.close()
+
+    def case_stats_by_client(self, client_id: str) -> Dict[str, Any]:
+        """Case stats scoped to a single client workspace."""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT status, COUNT(*) AS c FROM cases WHERE client_id = ? "
+                "GROUP BY status", (client_id,)).fetchall()
+            out = {s: 0 for s in _STATUSES}
+            total = 0
+            for r in rows:
+                count = int(r["c"])
+                total += count
+                if r["status"] in out:
+                    out[r["status"]] += count
+            return {"total": total, "by_status": out}
         finally:
             conn.close()
 
@@ -811,6 +890,7 @@ class SocPolicy:
 
     def transition(self, case_id: str, action: str, actor: str = "system",
                    assignee: str = "", note: str = "") -> Dict[str, Any]:
+        action = _LEGACY_ACTIONS.get(action, action)
         if action not in _ACTIONS:
             raise SocPolicyError(f"action must be one of {_ACTIONS}")
         conn = self._connect()
@@ -825,24 +905,24 @@ class SocPolicy:
             now_status = case["status"]
             new_status = now_status
             detail = ""
-            if action == "ack":
-                if now_status not in ("open", "resolved"):
-                    raise SocPolicyError(f"cannot ack a {now_status} case")
-                new_status = "acknowledged"
-                detail = "acknowledged"
-            elif action == "unack":
-                if now_status not in ("acknowledged",):
-                    raise SocPolicyError("only acknowledged cases can be un-acked")
+            if action == "investigate":
+                if now_status == "closed":
+                    raise SocPolicyError("closed cases must be reopened first")
+                new_status = "investigation"
+                detail = "opened for investigation"
+            elif action == "uninvestigate":
+                if now_status != "investigation":
+                    raise SocPolicyError("only investigation cases can be un-investigated")
                 new_status = "open"
-                detail = "reopened (un-ack)"
-            elif action == "resolve":
-                if now_status == "resolved":
-                    raise SocPolicyError("case is already resolved")
-                new_status = "resolved"
-                detail = "resolved"
+                detail = "back to open"
+            elif action == "close":
+                if now_status == "closed":
+                    raise SocPolicyError("case is already closed")
+                new_status = "closed"
+                detail = "closed"
             elif action == "reopen":
-                if now_status != "resolved":
-                    raise SocPolicyError("only resolved cases can be reopened")
+                if now_status != "closed":
+                    raise SocPolicyError("only closed cases can be reopened")
                 new_status = "open"
                 detail = "reopened"
             elif action == "assign":
@@ -856,7 +936,7 @@ class SocPolicy:
                     raise SocPolicyError("note is required")
                 notes.append({"ts": ts, "actor": str(actor)[:64], "note": note})
                 detail = "note added"
-            if note and action in ("ack", "unack", "resolve", "reopen", "assign"):
+            if note and action in ("investigate", "uninvestigate", "close", "reopen", "assign"):
                 notes.append({"ts": ts, "actor": str(actor)[:64], "note": note})
             if assignee:
                 conn.execute("UPDATE cases SET assignee = ? WHERE id = ?",
@@ -891,9 +971,9 @@ class SocPolicy:
                 return {"status": "skipped", "reason": "already delivered today"}
         since = _night_before(24 * 60 * 60)
         cases = [c for c in self.list_cases(status=None, limit=200)
-                 if c["timestamp"] >= since or c["status"] != "resolved"]
+                 if c["timestamp"] >= since or c["status"] != "closed"]
         stats = self.case_stats()
-        open_cases = [c for c in cases if c["status"] != "resolved"]
+        open_cases = [c for c in cases if c["status"] != "closed"]
         by_sev = {s: 0 for s in SEVERITY_LEVELS}
         for c in cases:
             sev = c["severity"] if c["severity"] in by_sev else "info"
@@ -906,8 +986,8 @@ class SocPolicy:
             "",
             f"total alerts  : {stats['total']}",
             f"open          : {stats['by_status']['open']}",
-            f"acknowledged  : {stats['by_status']['acknowledged']}",
-            f"resolved      : {stats['by_status']['resolved']}",
+            f"investigation : {stats['by_status']['investigation']}",
+            f"closed        : {stats['by_status']['closed']}",
             f"by severity   : " + ", ".join(f"{s}={by_sev[s]}" for s in SEVERITY_LEVELS),
             "",
             "Latest cases",

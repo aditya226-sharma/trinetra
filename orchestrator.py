@@ -316,6 +316,7 @@ class Orchestrator:
                 "verdict": result.verdict if result else "error",
                 "store_decision": result.store_decision if result else "keep",
                 "evidence": finding.get("alert", {}).get("evidence", {}),
+                "client_id": finding.get("client_id") or "",
                 "flows": (finding.get("alert", {}).get("flows") or
                           finding.get("alert", {}).get("flow_id") or ""),
             })

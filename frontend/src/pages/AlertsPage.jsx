@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { caseAction, getCases } from "../lib/api";
+import { caseAction, getCases, getIncidentDetail } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
 const POLL_MS = 5000;
-const STATUS_FILTERS = ["", "unresolved", "open", "acknowledged", "resolved"];
+const STATUS_FILTERS = ["", "unresolved", "open", "investigation", "closed"];
 const SEVERS = ["", "critical", "high", "warning", "info"];
 const KINDS = ["", "flow", "watch", "block", "rule"];
 const SORTS = ["newest", "oldest", "severity", "hits"];
@@ -23,6 +23,8 @@ export default function AlertsPage({ role }) {
   const [busy, setBusy] = useState({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [incidentData, setIncidentData] = useState(null);
+  const [incidentLoading, setIncidentLoading] = useState(false);
   const reqSeq = useRef(0);
 
   const fetchCases = () => {
@@ -79,7 +81,7 @@ export default function AlertsPage({ role }) {
     refresh();
   };
 
-  const baseQueue = statusFilter ? cases : cases.filter((c) => c.status !== "resolved");
+  const baseQueue = statusFilter ? cases : cases.filter((c) => c.status !== "closed");
 
   const visible = useMemo(() => {
     let out = baseQueue;
@@ -115,12 +117,22 @@ export default function AlertsPage({ role }) {
     URL.revokeObjectURL(a.href);
   };
 
+  const openIncident = (id) => {
+    setExpandedId(id);
+    if (!id) { setIncidentData(null); return; }
+    setIncidentLoading(true);
+    getIncidentDetail(id)
+      .then((d) => setIncidentData(d))
+      .catch(() => setIncidentData(null))
+      .finally(() => setIncidentLoading(false));
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="soc · alert cases · triage lifecycle"
         title="Alert queue"
-        sub="Every pipeline verdict and policy hit becomes a durable case — acknowledge, assign, resolve, and annotate. External delivery fans out at your configured severity floor."
+        sub="Every pipeline verdict and policy hit becomes a durable case — investigate, assign, close, and annotate. External delivery fans out at your configured severity floor."
         actions={
           <div className="flex items-center gap-2">
             <LiveBadge text={`Poll 5s · ${stats?.total ?? 0} cases`} />
@@ -133,8 +145,8 @@ export default function AlertsPage({ role }) {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5 anim-fadeup">
         <Tile label="total cases" value={stats?.total ?? 0} tone="tone-slate" />
         <Tile label="open" value={stats?.by_status?.open ?? 0} tone="tone-danger" />
-        <Tile label="acknowledged" value={stats?.by_status?.acknowledged ?? 0} tone="tone-warn" />
-        <Tile label="resolved" value={stats?.by_status?.resolved ?? 0} tone="tone-info" />
+        <Tile label="investigation" value={stats?.by_status?.investigation ?? 0} tone="tone-warn" />
+        <Tile label="closed" value={stats?.by_status?.closed ?? 0} tone="tone-info" />
         <Tile label="critical open" value={statsSev.critical ?? 0} tone="tone-danger" />
       </div>
 
@@ -171,11 +183,11 @@ export default function AlertsPage({ role }) {
         <div className="ml-auto flex items-center gap-2">
           {canTriage && selectedIds.length > 0 && (
             <>
-              <button onClick={() => actAll("ack")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px]">
-                {bulkBusy ? "…" : `ack ${selectedIds.length}`}
+              <button onClick={() => actAll("investigate")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px]">
+                {bulkBusy ? "…" : `investigate ${selectedIds.length}`}
               </button>
-              <button onClick={() => actAll("resolve")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400">
-                {bulkBusy ? "…" : `resolve ${selectedIds.length}`}
+              <button onClick={() => actAll("close")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400">
+                {bulkBusy ? "…" : `close ${selectedIds.length}`}
               </button>
             </>
           )}
@@ -194,7 +206,7 @@ export default function AlertsPage({ role }) {
               <div key={c.id} className="relative feed-in" style={{ animationDelay: `${i * 35}ms` }}>
                 <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(c.severity)} ${c.severity === "critical" ? "pulse-dot-red" : ""}`} />
                 <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
-                  <button onClick={() => setExpandedId(open ? null : c.id)} className="flex w-full items-center gap-3 p-4 text-left">
+                  <button onClick={() => openIncident(open ? null : c.id)} className="flex w-full items-center gap-3 p-4 text-left">
                     {canTriage && (
                       <span
                         role="checkbox"
@@ -232,15 +244,15 @@ export default function AlertsPage({ role }) {
                           <span className="mono text-[10.5px] uppercase tracking-widest text-slate-500">read-only queue — an admin or analyst owns this case</span>
                         ) : (
                           <>
-                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "ack")} busy={busy[c.id]} label="Acknowledge" />}
-                            {c.status === "acknowledged" && (
+                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "investigate")} busy={busy[c.id]} label="Investigate" />}
+                            {c.status === "investigation" && (
                               <>
-                                <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />
-                                <ActionBtn onClick={() => act(c.id, "unack")} busy={busy[c.id]} label="Reopen" variant="ghost" />
+                                <ActionBtn onClick={() => act(c.id, "close")} busy={busy[c.id]} label="Close" variant="danger" />
+                                <ActionBtn onClick={() => act(c.id, "uninvestigate")} busy={busy[c.id]} label="Back to open" variant="ghost" />
                               </>
                             )}
-                            {c.status === "resolved" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
-                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
+                            {c.status === "closed" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
+                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "close")} busy={busy[c.id]} label="Close" variant="danger" />}
                             <input
                               value={assignees[c.id] || ""}
                               onChange={(e) => setAssignees((a) => ({ ...a, [c.id]: e.target.value }))}
@@ -264,7 +276,7 @@ export default function AlertsPage({ role }) {
 
                       {(c.timeline?.length || 0) > 0 && (
                         <>
-                          <p className="eyebrow mb-2 mt-4">Timeline</p>
+                          <p className="eyebrow mb-2 mt-4">Activity timeline · who did what</p>
                           <div className="space-y-1">
                             {c.timeline.map((t, ti) => (
                               <p key={ti} className="mono text-[10.5px] text-slate-500">
@@ -278,6 +290,8 @@ export default function AlertsPage({ role }) {
                           </div>
                         </>
                       )}
+
+                      <IncidentPanel data={incidentData} loading={incidentLoading} />
                     </div>
                   )}
                 </div>
@@ -289,6 +303,93 @@ export default function AlertsPage({ role }) {
     </div>
   );
 }
+
+function IncidentPanel({ data, loading }) {
+  if (loading) return <p className="eyebrow mt-4">Loading incident context…</p>;
+  if (!data) return null;
+  const { case: incident, involved = [], graph = { nodes: [], edges: [] } } = data;
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div>
+        <p className="eyebrow mb-2">Involved parties · who is implicated</p>
+        {involved.length === 0 ? (
+          <p className="text-[11.5px] text-slate-500">No entity attribution recorded for this incident.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {involved.map((e, i) => (
+              <div key={`${e.kind}-${e.value}-${i}`} className="glass-row flex items-center gap-2 p-2.5">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${kindDot(e.kind)}`} />
+                <span className="mono text-[10px] uppercase tracking-widest text-slate-500">{e.kind}</span>
+                <span className="mono truncate text-[12px] text-slate-200">{e.label || e.value}</span>
+                {typeof e.events === "number" && (
+                  <span className="ml-auto mono text-[10.5px] text-slate-500">{e.events} events</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="eyebrow mb-2 mt-4">Incident graph</p>
+        <IncidentGraph graph={graph} />
+
+        {Array.isArray(incident?.timeline) && incident.timeline.length > 0 && (
+          <>
+            <p className="eyebrow mb-2 mt-4">Investigators · activity trail</p>
+            <div className="space-y-1">
+              {incident.timeline.map((t, ti) => (
+                <p key={ti} className="mono text-[10.5px] text-slate-500">
+                  <span className="text-slate-600">{t.ts}</span>{" "}
+                  <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
+                  {" by "}<span className="text-slate-400">{t.actor}</span>
+                  {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
+                </p>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IncidentGraph({ graph }) {
+  const nodes = graph.nodes || [];
+  const edges = graph.edges || [];
+  if (nodes.length === 0) {
+    return <div className="glass-row border border-white/5 p-3 text-[11px] text-slate-500">No graph data for this incident yet.</div>;
+  }
+  const rows = nodes.map((n, i) => ({
+    node: n,
+    x: 18 + (i % 3) * 130 + (i % 2) * 18,
+    y: 22 + Math.floor(i / 3) * 56 + (i % 2) * 12,
+  }));
+  const byId = {};
+  nodes.forEach((n) => { byId[n.id] = n; });
+  return (
+    <div className="rounded-lg border border-white/5 bg-black/40 p-2">
+      <svg viewBox="0 0 300 150" className="w-full">
+        {edges.map((e, i) => {
+          const a = rows.find((r) => r.node.id === e.source);
+          const b = rows.find((r) => r.node.id === e.target);
+          if (!a || !b) return null;
+          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#f43f5e" : "#334155"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
+        })}
+        {rows.map(({ node, x, y }) => (
+          <g key={node.id}>
+            <circle cx={x} cy={y} r={node.threatened || node.kind === "threat" ? 7 : 5} fill={node.color || "#6366f1"} opacity="0.9" />
+            <text x={x + 9} y={y + 3} fontSize="7.5" fill="#cbd5e1" className="mono">{node.label}</text>
+          </g>
+        ))}
+      </svg>
+      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-600">{nodes.length} nodes · {edges.length} edges</p>
+    </div>
+  );
+}
+
+const kindDot = (kind) => {
+  const m = { ip: "bg-indigo-500", user: "bg-emerald-500", domain: "bg-cyan-500", client: "bg-violet-500", proc: "bg-amber-500" };
+  return m[kind] || "bg-slate-500";
+};
 
 function ActionBtn({ onClick, busy, label, variant = "primary" }) {
   const cls = {
@@ -306,8 +407,8 @@ function ActionBtn({ onClick, busy, label, variant = "primary" }) {
 function StatusBadge({ status }) {
   const map = {
     open: "text-rose-300 border-rose-500/30 bg-rose-500/10",
-    acknowledged: "text-amber-300 border-amber-500/30 bg-amber-500/10",
-    resolved: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
+    investigation: "text-amber-300 border-amber-500/30 bg-amber-500/10",
+    closed: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
   };
   return (
     <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${map[status] || ""}`}>

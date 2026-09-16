@@ -279,7 +279,7 @@ def run_demo(reset: bool = Query(False),
     _ORCH.stats["bootstrapped"] = True
     audit_log(_settings, str(payload.get("sub", "admin")), "bootstrap.demo",
               f"ran demo storyline (reset={reset})")
-    return {"status": "ok", **dashboard()}
+    return {"status": "ok", **dashboard({"sub": "admin", "role": "admin", "scope": ""})}
 
 
 # ------------------------------------------------------------------ queries
@@ -296,12 +296,17 @@ def health() -> Dict[str, Any]:
     }
 
 
-@app.get("/api/dashboard", tags=["dashboard"], dependencies=[Depends(require_auth)])
-def dashboard() -> Dict[str, Any]:
+@app.get("/api/dashboard", tags=["dashboard"])
+def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428,
                             detail="Bootstrap first: POST /api/demo/run")
+    scope = _client_scope(payload)
     graph_payload = _GRAPH.to_dashboard() if _GRAPH else {"nodes": [], "edges": []}
+    if scope:
+        return _scoped_dashboard(scope)
+    all_cases = _ORCH.soc.list_cases(limit=500) if _ORCH.soc else []
+    case_stats = _ORCH.soc.case_stats() if _ORCH.soc else {"total": 0, "by_status": {}}
     return {
         "stats": _ORCH.stats,
         "dedup_rate": _ORCH.dedup.duplicate_rate,
@@ -310,6 +315,14 @@ def dashboard() -> Dict[str, Any]:
         "graph_summary": _ORCH.graph.summary(),
         "vpn": {"profiles": _ORCH.vpn_profiles},
         "findings": _ORCH.findings_log[-50:],
+        "scope": "",
+        "case_stats": case_stats,
+        "incidents": {
+            "open": [c for c in all_cases if c["status"] == "open"],
+            "investigation": [c for c in all_cases if c["status"] == "investigation"],
+            "closed": [c for c in all_cases if c["status"] == "closed"],
+            "stats": case_stats.get("by_status", {}),
+        },
     }
 
 
@@ -383,26 +396,41 @@ def compliance_all() -> Dict[str, Any]:
             "findings_count": len(findings)}
 
 
-@app.get("/api/network-threats", tags=["module-a"],
-         dependencies=[Depends(require_auth)])
-def network_threats(limit: int = Query(50, le=500)) -> Dict[str, Any]:
+@app.get("/api/network-threats", tags=["module-a"])
+def network_threats(limit: int = Query(50, le=500),
+                    payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
-    return {"findings": _ORCH.findings_log[-limit:][::-1],
-            "count": len(_ORCH.findings_log)}
+    scope = _client_scope(payload)
+    findings = [f for f in _ORCH.findings_log
+                if not scope or _touches_client(f, scope)]
+    return {"findings": findings[-limit:][::-1],
+            "count": len(findings)}
 
 
-@app.get("/api/alerts", tags=["alerts"], dependencies=[Depends(require_auth)])
-def alerts(limit: int = Query(50, le=500)) -> Dict[str, Any]:
+@app.get("/api/alerts", tags=["alerts"])
+def alerts(limit: int = Query(50, le=500),
+           payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
-    return {"alerts": _ORCH.alerts_log[-limit:][::-1],
-            "count": len(_ORCH.alerts_log),
+    scope = _client_scope(payload)
+    log_rows = _ORCH.alerts_log[::-1]
+    if scope:
+        log_rows = [a for a in log_rows if _alert_for_scope(a, scope)]
+    return {"alerts": log_rows[:limit],
+            "count": len(log_rows),
             "sent": _ORCH.stats.get("alerts_sent", 0)}
 
 
-@app.get("/api/clients", tags=["store"], dependencies=[Depends(require_auth)])
-def clients() -> Dict[str, Any]:
+def _alert_for_scope(alert: Dict[str, Any], client_id: str) -> bool:
+    cid = str(alert.get("client_id") or "")
+    if not cid:
+        return True
+    return cid == client_id
+
+
+@app.get("/api/clients", tags=["store"])
+def clients(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     """Fleet registry: per-machine presence + event volume.
 
     Merges the event-derived summaries (counts, dominant source, last event)
@@ -412,6 +440,7 @@ def clients() -> Dict[str, Any]:
     """
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
+    scope = _client_scope(payload)
     grace_s = int(_settings.get("events.client_online_grace_s", 180))
     window_s = int(_settings.get("events.client_rate_window_s", 300))
     now = datetime.now(timezone.utc)
@@ -435,6 +464,8 @@ def clients() -> Dict[str, Any]:
 
     rows = []
     for cid, entry in merged.items():
+        if scope and cid != scope:
+            continue
         m = entry.get("meta", {})
         last_seen = str(m.get("last_seen") or entry.get("event_last_seen") or "")
         online = bool(last_seen) and last_seen >= grace_cutoff
@@ -463,6 +494,60 @@ def clients() -> Dict[str, Any]:
         "events_recent": sum(r["events_recent"] for r in rows),
     }
     return {"clients": rows, "totals": totals}
+
+
+def _client_scope(payload: Dict[str, Any]) -> str:
+    """The client workspace a non-admin is scoped to ('' = all). Admins and
+    analysts always see the whole estate unless an explicit scope is set."""
+    if payload.get("role") in ("admin", "analyst"):
+        return str(payload.get("scope") or "")
+    return str(payload.get("scope") or "")
+
+
+def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
+    """Dashboard payload restricted to one client workspace: its events,
+    its module findings (via the analytic search), its open incidents and a
+    mini incident board — the 'individual dashboard' for a client user."""
+    assert _ORCH is not None
+    store = _ORCH.event_store
+    graph = _ORCH.graph
+    events = store.count_filtered(client_id=client_id)
+    stats = getattr(_ORCH, "soc", None).case_stats_by_client(client_id) if getattr(_ORCH, "soc", None) else {"total": 0, "by_status": {}}
+    threat_counts: Dict[str, int] = {}
+    all_cases = _ORCH.soc.list_cases(limit=500, client_id=client_id) if _ORCH.soc else []
+    for c in all_cases:
+        threat_counts[c["threat_class"]] = threat_counts.get(c["threat_class"], 0) + 1
+    findings = [f for f in _ORCH.findings_log
+                if _touches_client(f, client_id)][-50:]
+    graph_payload = graph.to_dashboard() if graph else {"nodes": [], "edges": []}
+    return {
+        "client_id": client_id,
+        "scope": client_id,
+        "stats": {"events": events, "findings": len(findings),
+                  "alerts_sent": stats.get("total", 0),
+                  "raw_lines": _ORCH.stats.get("raw_lines", 0)},
+        "dedup_rate": _ORCH.dedup.duplicate_rate,
+        "threat_detections": threat_counts,
+        "incidents": {
+            "open": [c for c in all_cases if c["status"] == "open"],
+            "investigation": [c for c in all_cases if c["status"] == "investigation"],
+            "closed": [c for c in all_cases if c["status"] == "closed"],
+            "stats": stats.get("by_status", {}),
+        },
+        "graph": graph_payload,
+        "graph_summary": graph.summary() if graph else {},
+        "vpn": {"profiles": _ORCH.vpn_profiles},
+        "findings": findings,
+    }
+
+
+def _touches_client(finding: Dict[str, Any], client_id: str) -> bool:
+    """Does a finding implicate a given client workspace? Fall back to true
+    when the finding carries no client attribution (single-workspace mode)."""
+    cid = str(finding.get("client_id") or (finding.get("alert") or {}).get("client_id") or "")
+    if cid:
+        return cid == client_id
+    return True
 
 
 @app.get("/api/events/search", tags=["store"], dependencies=[Depends(require_auth)])
@@ -1268,25 +1353,109 @@ def rules_toggle(rule_id: str, enabled: bool = Query(True),
     return {"enabled": enabled}
 
 
-@app.get("/api/cases", tags=["soc"], dependencies=[Depends(require_auth)])
+@app.get("/api/cases", tags=["soc"])
 def cases_list(status: Optional[str] = Query(None), severity: Optional[str] = Query(None),
-               q: str = Query(""), limit: int = Query(100, le=500)) -> Dict[str, Any]:
-    rows = _soc().list_cases(status=status, severity=severity, q=q, limit=limit)
+               q: str = Query(""), limit: int = Query(100, le=500),
+               payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    rows = _soc().list_cases(status=status, severity=severity, q=q, limit=limit,
+                             client_id=_client_scope(payload))
     return {"cases": rows, "count": len(rows),
-            "stats": _soc().case_stats()}
+            "stats": _soc().case_stats() if not _client_scope(payload)
+                     else _soc().case_stats_by_client(_client_scope(payload))}
 
 
-@app.get("/api/cases/stats", tags=["soc"], dependencies=[Depends(require_auth)])
-def cases_stats() -> Dict[str, Any]:
+@app.get("/api/cases/stats", tags=["soc"])
+def cases_stats(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    scope = _client_scope(payload)
+    if scope:
+        return _soc().case_stats_by_client(scope)
     return _soc().case_stats()
 
 
-@app.get("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_auth)])
-def cases_detail(case_id: str) -> Dict[str, Any]:
+@app.get("/api/cases/{case_id}", tags=["soc"])
+def cases_detail(case_id: str,
+                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     case = _soc().get_case(case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="case not found")
+    scope = _client_scope(payload)
+    if scope and case.get("client_id") and case["client_id"] != scope:
+        raise HTTPException(status_code=403, detail="not your client's incident")
     return {"case": case}
+
+
+@app.get("/api/cases/{case_id}/incident", tags=["soc"],
+         dependencies=[Depends(require_auth)])
+def incident_detail(case_id: str) -> Dict[str, Any]:
+    """Full incident drill-down: case record + activity timeline (who did what),
+    involved parties (who is implicated), the entity graph subgraph around them,
+    and enriched context pulled from the event store."""
+    case = _soc().get_case(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="case not found")
+    involved = case.get("involved") or []
+    case_evidence = case.get("evidence") or {}
+    if not involved:
+        involved = _soc()._involved_entities(case, case_evidence)
+    # Enrich each involved party with event-store context.
+    enriched = []
+    store = _ORCH.event_store if _ORCH else None
+    for ent in involved:
+        row: Dict[str, Any] = dict(ent)
+        if store is not None and ent.get("value"):
+            try:
+                hits = store.count_filtered(
+                    query=str(ent["value"]), client_id=case.get("client_id") or "")
+                row["events"] = int(hits)
+                row["activity"] = [e.to_dict() for e in store.search(
+                    query=str(ent["value"]), client_id=case.get("client_id") or "",
+                    limit=3)]
+            except Exception as exc:  # noqa: BLE001 — enrichment must never 500
+                log.warning("incident enrichment failed: %s", exc)
+        enriched.append(row)
+    # Entity graph subgraph restricted to involved parties.
+    subgraph = {"nodes": [], "edges": []}
+    if _GRAPH is not None:
+        full = _GRAPH.to_dashboard()
+        wanted = {f"ip:{ent['value']}" if ent.get("kind") == "ip"
+                  else f"{ent.get('kind', 'misc')}:{ent['value']}" for ent in involved}
+        wanted |= {e["id"] for e in full["nodes"] if e["label"] in {x.get("value") for x in involved}}
+        node_ids = {n["id"] for n in full["nodes"] if n["id"] in wanted}
+        subgraph["nodes"] = [n for n in full["nodes"] if n["id"] in node_ids]
+        edge_ids = node_ids
+        subgraph["edges"] = [e for e in full["edges"]
+                             if e["source"] in edge_ids or e["target"] in edge_ids]
+    if not subgraph["nodes"]:
+        subgraph["nodes"] = [{"id": ent["value"], "label": ent["value"],
+                              "kind": ent.get("kind", "misc"), "severity": "none"}
+                             for ent in involved]
+    return {"case": case, "involved": enriched, "graph": subgraph,
+            "timeline": case.get("timeline") or [],
+            "evidence": case_evidence,
+            "client_id": case.get("client_id") or ""}
+
+
+@app.get("/api/cases/{case_id}/graph", tags=["soc"],
+         dependencies=[Depends(require_auth)])
+def incident_graph(case_id: str) -> Dict[str, Any]:
+    case = _soc().get_case(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="case not found")
+    involved = case.get("involved") or []
+    if _GRAPH is None:
+        return {"graph": {"nodes": [], "edges": []}, "involved": involved}
+    full = _GRAPH.to_dashboard()
+    wanted = {f"ip:{ent['value']}" for ent in involved} | \
+             {f"{ent.get('kind', 'misc')}:{ent['value']}" for ent in involved}
+    node_ids = {n["id"] for n in full["nodes"] if n["id"] in wanted}
+    for n in full["nodes"]:
+        if n["label"] in {x.get("value") for x in involved} and n["kind"] != "threat":
+            node_ids.add(n["id"])
+    nodes = [n for n in full["nodes"] if n["id"] in node_ids]
+    edge_ids = node_ids
+    edges = [e for e in full["edges"]
+             if e["source"] in edge_ids or e["target"] in edge_ids]
+    return {"graph": {"nodes": nodes, "edges": edges}, "involved": involved}
 
 
 @app.patch("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_analyst)])

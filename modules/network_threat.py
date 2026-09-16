@@ -231,17 +231,21 @@ class ThreatDetector:
         first = flows[0] if flows else {}
         flow_id = first.get("event_id") or f"flow::{first.get('src_ip', '?')}->{first.get('dst_ip', '?')}"
         event_ids = sorted({str(f.get("event_id")) for f in flows if f.get("event_id")})
+        client_id = str(next((f.get("client_id") or "" for f in flows
+                              if f.get("client_id")), "") or "")
         return {
             "threat_class": threat_class,
             "threat_category": threat_category,
             "confidence": confidence,
             "severity": severity,
             "flow_id": flow_id,
+            "client_id": client_id,
             "event_ids": event_ids,
             "evidence": evidence,
             "alert": {
                 "timestamp": timestamp,
                 "flow_id": flow_id,
+                "client_id": client_id,
                 "threat_class": threat_class,
                 "threat_category": threat_category,
                 "confidence": confidence,

@@ -177,15 +177,15 @@ def test_rule_validation_errors(soc):
 def test_case_lifecycle_resolve_reopen(soc):
     soc.add_entry("watchlist", "user", "bob", "watch")
     case = soc.evaluate_event(_event())[0]
-    acked = soc.transition(case["id"], "ack", actor="analyst")
-    assert acked["status"] == "acknowledged"
-    resolved = soc.transition(case["id"], "resolve", actor="analyst", note="underscores hard")
-    assert resolved["status"] == "resolved"
+    acked = soc.transition(case["id"], "investigate", actor="analyst")
+    assert acked["status"] == "investigation"
+    resolved = soc.transition(case["id"], "close", actor="analyst", note="underscores hard")
+    assert resolved["status"] == "closed"
     assert resolved["notes"][-1]["note"] == "underscores hard"
     reopened = soc.transition(case["id"], "reopen", actor="analyst")
     assert reopened["status"] == "open"
     with pytest.raises(SocPolicyError):
-        soc.transition(case["id"], "unack", actor="analyst")  # not acknowledged anymore
+        soc.transition(case["id"], "uninvestigate", actor="analyst")  # not investigating anymore
 
 
 def test_case_assign_and_note(soc):
@@ -200,9 +200,9 @@ def test_case_assign_and_note(soc):
 def test_case_stats_after_resolution(soc):
     soc.add_entry("watchlist", "user", "bob", "w")
     case = soc.evaluate_event(_event())[0]
-    soc.transition(case["id"], "resolve", actor="a")
+    soc.transition(case["id"], "close", actor="a")
     stats = soc.case_stats()
-    assert stats["by_status"]["resolved"] == 1
+    assert stats["by_status"]["closed"] == 1
     assert stats["by_status"]["open"] == 0
 
 

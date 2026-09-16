@@ -557,7 +557,7 @@ export default function App() {
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/onboard" element={<OnboardingPage role={user?.role} />} />
             <Route path="/clients/:id" element={<LogConsolePage />} />
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<DashboardPage role={user?.role} clientScope={user?.client_scope || ""} />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/alerts" element={<AlertsPage role={user?.role} />} />
             <Route path="/rules" element={<RulesPage role={user?.role} />} />

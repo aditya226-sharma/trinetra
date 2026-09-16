@@ -261,14 +261,14 @@ export async function loginUser(username, password) {
 }
 
 export async function authMe() {
-  if (OFFLINE) return { username: "preview", role: "viewer" };
+  if (OFFLINE) return { username: "preview", role: "viewer", client_scope: "" };
   const { data } = await api.get("/auth/me");
   return data;
 }
 
-export async function registerUser(username, password, role = "viewer") {
-  if (OFFLINE) return { username, role };
-  const { data } = await api.post("/auth/register", { username, password, role });
+export async function registerUser(username, password, role = "viewer", client_scope = "") {
+  if (OFFLINE) return { username, role, client_scope };
+  const { data } = await api.post("/auth/register", { username, password, role, client_scope });
   return data;
 }
 
@@ -524,11 +524,19 @@ export async function getCases(params = {}) {
       assignee: "",
       notes: [],
       timeline: [],
+      involved: [],
+      client_id: "",
       delivery: null,
     }));
-    return { cases, count: cases.length, stats: { total: cases.length, by_status: { open: cases.length, acknowledged: 0, resolved: 0 }, by_severity: {}, unresolved_by_severity: {} } };
+    return { cases, count: cases.length, stats: { total: cases.length, by_status: { open: cases.length, investigation: 0, closed: 0 }, by_severity: {}, unresolved_by_severity: {} } };
   }
   const { data } = await api.get("/cases", { params });
+  return data;
+}
+
+export async function getIncidentDetail(id) {
+  if (OFFLINE) return { case: null, involved: [], graph: { nodes: [], edges: [] }, timeline: [], evidence: {} };
+  const { data } = await api.get(`/cases/${encodeURIComponent(id)}/incident`);
   return data;
 }
 

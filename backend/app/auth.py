@@ -60,6 +60,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=6, max_length=128)
     role: str = "viewer"
+    client_scope: str = ""
 
 
 class ChangePasswordRequest(BaseModel):
@@ -105,11 +106,14 @@ def _connect(settings: Settings) -> sqlite3.Connection:
         "CREATE TABLE IF NOT EXISTS users ("
         " username TEXT PRIMARY KEY, password_hash TEXT NOT NULL,"
         " role TEXT NOT NULL, created_at TEXT NOT NULL,"
-        " token_version INTEGER NOT NULL DEFAULT 0)")
+        " token_version INTEGER NOT NULL DEFAULT 0,"
+        " client_scope TEXT NOT NULL DEFAULT '')")
     # Migrate existing databases that lack the token_version column.
     cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     if "token_version" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+    if "client_scope" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN client_scope TEXT NOT NULL DEFAULT ''")
     conn.commit()
     return conn
 
@@ -139,15 +143,17 @@ def ensure_admin(settings: Settings) -> None:
         conn.close()
 
 
-def create_user(settings: Settings, username: str, password: str, role: str) -> None:
+def create_user(settings: Settings, username: str, password: str, role: str,
+                client_scope: str = "") -> None:
     conn = _connect(settings)
     try:
         if conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
             raise HTTPException(status_code=409, detail="user already exists")
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at, token_version)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (username, _hash_password(password), role, _iso_now(), secrets.randbelow(1 << 32)))
+            "INSERT INTO users (username, password_hash, role, created_at, token_version, client_scope)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (username, _hash_password(password), role, _iso_now(),
+             secrets.randbelow(1 << 32), client_scope))
         conn.commit()
     finally:
         conn.close()
@@ -185,11 +191,13 @@ def _jwt_secret(settings: Settings) -> str:
     return value
 
 
-def make_token(settings: Settings, username: str, role: str, version: int = 0) -> str:
+def make_token(settings: Settings, username: str, role: str, version: int = 0,
+               client_scope: str = "") -> str:
     now = int(time.time())
     expiry = now + int(settings.get("auth.jwt_expiry_hours", 12)) * 3600
     header = {"alg": "HS256", "typ": "JWT"}
-    payload = {"sub": username, "role": role, "iat": now, "exp": expiry, "ver": int(version)}
+    payload = {"sub": username, "role": role, "iat": now, "exp": expiry,
+               "ver": int(version), "scope": client_scope}
     signing_input = (
         _b64url(json.dumps(header, separators=(",", ":"), sort_keys=True).encode())
         + "." + _b64url(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode())
@@ -338,7 +346,7 @@ def login(body: LoginRequest, request: Request,
     conn = _connect(settings)
     try:
         row = conn.execute(
-            "SELECT password_hash, role, token_version FROM users WHERE username = ?",
+            "SELECT password_hash, role, token_version, client_scope FROM users WHERE username = ?",
             (body.username,)).fetchone()
     finally:
         conn.close()
@@ -347,16 +355,19 @@ def login(body: LoginRequest, request: Request,
         audit_log(settings, body.username, "auth.login_failed", "bad credentials")
         raise HTTPException(status_code=401, detail="Invalid username or password")
     _clear_login_failures(key)
+    scope = str(row["client_scope"] or "")
     token = make_token(settings, body.username, str(row["role"]),
-                       version=int(row["token_version"]))
+                       version=int(row["token_version"]), client_scope=scope)
     audit_log(settings, body.username, "auth.login", f"role={row['role']}")
     return {"access_token": token, "token_type": "bearer",
-            "username": body.username, "role": str(row["role"])}
+            "username": body.username, "role": str(row["role"]),
+            "client_scope": scope}
 
 
 @router.get("/me", response_model=dict)
 def me(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, str]:
-    return {"username": str(payload.get("sub")), "role": str(payload.get("role"))}
+    return {"username": str(payload.get("sub")), "role": str(payload.get("role")),
+            "client_scope": str(payload.get("scope") or "")}
 
 
 @router.post("/register", response_model=dict,
@@ -367,10 +378,10 @@ def register(body: RegisterRequest,
     if body.role not in ("admin", "analyst", "viewer"):
         raise HTTPException(status_code=400,
                             detail="role must be 'admin', 'analyst' or 'viewer'")
-    create_user(settings, body.username, body.password, body.role)
+    create_user(settings, body.username, body.password, body.role, body.client_scope)
     audit_log(settings, str(payload.get("sub", "admin")), "auth.register",
-              f"created user {body.username} (role={body.role})")
-    return {"username": body.username, "role": body.role}
+              f"created user {body.username} (role={body.role} scope={body.client_scope or 'all'})")
+    return {"username": body.username, "role": body.role, "client_scope": body.client_scope}
 
 
 @router.get("/users", response_model=dict, dependencies=[Depends(require_admin)])
@@ -379,7 +390,7 @@ def users_list(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
     conn = _connect(settings)
     try:
         rows = conn.execute(
-            "SELECT username, role, created_at FROM users ORDER BY created_at").fetchall()
+            "SELECT username, role, client_scope, created_at FROM users ORDER BY created_at").fetchall()
     finally:
         conn.close()
     return {"users": [dict(r) for r in rows]}
