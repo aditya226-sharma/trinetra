@@ -166,12 +166,12 @@ class SocPolicy:
             " delivery TEXT NOT NULL DEFAULT 'null')")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_ts ON cases(timestamp DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(client_id)")
         cols = {r[1] for r in conn.execute("PRAGMA table_info(cases)").fetchall()}
         if "client_id" not in cols:
             conn.execute("ALTER TABLE cases ADD COLUMN client_id TEXT NOT NULL DEFAULT ''")
         if "involved" not in cols:
             conn.execute("ALTER TABLE cases ADD COLUMN involved TEXT NOT NULL DEFAULT '[]'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cases_client ON cases(client_id)")
         # Migrate legacy statuses -> open/investigation/closed.
         conn.execute("UPDATE cases SET status = 'investigation' WHERE status = 'acknowledged'")
         conn.execute("UPDATE cases SET status = 'closed' WHERE status = 'resolved'")
