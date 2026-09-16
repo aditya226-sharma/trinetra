@@ -281,6 +281,15 @@ class Orchestrator:
             self.stats["findings"] += 1
             self.findings_log.append(finding)
             self.graph.add_finding(finding)
+            # M3: persist the module finding back onto the source flow events
+            # so /api/events/search?threat_class= returns correlated events.
+            try:
+                self.event_store.attach_findings(
+                    (finding.get("event_ids") or
+                     ([finding.get("flow_id")] if finding.get("flow_id") else [])),
+                    "network_threat", finding)
+            except Exception as exc:  # noqa: BLE001 — never kill the batch
+                log.warning("finding attach failed: %s", exc)
             # AI gate: analyze the module finding itself (event=None).
             with self._loop_lock:
                 try:

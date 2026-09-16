@@ -75,6 +75,8 @@ class Batcher:
 class DedupCounter:
     """Lightweight fingerprint->count tracker for reporting dedup stats."""
 
+    _MAX_SEEN = 200_000
+
     def __init__(self) -> None:
         self.seen_fingerprints: set = set()
         self.raw_in = 0
@@ -87,6 +89,9 @@ class DedupCounter:
         if fp in self.seen_fingerprints:
             self.raw_duplicates += 1
             return False
+        # Bound long-running memory: keep at most the most recent fingerprints.
+        if len(self.seen_fingerprints) >= self._MAX_SEEN:
+            self.seen_fingerprints.clear()
         self.seen_fingerprints.add(fp)
         return True
 

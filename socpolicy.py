@@ -676,6 +676,15 @@ class SocPolicy:
                         ts: str, extra: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         now = time.time()
         with self._lock:
+            # Bound the throttle window (m6: prune stale entries + cap size).
+            if len(self._window) > 4096:
+                stale = [k for k, t in self._window.items()
+                         if now - t > max(3600, float(throttle_s) * 4)]
+                for stale_key in stale:
+                    self._window.pop(stale_key, None)
+                if len(self._window) > 4096:
+                    for evicted in list(self._window)[:len(self._window) - 2048]:
+                        self._window.pop(evicted, None)
             last = self._window.get(key, 0.0)
             if now - last < float(throttle_s):
                 case = self._touch_open(key)

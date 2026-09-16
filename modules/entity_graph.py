@@ -174,7 +174,10 @@ class EntityGraph:
         """Overlay a Module A/B finding; flags edges between involved entities."""
         threat_class = finding.get("threat_class") or "unknown"
         threat_id = self.nid("threat", threat_class)
+        # Bound in-memory finding history (m6: cap + drop oldest).
         self._findings.append(finding)
+        if len(self._findings) > 1000:
+            self._findings = self._findings[-500:]
         if nx is None:
             return
         self._add_node(threat_id, kind="threat", label=threat_class,

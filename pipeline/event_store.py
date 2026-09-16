@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS events (
     severity   TEXT NOT NULL,
     message    TEXT,
     trace_id   TEXT,
-    fields_json TEXT
+    fields_json TEXT,
+    module_findings_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts      ON events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_events_sev     ON events(severity);
@@ -45,6 +46,10 @@ CREATE INDEX IF NOT EXISTS idx_events_client_ts ON events(client_id, timestamp);
 def _row_to_event(row: Optional[sqlite3.Row]) -> Optional[Event]:
     if row is None:
         return None
+    try:
+        findings = json.loads(row["module_findings_json"]) if row["module_findings_json"] else {}
+    except (TypeError, ValueError):
+        findings = {}
     return Event(
         event_id=row["event_id"],
         timestamp=row["timestamp"],
@@ -56,6 +61,7 @@ def _row_to_event(row: Optional[sqlite3.Row]) -> Optional[Event]:
         message=row["message"] or "",
         trace_id=row["trace_id"] or "",
         fields=json.loads(row["fields_json"]) if row["fields_json"] else {},
+        module_findings=findings if isinstance(findings, dict) else {},
     )
 
 
@@ -77,6 +83,11 @@ class EventStore:
         self._conn.execute("PRAGMA journal_mode=WAL").fetchone()
         self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(_SCHEMA)
+        # Migrate databases created before module findings were persisted.
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(events)").fetchall()}
+        if "module_findings_json" not in cols:
+            self._conn.execute(
+                "ALTER TABLE events ADD COLUMN module_findings_json TEXT")
         self._conn.commit()
 
     def _reconnect(self) -> None:
@@ -113,12 +124,15 @@ class EventStore:
                 self._conn.execute(
                     """INSERT OR REPLACE INTO events
                        (event_id, timestamp, source_type, client_id, client_ip,
-                        category, severity, message, trace_id, fields_json)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        category, severity, message, trace_id, fields_json,
+                        module_findings_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (event.event_id, event.timestamp, event.source_type,
                      event.client_id, event.client_ip, event.category,
                      event.severity, event.message, event.trace_id,
-                     json.dumps(event.fields, default=str)),
+                     json.dumps(event.fields, default=str),
+                     json.dumps(event.module_findings, default=str)
+                     if event.module_findings else None),
                 )
                 self._conn.commit()
             self._staleness_retry(_do)
@@ -129,11 +143,14 @@ class EventStore:
                 self._conn.executemany(
                     """INSERT OR REPLACE INTO events
                        (event_id, timestamp, source_type, client_id, client_ip,
-                        category, severity, message, trace_id, fields_json)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        category, severity, message, trace_id, fields_json,
+                        module_findings_json)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     [(e.event_id, e.timestamp, e.source_type, e.client_id,
                       e.client_ip, e.category, e.severity, e.message, e.trace_id,
-                      json.dumps(e.fields, default=str)) for e in events],
+                      json.dumps(e.fields, default=str),
+                      json.dumps(e.module_findings, default=str)
+                      if e.module_findings else None) for e in events],
                 )
                 self._conn.commit()
             self._staleness_retry(_do)
@@ -147,6 +164,29 @@ class EventStore:
                     (event_id,)).fetchone()
             row = self._staleness_retry(_do)
         return _row_to_event(row)
+
+    # ------------------------------------------------------------- findings
+    def attach_findings(self, event_ids: List[str], module: str,
+                        finding: Dict[str, Any]) -> int:
+        """Attach a module finding back onto the source flow event(s) so the
+        ``threat_class`` search filter finds real correlated events.
+
+        Returns the number of events updated (events that no longer exist,
+        e.g. after a reset, are skipped).
+        """
+        updated = 0
+        for event_id in event_ids or []:
+            event = self.get(event_id)
+            if event is None:
+                continue
+            existing = event.module_findings.get(module)
+            if isinstance(existing, list):
+                existing.append(finding)
+            else:
+                event.module_findings[module] = [finding]
+            self.save(event)
+            updated += 1
+        return updated
 
     def _where(self, query: str = "", source_type: str = "", severity: str = "",
                category: str = "", client_id: str = "", threat_class: str = "",
@@ -167,14 +207,15 @@ class EventStore:
                 clauses.append(f"{column} = ?")
                 params.append(value)
         if threat_class:
-            # threat_class lives in the serialized UES fields blob (module
-            # findings / detections). Match the exact JSON key/value so the
+            # threat_class lives in the serialized fields blob and/or the
+            # persisted module findings. Match the exact JSON key/value so the
             # filter is stable regardless of surrounding field order.
             # (json.dumps default separators put a space after the colon.)
             esc = (threat_class.replace("\\", "\\\\")
                    .replace("%", "\\%").replace("_", "\\_"))
-            clauses.append(f'fields_json LIKE ? ESCAPE \'\\\'')
-            params.append(f'%"threat_class": "{esc}"%')
+            clauses.append("(fields_json LIKE ? ESCAPE '\\'"
+                           " OR module_findings_json LIKE ? ESCAPE '\\')")
+            params += [f'%"threat_class": "{esc}"%'] * 2
         if ts_from:
             clauses.append("timestamp >= ?")
             params.append(ts_from)

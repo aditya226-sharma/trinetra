@@ -130,3 +130,65 @@ def test_prefilter_flow_passes_with_findings():
     assert p.should_pass(flow) is False  # no module findings yet
     flow.module_findings["network_threat"] = {"threat_class": "c2_beaconing"}
     assert p.should_pass(flow) is True
+
+
+def test_dedup_counter_bounded():
+    """m6: the fingerprint set is capped so long-running ingestion does not
+    grow memory without bound."""
+    dc = DedupCounter()
+    dc._MAX_SEEN = 100
+    for i in range(150):
+        e = Event(event_id=f"e{i}", timestamp="t", source_type="syslog",
+                  client_id="c", message=f"line {i}", fields={"i": i})
+        assert dc.track(e) is True
+    assert len(dc.seen_fingerprints) <= 100
+
+
+def test_module_findings_persist_and_threat_class_search(tmp_path):
+    """M3: module findings written back onto events survive a reload, and the
+    ``threat_class`` search filter returns those correlated flow events."""
+    from pipeline.event_store import EventStore
+    from schema import Event, new_uuid
+
+    store = EventStore(tmp_path / "ev.db")
+    flow = Event(event_id="flow-0001", timestamp="2026-09-12T10:00:01Z",
+                 source_type="netflow", client_id="c1", category="flow",
+                 severity="info", message="tcp 192.168.1.5 -> 203.0.113.9:443",
+                 fields={"src_ip": "192.168.1.5", "dst_ip": "203.0.113.9"})
+    store.save(flow)
+    # simulate flush_batch attaching a Module A finding back to the sources
+    store.attach_findings(["flow-0001"], "network_threat", {
+        "threat_class": "port_scan", "confidence": 0.9,
+        "event_ids": ["flow-0001"],
+    })
+    # reload from disk — module findings must be present (persistence)
+    reloaded = EventStore(tmp_path / "ev.db")
+    got = reloaded.get("flow-0001")
+    assert got is not None
+    assert got.module_findings["network_threat"][0]["threat_class"] == "port_scan"
+    # and the threat_class filter now actually finds the event
+    hits = reloaded.search(threat_class="port_scan")
+    assert len(hits) == 1
+    # a threat class with no findings matches nothing (filter is stable)
+    assert reloaded.search(threat_class="ddos") == []
+    # checking that a *different* threat class value does not leak through
+    other = Event(event_id="flow-0002", timestamp="2026-09-12T10:00:02Z",
+                  source_type="netflow", client_id="c1", category="flow",
+                  severity="info", message="x",
+                  fields={"threat_class": "geo_fence"})
+    store.save(other)
+    assert len(reloaded.search(threat_class="port_scan")) == 1
+
+
+def test_module_findings_absent_when_none(tmp_path):
+    """Events saved without findings round-trip with an empty map."""
+    from pipeline.event_store import EventStore
+    from schema import Event
+
+    store = EventStore(tmp_path / "plain.db")
+    e = Event(event_id="plain-1", timestamp="2026-09-12T10:00:00Z",
+              source_type="syslog", client_id="c1", category="auth",
+              severity="info", message="ok", fields={"user": "root"})
+    store.save(e)
+    got = EventStore(tmp_path / "plain.db").get("plain-1")
+    assert got is not None and got.module_findings == {}

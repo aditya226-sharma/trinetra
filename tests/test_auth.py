@@ -212,3 +212,72 @@ def test_delete_user_rules(client):
     assert client.delete(f"/api/auth/users/{again}", headers=ah).status_code == 403
     # missing user
     assert client.delete("/api/auth/users/ghost-404", headers=admin).status_code == 404
+
+
+def test_deleted_user_token_is_revoked(client):
+    """M1: a JWT minted before account deletion stops working immediately."""
+    admin = _login(client)
+    who = f"revoke-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "revoke-pass", "role": "viewer"})
+    headers = _login(client, username=who, password="revoke-pass")
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    assert client.delete(f"/api/auth/users/{who}", headers=admin).status_code == 200
+    # the old (still cryptographically valid, unexpired) token is now rejected
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+
+def test_password_change_revokes_old_token(client):
+    """M1: password rotation bumps token_version, killing old sessions."""
+    admin = _login(client)
+    who = f"pwrot-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "rot-pass-1", "role": "viewer"})
+    old = _login(client, username=who, password="rot-pass-1")
+    assert client.get("/api/auth/me", headers=old).status_code == 200
+    resp = client.post("/api/auth/change-password", headers=old,
+                       json={"current_password": "rot-pass-1", "new_password": "rot-pass-2"})
+    assert resp.status_code == 200, resp.text
+    # the pre-rotation token is revoked
+    assert client.get("/api/auth/me", headers=old).status_code == 401
+    # logging in with the new password works and returns a fresh token
+    new = _login(client, username=who, password="rot-pass-2")
+    assert client.get("/api/auth/me", headers=new).status_code == 200
+    assert client.post("/api/auth/login",
+                       json={"username": who, "password": "rot-pass-1"}).status_code == 401
+
+
+def test_bruteforce_lockout_returns_429(client):
+    """M2: repeated failed logins for a user+IP are throttled with 429."""
+    admin = _login(client)
+    who = f"locked-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": who, "password": "lock-pass", "role": "viewer"})
+    payload = {"username": who, "password": "wrong-pass"}
+    for _ in range(4):
+        assert client.post("/api/auth/login", json=payload).status_code == 401
+    # the 5th failure tips over the threshold
+    assert client.post("/api/auth/login", json=payload).status_code == 401
+    # subsequent attempts are locked out even with the correct password
+    locked = client.post("/api/auth/login",
+                         json={"username": who, "password": "lock-pass"})
+    assert locked.status_code == 429
+    assert "Retry-After" in locked.headers
+
+
+def test_lockout_keyed_by_username(client):
+    """M2: locking one user does not lock out users with different names."""
+    admin = _login(client)
+    hit = f"hit-{uuid.uuid4().hex[:8]}"
+    miss = f"miss-{uuid.uuid4().hex[:8]}"
+    client.post("/api/auth/register", headers=admin,
+                json={"username": hit, "password": "hit-pass", "role": "viewer"})
+    client.post("/api/auth/register", headers=admin,
+                json={"username": miss, "password": "miss-pass", "role": "viewer"})
+    payload = {"username": hit, "password": "wrong"}
+    for _ in range(5):
+        client.post("/api/auth/login", json=payload)
+    assert client.post("/api/auth/login", json=payload).status_code == 429
+    # unrelated user can still log in
+    assert client.post("/api/auth/login",
+                       json={"username": miss, "password": "miss-pass"}).status_code == 200

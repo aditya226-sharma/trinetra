@@ -230,12 +230,14 @@ class ThreatDetector:
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         first = flows[0] if flows else {}
         flow_id = first.get("event_id") or f"flow::{first.get('src_ip', '?')}->{first.get('dst_ip', '?')}"
+        event_ids = sorted({str(f.get("event_id")) for f in flows if f.get("event_id")})
         return {
             "threat_class": threat_class,
             "threat_category": threat_category,
             "confidence": confidence,
             "severity": severity,
             "flow_id": flow_id,
+            "event_ids": event_ids,
             "evidence": evidence,
             "alert": {
                 "timestamp": timestamp,
