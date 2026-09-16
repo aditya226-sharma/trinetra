@@ -95,6 +95,7 @@ def compliance_for_asset(asset_id: str, findings: List[Dict[str, Any]]) -> Dict[
     return {
         "asset_id": asset_id,
         "affected_findings": affected_findings,
+        "findings": affected_findings,
         "controls": entries,
         "summary_markdown": _markdown(asset_id, entries),
     }

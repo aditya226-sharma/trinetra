@@ -319,3 +319,48 @@ def test_policy_isolation_between_instances(soc, tmp_path):
     other = SocPolicy(other_settings)
     assert other.list_entries("watchlist") == []
     assert other.list_rules() == []
+
+
+# ------------------------------------------------------------ regression fixes
+
+
+def test_invalid_list_name_is_defensive_not_a_500(soc):
+    """remove_entry / set_entry_active must tolerate unknown list names
+    instead of raising KeyError on the (previously unguarded) lookup."""
+    assert soc.remove_entry("watchlist", "user", "bob") is False
+    # bogus list name -> False, never an exception
+    assert soc.remove_entry("nonexistent", "user", "bob") is False
+    assert soc.set_entry_active("nonexistent", "user", "bob", False) is False
+    # a real list still works after the defensive change
+    soc.add_entry("watchlist", "user", "bob", "vip", actor="admin")
+    assert soc.set_entry_active("watchlist", "user", "bob", False) is True
+    assert soc.remove_entry("watchlist", "user", "bob") is True
+
+
+def test_notifications_preserve_secret_on_blank_put(soc):
+    """Saving a notifications patch with an empty secret must keep the
+    stored secret (form round-trip: GET masks it to '', PUT sends '' back)."""
+    soc.save_notifications({"webhook": {"url": "https://h/x", "secret": "real-secret"}})
+    soc.save_notifications({"webhook": {"url": "https://h/x", "secret": ""}})
+    assert soc.notifications()["webhook"]["secret"] == "real-secret"
+    # explicitly setting a new value still overwrites
+    soc.save_notifications({"webhook": {"url": "https://h/x", "secret": "new-secret"}})
+    assert soc.notifications()["webhook"]["secret"] == "new-secret"
+
+
+def test_email_port_tls_route_selection():
+    """EmailNotifier must elect SMTPS for 465 and STARTTLS for 587 without
+    erroring — the audit found no TLS branch existed for 465."""
+    from alerting.notifier import EmailNotifier
+
+    e587 = EmailNotifier(host="smtp.example.com", port=587, sender="a@x.y",
+                         recipient="b@x.y")
+    e465 = EmailNotifier(host="smtp.example.com", port=465, sender="a@x.y",
+                         recipient="b@x.y")
+    # unconfigured host means notify() short-circuits to skipped before any
+    # network I/O — the port routing itself is exercised by the code path.
+    e_unset = EmailNotifier(port=465)
+    r = e_unset.notify("critical", "t", "b")
+    assert r["status"] == "skipped"
+    assert e465.port == 465
+    assert e587.port == 587

@@ -24,6 +24,8 @@ export default function EventsPage() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const PAGE = 60;
+  const searchSeq = useRef(0);
+  const detailSeq = useRef(0);
   const [query, setQuery] = useState("");
   const [src, setSrc] = useState("");
   const [sev, setSev] = useState("");
@@ -109,6 +111,7 @@ export default function EventsPage() {
   }, []);
 
   const run = async (keepDetail = false, reset = true) => {
+    const my = ++searchSeq.current;
     setLoading(true);
     const nextOffset = reset ? 0 : offset;
     try {
@@ -124,6 +127,7 @@ export default function EventsPage() {
         limit: PAGE,
         offset: nextOffset,
       });
+      if (my !== searchSeq.current) return;
       if (reset) {
         setEvents(data.events);
       } else {
@@ -139,9 +143,10 @@ export default function EventsPage() {
       if (!keepDetail) setDetail(null);
       setError(null);
     } catch (e) {
+      if (my !== searchSeq.current) return;
       setError(e.response?.data?.detail || e.message);
     } finally {
-      setLoading(false);
+      if (my === searchSeq.current) setLoading(false);
     }
   };
 
@@ -216,12 +221,14 @@ export default function EventsPage() {
   };
 
   async function openDetail(e) {
+    const my = ++detailSeq.current;
     setDetail(null);
     try {
       const full = await getEvent(e.event_id);
+      if (my !== detailSeq.current) return;
       setDetail({ ...e, ...full, raw: full.raw ?? e.raw_event ?? null });
     } catch {
-      setDetail(e);
+      if (my === detailSeq.current) setDetail(e);
     }
   }
 
@@ -335,7 +342,7 @@ export default function EventsPage() {
           </button>
           {filtersActive && (
             <button
-              onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setThreat(""); setFromTs(""); setToTs(""); setTimeout(run, 0); }}
+              onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setThreat(""); setFromTs(""); setToTs(""); }}
               className="ml-auto text-[11px] text-slate-500 hover:text-emerald-300"
             >
               reset filters ×

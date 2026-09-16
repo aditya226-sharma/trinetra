@@ -471,9 +471,9 @@ export default function App() {
                       <p className="px-2 py-3 text-[12px] text-slate-500">No alerts yet.</p>
                     ) : (
                       <div className="max-h-80 space-y-1 overflow-y-auto">
-                        {bell.alerts.map((a) => (
+                        {bell.alerts.map((a, i) => (
                           <button
-                            key={a.alert_id || a.id || a.timestamp + a.threat_class}
+                            key={a.alert_id || a.id || `${a.threat_class}_${a.timestamp || i}_${i}`}
                             onClick={() => { setBell((b) => ({ ...b, open: false })); navigate("/alerts"); }}
                             className="glass-row flex w-full items-center gap-2 p-2 text-left"
                           >
@@ -555,7 +555,7 @@ export default function App() {
           )}
           <Routes>
             <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/clients/onboard" element={<OnboardingPage />} />
+            <Route path="/clients/onboard" element={<OnboardingPage role={user?.role} />} />
             <Route path="/clients/:id" element={<LogConsolePage />} />
             <Route path="/" element={<DashboardPage />} />
             <Route path="/events" element={<EventsPage />} />
@@ -566,7 +566,7 @@ export default function App() {
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/fleet" element={<FleetPage />} />
+            <Route path="/fleet" element={<FleetPage role={user?.role} />} />
             <Route path="/report/:assetId" element={<ReportPage />} />
             <Route path="/ingest" element={user?.role === "admin" ? <IngestPage /> : <Navigate to="/" replace />} />
             <Route path="/console" element={<ConsolePage />} />

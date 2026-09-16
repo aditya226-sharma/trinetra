@@ -141,6 +141,11 @@ class CollectorsManager:
         self.stop_all()
         self.start_all(self._orch)
 
+    def set_orchestrator(self, orch: Any) -> None:
+        """Re-point live collector threads at a freshly (re)built orchestrator."""
+        with self._lock:
+            self._orch = orch
+
     def _start(self, key: str, target, cfg) -> None:
         ev = threading.Event()
         t = threading.Thread(target=target, args=(cfg, ev),

@@ -84,7 +84,7 @@ class LLMAnalyzer:
                 "backend": state}
 
     def health(self) -> Dict[str, Any]:
-        return {"healthy": self._stats["failed"] == 0 or True,
+        return {"healthy": self._stats["failed"] == 0,
                 "backend": self.backend_name}
 
 

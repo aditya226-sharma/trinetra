@@ -34,7 +34,7 @@ def _pri_severity(raw: str) -> Optional[str]:
     match = _PRI_RE.match(raw)
     if not match:
         return None
-    return _PRI_SEVERITY.get(int(match.group(1)) >> 3 % 8, "info")
+    return _PRI_SEVERITY.get(int(match.group(1)) & 7, "info")
 
 
 def _categorize(text: str) -> tuple[str, str]:

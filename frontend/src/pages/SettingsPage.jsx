@@ -111,12 +111,12 @@ export default function SettingsPage() {
         enabled: notif.enabled,
         severity_min: notif.severity_min,
         email: {
-          host: notif.email.host, port: notif.email.port,
+          host: notif.email.host, port: Number(notif.email.port) || 587,
           sender: notif.email.sender, recipient: notif.email.recipient,
           username: notif.email.username, password: notif.email.password,
         },
         webhook: { url: notif.webhook.url, secret: notif.webhook.secret },
-        digest: { enabled: notif.digest.enabled, hour_utc: notif.digest.hour_utc },
+        digest: { enabled: notif.digest.enabled, hour_utc: Math.max(0, Math.min(23, Number(notif.digest.hour_utc) || 0)) },
       };
       const saved = await saveNotifications(patch);
       setNotif(saved);
@@ -383,7 +383,7 @@ export default function SettingsPage() {
               <input
                 value={syslogPort}
                 disabled={!syslogEnabled}
-                onChange={(e) => setSyslogPort(Number(e.target.value) || 0)}
+                onChange={(e) => setSyslogPort(e.target.value)}
                 className="field mono w-full px-3 py-2 disabled:opacity-40"
               />
             </label>
@@ -449,7 +449,7 @@ export default function SettingsPage() {
               <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">pause between passes (s)</span>
               <input
                 value={demoDelay}
-                onChange={(e) => setDemoDelay(Number(e.target.value) || 300)}
+                onChange={(e) => setDemoDelay(e.target.value)}
                 className="field mono w-full px-3 py-2"
               />
             </label>
@@ -488,7 +488,7 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 text-[12px] text-slate-300">
                 <span className="eyebrow">min severity</span>
                 <select value={notif.severity_min} onChange={(e) => setNotif((n) => ({ ...n, severity_min: e.target.value }))} className="field mono px-3 py-1.5 text-[11px]">
-                  {["info", "warning", "error", "critical"].map((s) => <option key={s}>{s}</option>)}
+                  {["info", "warning", "error", "critical"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
               <label className="flex items-center gap-2 text-[12px] text-slate-300">
@@ -497,7 +497,7 @@ export default function SettingsPage() {
               </label>
               <label className="flex items-center gap-2 text-[12px] text-slate-300">
                 <span className="eyebrow">UTC hour</span>
-                <input type="number" min="0" max="23" value={notif.digest.hour_utc} onChange={(e) => setNotif((n) => ({ ...n, digest: { ...n.digest, hour_utc: Math.max(0, Math.min(23, Number(e.target.value) || 0)) } }))} className="field mono w-16 px-2 py-1.5 text-[11px]" />
+                <input type="number" min="0" max="23" value={notif.digest.hour_utc} onChange={(e) => setNotif((n) => ({ ...n, digest: { ...n.digest, hour_utc: e.target.value } }))} className="field mono w-16 px-2 py-1.5 text-[11px]" />
               </label>
             </div>
 
@@ -505,7 +505,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <p className="eyebrow">SMTP</p>
                 <Field label="host"><input value={notif.email.host} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, host: e.target.value } }))} placeholder="smtp.example.com" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
-                <Field label="port"><input type="number" value={notif.email.port} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, port: Number(e.target.value) || 587 } }))} className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
+                <Field label="port"><input type="number" value={notif.email.port} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, port: e.target.value } }))} className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
                 <Field label="sender"><input value={notif.email.sender} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, sender: e.target.value } }))} placeholder="trinetra@acme.io" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
                 <Field label="recipient"><input value={notif.email.recipient} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, recipient: e.target.value } }))} placeholder="soc@acme.io" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
                 <Field label="username / password"><input value={notif.email.username} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, username: e.target.value } }))} placeholder="username (optional)" className="field mono w-full px-3 py-1.5 text-[11px]" /><input value={notif.email.password} onChange={(e) => setNotif((n) => ({ ...n, email: { ...n.email, password: e.target.value } }))} type="password" placeholder="••••••••" className="field mono mt-1.5 w-full px-3 py-1.5 text-[11px]" /></Field>
@@ -552,7 +552,7 @@ export default function SettingsPage() {
           <div className="terminal max-h-[18rem] overflow-y-auto p-3">
             {audit.map((a, i) => (
               <div key={i} className="flex gap-3 border-b border-white/[0.04] px-2 py-1.5 text-[11px]">
-                <span className="mono shrink-0 text-slate-600">{a.ts.replace("T", " ").slice(0, 19)}</span>
+                <span className="mono shrink-0 text-slate-600">{(a.ts || "").replace("T", " ").slice(0, 19)}</span>
                 <span className="mono w-32 shrink-0 truncate text-slate-400">{a.actor}</span>
                 <span className="mono shrink-0 text-emerald-300/90">{a.action}</span>
                 <span className="min-w-0 flex-1 truncate text-slate-500" title={a.detail}>{a.detail}</span>
@@ -591,8 +591,8 @@ function decodeSession() {
     const h = Math.floor(remaining / 3600);
     const m = Math.floor((remaining % 3600) / 60);
     return {
-      username: payload.sub,
-      role: payload.role,
+      username: payload.sub || payload.username || payload.preferred_username || "unknown",
+      role: payload.role || "viewer",
       remaining: remaining > 0 ? `${h}h ${m}m` : "expired",
     };
   } catch {

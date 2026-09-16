@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { caseAction, getCases } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
@@ -23,13 +23,23 @@ export default function AlertsPage({ role }) {
   const [busy, setBusy] = useState({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState(null);
+  const reqSeq = useRef(0);
+
+  const fetchCases = () => {
+    const my = ++reqSeq.current;
+    return getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
+      .then((d) => { if (my === reqSeq.current) { setData(d); setError(null); } })
+      .catch((e) => { if (my === reqSeq.current) setError(e.message); });
+  };
 
   useEffect(() => {
     let alive = true;
-    const tick = () =>
-      getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
-        .then((d) => { if (alive) { setData(d); setError(null); } })
+    const tick = () => {
+      const my = ++reqSeq.current;
+      return getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
+        .then((d) => { if (alive && my === reqSeq.current) { setData(d); setError(null); } })
         .catch((e) => alive && setError(e.message));
+    };
     tick();
     const id = setInterval(tick, POLL_MS);
     return () => { alive = false; clearInterval(id); };
@@ -40,9 +50,7 @@ export default function AlertsPage({ role }) {
 
   const refresh = (fresh) => {
     if (fresh) { setData(fresh); return; }
-    getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
-      .then((d) => { setData(d); setError(null); })
-      .catch((e) => setError(e.message));
+    fetchCases();
   };
 
   const act = async (id, action, extra = {}) => {
@@ -232,7 +240,7 @@ export default function AlertsPage({ role }) {
                               </>
                             )}
                             {c.status === "resolved" && <ActionBtn onClick={() => act(c.id, "reopen")} busy={busy[c.id]} label="Reopen" variant="ghost" />}
-                            {c.status !== "resolved" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
+                            {c.status === "open" && <ActionBtn onClick={() => act(c.id, "resolve")} busy={busy[c.id]} label="Resolve" variant="danger" />}
                             <input
                               value={assignees[c.id] || ""}
                               onChange={(e) => setAssignees((a) => ({ ...a, [c.id]: e.target.value }))}

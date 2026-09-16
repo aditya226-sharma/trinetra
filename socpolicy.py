@@ -28,7 +28,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from alerting.notifier import ConsoleNotifier, EmailNotifier, Notifier
 from backend.app.services.audit import audit_log
@@ -61,6 +61,14 @@ def _today() -> str:
 
 def _night_before(days: int = 1) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Parse a confidence/score into a float, tolerating strings and junk."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 class SocPolicyError(ValueError):
@@ -217,8 +225,10 @@ class SocPolicy:
 
     def remove_entry(self, list_name: str, kind: str, value: str,
                      actor: str = "system") -> bool:
+        entries = self._data.get(list_name)
+        if entries is None:
+            return False
         with self._lock:
-            entries = self._data[list_name]
             kept = [e for e in entries
                     if not (e.get("kind") == kind and e.get("value", "").lower() == value.lower())]
             if len(kept) == len(entries):
@@ -230,8 +240,11 @@ class SocPolicy:
 
     def set_entry_active(self, list_name: str, kind: str, value: str,
                          active: bool, actor: str = "system") -> bool:
+        entries = self._data.get(list_name)
+        if entries is None:
+            return False
         with self._lock:
-            for e in self._data[list_name]:
+            for e in entries:
                 if e.get("kind") == kind and e.get("value", "").lower() == value.lower():
                     e["active"] = bool(active)
                     self._save()
@@ -353,15 +366,17 @@ class SocPolicy:
                     notif[key] = patch[key]
             if isinstance(patch.get("email"), dict):
                 email = notif["email"]
-                for k in ("host", "port", "sender", "recipient", "username", "password"):
+                for k in ("host", "port", "sender", "recipient", "username"):
                     if k in patch["email"]:
-                        email[k] = patch["email"][k]
+                        email[k] = str(patch["email"][k] or "")[:512]
+                if patch["email"].get("password"):
+                    email["password"] = str(patch["email"]["password"])[:512]
             if isinstance(patch.get("webhook"), dict):
                 webhook = notif["webhook"]
                 if "url" in patch["webhook"]:
                     webhook["url"] = str(patch["webhook"]["url"] or "")[:512]
-                if "secret" in patch["webhook"]:
-                    webhook["secret"] = str(patch["webhook"]["secret"] or "")[:512]
+                if patch["webhook"].get("secret"):
+                    webhook["secret"] = str(patch["webhook"]["secret"])[:512]
             if isinstance(patch.get("digest"), dict):
                 digest = notif["digest"]
                 if "enabled" in patch["digest"]:
@@ -643,7 +658,7 @@ class SocPolicy:
                 ts=ts,
                 extra={"verdict": finding.get("analysis", {}).get("verdict", "n/a"),
                        "store_decision": finding.get("analysis", {}).get("store_decision", "keep"),
-                       "confidence": float(finding.get("confidence", 0)),
+                       "confidence": _safe_float(finding.get("confidence", 0)),
                        "flows": flows,
                        "created_by": "system"},
             )
@@ -667,49 +682,49 @@ class SocPolicy:
                 if case:
                     return case
             self._window[key] = now
-        conn = self._connect()
-        try:
-            case_id = new_uuid()
-            timeline = [{"ts": ts, "action": "created", "actor": "system"}]
-            conn.execute(
-                "INSERT INTO cases "
-                "(id, threat_class, severity, source_kind, source_value, rule_id,"
-                " message, evidence, verdict, store_decision, confidence, flows,"
-                " timestamp, last_seen, hits, status, assignee, notes, timeline, delivery)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (case_id, threat_class, severity, source_kind, source_value, rule_id,
-                 message, json.dumps(evidence),
-                 str((extra or {}).get("verdict", "n/a")),
-                 str((extra or {}).get("store_decision", "keep")),
-                 float((extra or {}).get("confidence", 0)),
-                 str((extra or {}).get("flows", "")),
-                 ts, ts, 1, "open", str((extra or {}).get("created_by", "system")) or "",
-                 "[]", json.dumps(timeline), "null"))
-            conn.commit()
-            return self._case_row(conn.execute(
-                "SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
-        finally:
-            conn.close()
+            conn = self._connect()
+            try:
+                case_id = new_uuid()
+                timeline = [{"ts": ts, "action": "created", "actor": "system"}]
+                conn.execute(
+                    "INSERT INTO cases "
+                    "(id, threat_class, severity, source_kind, source_value, rule_id,"
+                    " message, evidence, verdict, store_decision, confidence, flows,"
+                    " timestamp, last_seen, hits, status, assignee, notes, timeline, delivery)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (case_id, threat_class, severity, source_kind, source_value, rule_id,
+                     message, json.dumps(evidence),
+                     str((extra or {}).get("verdict", "n/a")),
+                     str((extra or {}).get("store_decision", "keep")),
+                     float((extra or {}).get("confidence", 0)),
+                     str((extra or {}).get("flows", "")),
+                     ts, ts, 1, "open", str((extra or {}).get("created_by", "system")) or "",
+                     "[]", json.dumps(timeline), "null"))
+                conn.commit()
+                return self._case_row(conn.execute(
+                    "SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
+            finally:
+                conn.close()
 
     def _touch_open(self, key: tuple) -> Optional[Dict[str, Any]]:
-        """Increment hits on the most recent OPEN case for this throttled key."""
-        prefix = f"{key[0]}::{key[1]}"
+        """Increment hits on the OPEN case matching this throttled key."""
+        if key[0] == "rule":
+            where, args = ("AND rule_id = ?", [key[1]])
+        elif key[0] in ("block", "watch"):
+            where, args = ("AND lower(source_value) = lower(?)", [key[2]])
+        elif key[0] == "flow":
+            where, args = ("AND flows = ?", [key[2]])
+        else:
+            where, args = ("", [])
         conn = self._connect()
         try:
             row = conn.execute(
                 "SELECT * FROM cases WHERE status = 'open' "
-                "AND source_kind = ? ORDER BY timestamp DESC LIMIT 1",
-                (key[0],)).fetchone()
+                "AND source_kind = ? " + where + " ORDER BY timestamp DESC LIMIT 1",
+                (key[0], *args)).fetchone()
             if row is None:
                 return None
             case = self._case_row(row)
-            if case.get("rule_id") and key[0] == "rule" and case["rule_id"] != key[1]:
-                return None
-            if key[0] in ("block", "watch") and \
-                    str(case.get("source_value", "")).lower() != str(key[2]):
-                return None
-            if key[0] == "flow" and case.get("flows") != key[2]:
-                return None
             hits = int(case["hits"]) + 1
             conn.execute(
                 "UPDATE cases SET hits = ?, last_seen = ? WHERE id = ?",

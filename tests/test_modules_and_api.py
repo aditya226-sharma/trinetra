@@ -276,3 +276,127 @@ def test_ingest_bootstraps_graph_when_first_call():
             con.close()
     finally:
         api_module._ORCH, api_module._GRAPH = prev_orch, prev_graph
+
+
+def test_notifications_get_masks_secrets_and_put_preserves_them():
+    """C1: GET renders password/secret as blank + a has_* flag; a PUT with a
+    blank secret/password must NOT clobber the stored value, and the masked
+    GET result remains round-trippable (an analyst gets 403)."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        admin = _login_headers(client)
+        cfg = client.get("/api/admin/notifications", headers=admin).json()
+        assert cfg["email"]["password"] == ""
+        assert "has_password" in cfg["email"]
+        assert cfg["webhook"]["secret"] == ""
+        assert "has_secret" in cfg["webhook"]
+
+        # Admin can persist a real secret via PUT.
+        put = client.put("/api/admin/notifications", json={
+            "webhook": {"url": "https://example.com/hook", "secret": "s3cr3t"},
+        }, headers=admin)
+        assert put.status_code == 200, put.text
+        # Blank secret in a later PUT rounds-trips the *stored* secret.
+        again = client.put("/api/admin/notifications", json={
+            "webhook": {"url": "https://example.com/hook", "secret": ""},
+        }, headers=admin)
+        assert again.status_code == 200, again.text
+        stored = client.get("/api/admin/notifications", headers=admin).json()
+        assert stored["webhook"]["secret"] == ""
+        assert stored["webhook"]["has_secret"] is True
+        # Sanity: the actual persisted secret is still there.
+        assert api_module._soc().notifications()["webhook"]["secret"] == "s3cr3t"
+
+
+def test_admin_endpoints_require_admin_role():
+    """m11: admin-tagged GETs must reject a plain non-admin user."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        admin = _login_headers(client)
+        # Create a viewer and log in as them.
+        viewer = client.post("/api/auth/register", json={
+            "username": "plain-viewer", "password": "secret123",
+            "role": "viewer",
+        }, headers=admin)
+        assert viewer.status_code == 200, viewer.text
+        vr = client.post("/api/auth/login", json={
+            "username": "plain-viewer", "password": "secret123"})
+        assert vr.status_code == 200, vr.text
+        vh = {"Authorization": f"Bearer {vr.json()['access_token']}"}
+
+        for path in ("/api/admin/storage", "/api/admin/audit",
+                     "/api/admin/collectors", "/api/admin/notifications"):
+            resp = client.get(path, headers=vh)
+            assert resp.status_code == 403, f"{path} should be admin-only"
+
+
+def test_csv_export_neutralizes_formula_injection():
+    """m8: CSV export must prefix spreadsheet formulas so cells stay inert."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        headers = _login_headers(client)
+        admin = headers  # demo-run already ingests the canonical corpus
+        hunted = ("=HYPERLINK(\"http://evil.example\",\"x\")",
+                  "+cmd", "-1+1", "@SUM(1,1)")
+        resp = client.post("/api/ingest", json={"lines": [
+            {"raw": f"Sep 12 09:00:00 {t} attacker 1.2.3.4 5.6.7.8 tcp 40000 443 3 1500 S",
+             "source": "csv", "client_id": "csv-inject-probe"}
+            for t in hunted
+        ]}, headers=admin)
+        assert resp.status_code == 200, resp.text
+        row = [api_module._csv_safe(c) for c in hunted]
+        for cell in row:
+            assert not any(cell.startswith(p) if cell else False
+                           for p in ("=", "+", "-", "@"))
+
+        import sqlite3
+        con = sqlite3.connect(str(api_module._settings.path("event_store")))
+        con.execute("DELETE FROM events WHERE client_id = 'csv-inject-probe'")
+        con.commit()
+        con.close()
+
+
+def test_reports_compliance_contract_has_findings_alias():
+    """m7: /api/compliance/<ip> body must expose .findings (ReportPage reads
+    that key) in addition to .affected_findings used by other callers."""
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        admin = _login_headers(client)
+        assets = client.get("/api/assets", headers=admin).json()["assets"]
+        threatened = [a for a in assets if a.get("threatened")]
+        if not threatened:
+            # ensure a base corpus exists so there is an asset to check
+            resp = client.post("/api/demo/run?reset=true", headers=admin)
+            assert resp.status_code == 200
+            assets = client.get("/api/assets", headers=admin).json()["assets"]
+            threatened = [a for a in assets if a.get("threatened")]
+        assert threatened, "need at least one threatened asset"
+        ip = threatened[0]["id"]
+        comp = client.get(f"/api/compliance/{ip}", headers=admin)
+        assert comp.status_code == 200, comp.text
+        body = comp.json()
+        assert "affected_findings" in body
+        assert "findings" in body
+        assert body["findings"] == body["affected_findings"]
+
+
+def test_llm_analyzer_health_tracks_failures():
+    """m12: health must not claim healthy after a failed analyze call."""
+    from analyzer.llm_analyzer import LLMAnalyzer
+
+    a = LLMAnalyzer(backend="heuristic")
+    assert a.health()["healthy"] is True
+    a._stats["failed"] = 3
+    assert a.health()["healthy"] is False

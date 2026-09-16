@@ -184,7 +184,7 @@ export default function GraphPage() {
                     cx={p.x}
                     cy={p.y}
                     r={r}
-                    fill={`url(#nodeg-${n.kind})`}
+                    fill={KIND_COLOR[n.kind] ? `url(#nodeg-${n.kind})` : "#34d399"}
                     stroke={isSel ? "#f8fafc" : "rgba(255,255,255,0.25)"}
                     strokeWidth={isSel ? 1.6 : 0.6}
                     style={{ filter: `drop-shadow(0 0 ${isSel ? 10 : 5}px ${KIND_COLOR[n.kind] || "#34d399"})` }}

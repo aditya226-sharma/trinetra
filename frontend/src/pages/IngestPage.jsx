@@ -25,6 +25,7 @@ export default function IngestPage() {
   const [sending, setSending] = useState(false);
   const [stored, setStored] = useState(0);
   const [stage, setStage] = useState(-1);
+  const stageRef = useRef(-1);
 
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkSource, setBulkSource] = useState("");
@@ -48,14 +49,15 @@ export default function IngestPage() {
   // drive the terminal stage animation during ingest
   useEffect(() => {
     if (!sending) return;
+    stageRef.current = 0;
+    setStage(0);
     const id = setInterval(() => {
-      setStage((s) => {
-        if (s >= PIPELINE_STAGES.length - 1) {
-          clearInterval(id);
-          return s;
-        }
-        return s + 1;
-      });
+      if (stageRef.current >= PIPELINE_STAGES.length - 1) {
+        clearInterval(id);
+        return;
+      }
+      stageRef.current += 1;
+      setStage(stageRef.current);
     }, 260);
     return () => clearInterval(id);
   }, [sending]);

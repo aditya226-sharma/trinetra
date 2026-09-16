@@ -6,6 +6,13 @@ import { getToken, setToken } from "./auth";
 // at a deployed FastAPI origin; the default "/api" keeps everything
 // same-origin for the Docker image.
 const BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/+$/, "");
+
+// GitHub Pages preview mode: the Python backend cannot run there, so the
+// Pages build embeds the canonical demo corpus (scripts/export_snapshot.py)
+// and serves it locally with identical response shapes. Data-driven pages,
+// search and drill-downs work exactly like the live product.
+const OFFLINE = import.meta.env.VITE_OFFLINE_DEMO === "1";
+
 const api = axios.create({ baseURL: BASE, timeout: 30000 });
 
 // The deploy origin the agent config should point at (used by OnboardingPage).
@@ -37,13 +44,11 @@ api.interceptors.response.use(
 );
 
 // ---------------------------------------------------------------------------
-// GitHub Pages preview mode: the Python backend cannot run there, so the
-// Pages build embeds the canonical demo corpus (scripts/export_snapshot.py)
+// GitHub Pages preview mode (OFFLINE): the Python backend cannot run there, so
+// the Pages build embeds the canonical demo corpus (scripts/export_snapshot.py)
 // and serves it locally with identical response shapes. Data-driven pages,
 // search and drill-downs work exactly like the live product.
 // ---------------------------------------------------------------------------
-const OFFLINE = import.meta.env.VITE_OFFLINE_DEMO === "1";
-
 let snapshot = null;
 
 // Import is hoisted statically; doing it lazily keeps it out of live builds.
@@ -311,16 +316,19 @@ export function streamEvents({ onEvent, onError, clientFilter } = {}) {
 // ------------------------------------------------------------------
 
 export async function getAgents() {
+  if (OFFLINE) return { agents: [] };
   const { data } = await api.get("/agents");
   return data;
 }
 
 export async function mintAgent(label = "", clientId = "") {
+  if (OFFLINE) return { token_id: "preview", token: "preview", client_id: clientId || null };
   const { data } = await api.post("/agents", { label, client_id: clientId });
   return data;
 }
 
 export async function revokeAgent(tokenId) {
+  if (OFFLINE) return { status: "revoked", token_id: tokenId };
   const { data } = await api.delete(`/agents/${encodeURIComponent(tokenId)}`);
   return data;
 }
@@ -419,6 +427,9 @@ export async function getCollectors() {
 }
 
 export async function setCollectors(patch) {
+  if (OFFLINE) return { config: { syslog: { enabled: false, port: 1514 },
+      tailers: [], demo: { enabled: false, replay_delay_s: 300 } },
+    running: { syslog_active: false, tailer_active: false, demo_active: false, syslog_port: 1514, tailers: [], demo_enabled: false } };
   const { data } = await api.put("/admin/collectors", patch);
   return data;
 }
@@ -548,16 +559,19 @@ export async function getNotifications() {
 }
 
 export async function saveNotifications(patch) {
+  if (OFFLINE) return { ...patch };
   const { data } = await api.put("/admin/notifications", patch);
   return data;
 }
 
 export async function testNotifications() {
+  if (OFFLINE) return { results: [{ transport: "console", status: "skipped" }] };
   const { data } = await api.post("/admin/notifications/test");
   return data;
 }
 
 export async function runDigest(force = false) {
+  if (OFFLINE) return { cases_in_window: 0, results: [{ transport: "console", status: "skipped" }] };
   const { data } = await api.post("/admin/notifications/digest", null, { params: { force } });
   return data;
 }

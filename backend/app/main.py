@@ -267,7 +267,7 @@ def run_demo(reset: bool = Query(False),
     _GRAPH = _ORCH.graph
     _ORCH.stream = hub
     _ORCH.soc = _SOC
-    _COLLECTORS._orch = _ORCH
+    _COLLECTORS.set_orchestrator(_ORCH)
     from collectors.demo_feed import DemoFeed
 
     pcap_dir = str(_settings.path("pcap"))
@@ -523,12 +523,20 @@ def events_to_rows(events: List[Any]) -> List[List[str]]:
     return rows
 
 
+def _csv_safe(value: str) -> str:
+    """Neutralize spreadsheet formula-injection prefixes in exported cells."""
+    if value and value[0] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
 def export_events_csv(rows: List[List[str]]) -> StreamingResponse:
     import csv
     import io as _io
     buf = _io.StringIO()
     writer = csv.writer(buf)
-    writer.writerows(rows)
+    for row in rows:
+        writer.writerow([_csv_safe(c) for c in row])
     return StreamingResponse(
         iter([buf.getvalue().encode("utf-8")]),
         media_type="text/csv",
@@ -588,6 +596,9 @@ def ingest(body: IngestRequest,
         _ORCH = Orchestrator(_settings)
         _GRAPH = _ORCH.graph
         _ORCH.stream = hub
+    if len(body.lines) > _BULK_MAX_RECORDS:
+        raise HTTPException(status_code=413,
+                            detail=f"Too many lines: {len(body.lines)} > {_BULK_MAX_RECORDS}")
     accepted, duplicates, ignored, failed = 0, 0, 0, 0
     for line in body.lines:
         try:
@@ -778,7 +789,7 @@ def revoke_agent(token_id: str,
 # mutation is recorded to the audit trail.
 
 
-@app.get("/api/admin/storage", tags=["admin"], dependencies=[Depends(require_auth)])
+@app.get("/api/admin/storage", tags=["admin"], dependencies=[Depends(require_admin)])
 def admin_storage() -> Dict[str, Any]:
     """Store volumes, sizes and the effective retention policy."""
     return storage_snapshot(_settings)
@@ -801,13 +812,13 @@ def admin_retention(body: RetentionRequest,
     return result
 
 
-@app.get("/api/admin/audit", tags=["admin"], dependencies=[Depends(require_auth)])
+@app.get("/api/admin/audit", tags=["admin"], dependencies=[Depends(require_admin)])
 def admin_audit(limit: int = Query(100)) -> Dict[str, Any]:
     """Newest-first audit trail of privileged actions."""
     return {"entries": audit_recent(_settings, limit)}
 
 
-@app.get("/api/admin/collectors", tags=["admin"], dependencies=[Depends(require_auth)])
+@app.get("/api/admin/collectors", tags=["admin"], dependencies=[Depends(require_admin)])
 def admin_collectors() -> Dict[str, Any]:
     """Current collector config + which live threads are running."""
     if _COLLECTORS is None:
@@ -1289,9 +1300,19 @@ def cases_action(case_id: str, body: CaseActionRequest,
     return {"case": case}
 
 
-@app.get("/api/admin/notifications", tags=["soc"], dependencies=[Depends(require_auth)])
+@app.get("/api/admin/notifications", tags=["soc"],
+         dependencies=[Depends(require_admin)])
 def notifications_get() -> Dict[str, Any]:
-    return _soc().notifications()
+    cfg = _soc().notifications()
+    email = dict(cfg.get("email") or {})
+    webhook = dict(cfg.get("webhook") or {})
+    email["has_password"] = bool(email.get("password"))
+    email["password"] = ""
+    webhook["has_secret"] = bool(webhook.get("secret"))
+    webhook["secret"] = ""
+    cfg["email"] = email
+    cfg["webhook"] = webhook
+    return cfg
 
 
 @app.put("/api/admin/notifications", tags=["soc"],

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getAssets, getAssetRelations } from "../lib/api";
 import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, ProgressBar, CodeBlock } from "../components/ui";
 
@@ -6,6 +6,7 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState([]);
   const [relation, setRelation] = useState(null);
   const [error, setError] = useState(null);
+  const reqSeq = useRef(0);
 
   useEffect(() => {
     getAssets()
@@ -14,12 +15,13 @@ export default function AssetsPage() {
   }, []);
 
   const open = async (ip) => {
+    const my = ++reqSeq.current;
     setRelation(null);
     try {
       const data = await getAssetRelations(ip);
-      setRelation({ ip, ...data });
+      if (my === reqSeq.current) setRelation({ ip, ...data });
     } catch (e) {
-      setError(e.response?.data?.detail || e.message);
+      if (my === reqSeq.current) setError(e.response?.data?.detail || e.message);
     }
   };
 

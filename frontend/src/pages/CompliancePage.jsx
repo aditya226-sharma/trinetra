@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getAssets, getCompliance, complianceReportUrl } from "../lib/api";
 import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, CodeBlock } from "../components/ui";
 
@@ -7,6 +7,7 @@ export default function CompliancePage() {
   const [selected, setSelected] = useState(null);
   const [compliance, setCompliance] = useState(null);
   const [error, setError] = useState(null);
+  const reqSeq = useRef(0);
 
   useEffect(() => {
     getAssets()
@@ -15,13 +16,14 @@ export default function CompliancePage() {
   }, []);
 
   const pick = async (ip) => {
+    const my = ++reqSeq.current;
     setSelected(ip);
     setCompliance(null);
     try {
       const d = await getCompliance(ip);
-      setCompliance(d);
+      if (my === reqSeq.current) setCompliance(d);
     } catch (e) {
-      setError(e.response?.data?.detail || e.message);
+      if (my === reqSeq.current) setError(e.response?.data?.detail || e.message);
     }
   };
 

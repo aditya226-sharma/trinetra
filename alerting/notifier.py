@@ -58,12 +58,18 @@ class EmailNotifier:
         msg["From"] = self.sender
         msg["To"] = self.recipient
         try:
-            with smtplib.SMTP(self.host, self.port, timeout=15) as smtp:
-                if self.port == 587:
-                    smtp.starttls()
-                if self.username:
-                    smtp.login(self.username, self.password)
-                smtp.sendmail(self.sender, [self.recipient], msg.as_string())
+            if self.port == 465:
+                with smtplib.SMTP_SSL(self.host, self.port, timeout=15) as smtp:
+                    if self.username:
+                        smtp.login(self.username, self.password)
+                    smtp.sendmail(self.sender, [self.recipient], msg.as_string())
+            else:
+                with smtplib.SMTP(self.host, self.port, timeout=15) as smtp:
+                    if self.port == 587:
+                        smtp.starttls()
+                    if self.username:
+                        smtp.login(self.username, self.password)
+                    smtp.sendmail(self.sender, [self.recipient], msg.as_string())
             return {"transport": self.name, "status": "sent", "severity": severity}
         except Exception as exc:  # noqa: BLE001
             log.warning("email notify failed: %s", exc)

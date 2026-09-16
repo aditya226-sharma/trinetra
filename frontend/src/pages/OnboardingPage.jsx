@@ -94,7 +94,8 @@ python -m venv .venv; .venv\\Scripts\\pip install -e .
 .venv\\Scripts\\log-agent --service start`,
 };
 
-export default function OnboardingPage() {
+export default function OnboardingPage({ role }) {
+  const isAdmin = role === "admin";
   const [agents, setAgents] = useState(null);
   const [error, setError] = useState(null);
   const [label, setLabel] = useState("");
@@ -182,12 +183,12 @@ export default function OnboardingPage() {
                   onChange={(e) => setLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleMint()}
                   placeholder="e.g. workshop-mbp, prod-api-01"
-                  disabled={isPreview || busy}
+                  disabled={isPreview || busy || !isAdmin}
                   className="field mono flex-1 px-3 py-2 text-[12px]"
                 />
                 <button
                   onClick={handleMint}
-                  disabled={isPreview || busy}
+                  disabled={isPreview || busy || !isAdmin}
                   className="btn-primary shrink-0"
                 >
                   {busy ? "MINTING…" : "Generate token"}
@@ -254,7 +255,7 @@ export default function OnboardingPage() {
                     {revoked ? (
                       <PlainBadge cls="!text-rose-300">revoked</PlainBadge>
                     ) : (
-                      !isPreview && (
+                      !isPreview && isAdmin && (
                         <button
                           onClick={() => handleRevoke(a.token_id)}
                           className="rounded-md border border-rose-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-rose-300 transition hover:bg-rose-500/10"

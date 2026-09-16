@@ -78,14 +78,16 @@ export default function ConsolePage() {
     const missed = missedRef.current;
     missedRef.current = [];
     if (missed.length === 0) return;
+    let freshCount = 0;
     setLines((prev) => {
       const seen = new Set(prev.map((e) => e.event_id));
       const fresh = missed.filter((e) => !seen.has(e.event_id));
+      freshCount = fresh.length;
       let next = [...fresh.reverse(), ...prev];
       if (next.length > MAX_LINES) next = next.slice(0, MAX_LINES);
       return next;
     });
-    setTotal((t) => t + fresh.length);
+    setTotal((t) => t + freshCount);
   }, [paused]);
 
   useEffect(() => {

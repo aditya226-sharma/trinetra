@@ -20,15 +20,16 @@ function fmtDate(iso) {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function FleetPage() {
+export default function FleetPage({ role }) {
   const [clients, setClients] = useState([]);
   const [agents, setAgents] = useState([]);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [mintLabel, setMintLabel] = useState("");
   const [mintClient, setMintClient] = useState("");
+  const canMint = role === "admin";
 
-  const loadAgents = () => getAgents().then((d) => setAgents(d.agents || []));
+  const loadAgents = () => getAgents().then((d) => setAgents(d.agents || [])).catch(() => {});
 
   useEffect(() => {
     Promise.all([getClients(), getAgents()])
@@ -81,6 +82,7 @@ export default function FleetPage() {
       {notice && <div className="text-sm text-emerald-400">{notice}</div>}
 
       <GlassCard title="Agent tokens" right={<PlainBadge>mint · revoke</PlainBadge>}>
+        {canMint && (
         <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
           <input
             value={mintLabel}
@@ -102,6 +104,7 @@ export default function FleetPage() {
             Mint token
           </button>
         </div>
+        )}
 
         {agents.length === 0 ? (
           <Empty title="No agent tokens" hint="Mint a per-machine token above; agents authenticate with X-Agent-Token." />
@@ -147,7 +150,7 @@ export default function FleetPage() {
                         )}
                       </td>
                       <td className="py-2.5 text-right">
-                        {a.enabled && (
+                        {a.enabled && canMint && (
                           <button
                             onClick={() => doRevoke(a.token_id)}
                             className="rounded-lg border border-rose-500/30 px-2.5 py-1 text-[10px] uppercase tracking-wider text-rose-300 hover:bg-rose-500/15"
@@ -201,7 +204,7 @@ export default function FleetPage() {
                     <td className="py-2.5 pr-3 text-slate-400">{c.platform || "—"}</td>
                     <td className="py-2.5 pr-3 text-slate-400">{(c.source_types || []).join(", ") || "—"}</td>
                     <td className="py-2.5 pr-3 mono text-slate-300">
-                      {c.events.toLocaleString()}
+                      {(c.events ?? 0).toLocaleString()}
                       {c.events_recent > 0 && (
                         <span className="ml-1.5 text-[10px] text-emerald-400">+{c.events_recent} /5m</span>
                       )}

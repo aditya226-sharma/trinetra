@@ -290,7 +290,10 @@ class Orchestrator:
                     log.warning("analyzer failed on finding %s: %s",
                                 finding.get("threat_class", "?"), exc)
                     result = None
-            confidence = float(finding.get("confidence", 0))
+            try:
+                confidence = float(finding.get("confidence", 0))
+            except (TypeError, ValueError):
+                confidence = 0.0
             finding["analysis"] = result.as_dict() if result else {}
             findings_alerts = self.notifier.alert(finding)
             self.stats["alerts_sent"] += sum(

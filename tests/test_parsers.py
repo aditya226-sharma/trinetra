@@ -126,3 +126,32 @@ def test_csv_headerless_positional_mapping():
     assert parsed["fields"]["dport"] == "445"
     # Deterministic output -> same input yields the same fingerprint.
     assert parse(row, "csv", "client", "")["fields"] == parsed["fields"]
+
+
+def test_syslog_pri_severity_uses_low_3_bits():
+    """PRI severity is the lowest 3 bits (value & 7) — not the facility.
+
+    Regression: ``>> 3 % 8`` would shift the *facility* bits and mis-rank
+    almost every message (local0/daemon facilities collapsed to info/critical).
+    """
+    from parsers.syslog import _pri_severity
+
+    # local0.notice      = 16*8 + 5 = 133 -> severity info (5)
+    assert _pri_severity("<133>x") == "info"
+    # local0.warning     = 16*8 + 4 = 132 -> warning (4)
+    assert _pri_severity("<132>x") == "warning"
+    # daemon.crit        = 3*8 + 2   = 26  -> critical (2)
+    assert _pri_severity("<26>x") == "critical"
+    # daemon.notice      = 3*8 + 5   = 29  -> info (5)
+    assert _pri_severity("<29>x") == "info"
+    # kern.emerg         = 0*8 + 0   = 0   -> critical (0)
+    assert _pri_severity("<0>x") == "critical"
+    # user.alert         = 1*8 + 1   = 9   -> critical (1)
+    assert _pri_severity("<9>x") == "critical"
+
+
+def test_syslog_pri_never_raises_on_non_numeric_pri():
+    from parsers.syslog import _pri_severity
+
+    assert _pri_severity("no-pri-marker") is None
+    assert _pri_severity("") is None

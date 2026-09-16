@@ -74,6 +74,8 @@ export default function AnalyticsPage() {
         URL.revokeObjectURL(url);
         a.remove();
       }
+    } catch (e) {
+      alert(`Export failed: ${e.response?.data?.detail || e.message}`);
     } finally {
       setExporting(false);
     }
