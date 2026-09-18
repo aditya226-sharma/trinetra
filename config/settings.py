@@ -53,6 +53,7 @@ class Settings:
             "TRINETRA_INTEL_PROVIDER": ("enrichment", "intel", "provider"),
             "ABUSEIPDB_API_KEY": ("enrichment", "intel", "api_key"),
             "VIRUSTOTAL_API_KEY": ("enrichment", "intel", "api_key"),
+            "TRINETRA_CORS_ORIGINS": ("web", "cors_origins"),
         }
         for env, path in mapping.items():
             value = os.environ.get(env)

@@ -24,6 +24,7 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
   const [clients, setClients] = useState([]);
   const [error, setError] = useState(null);
   const scoped = Boolean(clientScope) && role !== "admin";
+  const adminOnly = role === "admin";
 
   useEffect(() => {
     let alive = true;
@@ -31,9 +32,13 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
       getDashboard()
         .then((d) => alive && setData(d))
         .catch((e) => alive && setError(e.message));
-      getClients()
-        .then((d) => alive && setClients(d.clients || []))
-        .catch(() => {});
+      // Client list is admin-only: scoped viewers must not fetch (or see) the
+      // whole estate's client roster, even if they never render it.
+      if (adminOnly) {
+        getClients()
+          .then((d) => alive && setClients(d.clients || []))
+          .catch(() => {});
+      }
     };
     tick();
     const id = setInterval(tick, 10000);
@@ -41,7 +46,7 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
       alive = false;
       clearInterval(id);
     };
-  }, []);
+  }, [adminOnly]);
 
   if (error) return <div className="text-sm text-rose-400">Failed to load dashboard: {error}</div>;
   if (!data) return <div className="text-slate-500">Loading dashboard…</div>;

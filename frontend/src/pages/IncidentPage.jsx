@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { getIncidentDetail, caseAction, enrichEntity } from "../lib/api";
 import { SeverityBadge, SectionTitle, Empty } from "../components/ui";
@@ -28,6 +28,7 @@ export default function IncidentPage({ role }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [enrich, setEnrich] = useState({});
+  const enrichFetched = useRef(new Set());
   const canAct = role === "admin";
 
   useEffect(() => {
@@ -44,12 +45,12 @@ export default function IncidentPage({ role }) {
     const involved = data.involved || [];
     involved.filter((e) => e.kind === "ip" && e.value).forEach((e) => {
       const key = String(e.value);
-      if (enrich[key]) return;
+      if (enrichFetched.current.has(key)) return;
+      enrichFetched.current.add(key);
       enrichEntity("ip", key)
-        .then((r) => setEnrich((m) => ({ ...m, [key]: r })))
+        .then((r) => setEnrich((m) => (m[key] ? m : { ...m, [key]: r })))
         .catch(() => {});
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   const act = (action, payload = {}) => {

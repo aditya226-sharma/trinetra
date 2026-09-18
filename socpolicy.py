@@ -28,7 +28,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 from alerting.notifier import ConsoleNotifier, EmailNotifier, Notifier
 from backend.app.services.audit import audit_log
@@ -356,7 +356,6 @@ class SocPolicy:
         with self._lock:
             rules = self._data["rules"]
             replaced = [r for r in rules if r.get("id") != clean["id"]]
-            existed = len(replaced) != len(rules)
             replaced.append(clean)
             self._data["rules"] = replaced
             self._save()

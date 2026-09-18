@@ -104,8 +104,19 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="TriNetra ULPF API", version="0.1.0", lifespan=lifespan)
+_cors_raw = get_settings().get("web.cors_origins")
+if isinstance(_cors_raw, str):
+    _allow_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
+else:
+    _allow_origins = list(_cors_raw or [])
+if not _allow_origins:
+    _allow_origins = [
+        "http://127.0.0.1:5173", "http://localhost:5173",   # vite dev
+        "https://aditya226-sharma.github.io",                # GitHub Pages demo
+    ]
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origins=_allow_origins, allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.include_router(auth_router)
 
@@ -349,7 +360,7 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
     }
 
 
-@app.get("/api/graph", tags=["module-c"], dependencies=[Depends(require_auth)])
+@app.get("/api/graph", tags=["module-c"], dependencies=[Depends(require_analyst)])
 def graph() -> Dict[str, Any]:
     if _GRAPH is None:
         raise HTTPException(status_code=428,
@@ -357,7 +368,7 @@ def graph() -> Dict[str, Any]:
     return _GRAPH.to_dashboard()
 
 
-@app.get("/api/assets", tags=["module-c"], dependencies=[Depends(require_auth)])
+@app.get("/api/assets", tags=["module-c"], dependencies=[Depends(require_analyst)])
 def assets() -> Dict[str, Any]:
     if _GRAPH is None:
         raise HTTPException(status_code=428,
@@ -378,7 +389,7 @@ def assets() -> Dict[str, Any]:
 
 
 @app.get("/api/assets/{asset_ip}/relations", tags=["module-c"],
-         dependencies=[Depends(require_auth)])
+         dependencies=[Depends(require_analyst)])
 def asset_relations(asset_ip: str) -> Dict[str, Any]:
     """Lateral-movement drill down for one internal asset (PS26189 graph)."""
     if _GRAPH is None:
@@ -402,13 +413,13 @@ from backend.app.services.compliance import compliance_for_asset, mapping_for
 
 
 @app.get("/api/compliance/{asset_id}", tags=["compliance"],
-         dependencies=[Depends(require_auth)])
+         dependencies=[Depends(require_analyst)])
 def compliance(asset_id: str) -> Dict[str, Any]:
     findings = [f for f in _ORCH.findings_log] if _ORCH else []
     return compliance_for_asset(asset_id, findings)
 
 
-@app.get("/api/compliance", tags=["compliance"], dependencies=[Depends(require_auth)])
+@app.get("/api/compliance", tags=["compliance"], dependencies=[Depends(require_analyst)])
 def compliance_all() -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
@@ -586,16 +597,24 @@ def _touches_client(finding: Dict[str, Any], client_id: str) -> bool:
     return True
 
 
-@app.get("/api/events/search", tags=["store"], dependencies=[Depends(require_auth)])
+@app.get("/api/events/search", tags=["store"])
 def search_events(
     query: str = "", source_type: str = "", severity: str = "",
     category: str = "", client_id: str = "", threat_class: str = "",
     ts_from: str = "", ts_to: str = "",
     limit: int = Query(50, le=500), offset: int = 0,
     format: str = "",
+    payload: Dict[str, Any] = Depends(require_auth),
 ) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
+    scope = _client_scope(payload)
+    if scope:
+        # Scoped viewers may only ever see their own client's events, no
+        # matter what client_id they ask for.
+        if client_id and client_id != scope:
+            raise HTTPException(status_code=403, detail="not your client's events")
+        client_id = scope
     if format == "csv":
         # Exports sweep the full matching set (capped so a runaway corpus
         # can't blow out memory); live triage keeps the paginated fetch below.
@@ -692,13 +711,17 @@ async def events_stream(payload: Dict[str, Any] = Depends(require_token_query)):
     )
 
 
-@app.get("/api/events/{event_id}", tags=["store"], dependencies=[Depends(require_auth)])
-def event_detail(event_id: str) -> Dict[str, Any]:
+@app.get("/api/events/{event_id}", tags=["store"])
+def event_detail(event_id: str,
+                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
     event = _ORCH.event_store.get(event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
+    scope = _client_scope(payload)
+    if scope and getattr(event, "client_id", None) and event.client_id != scope:
+        raise HTTPException(status_code=403, detail="not your client's event")
     detail = event.to_dict()
     detail["raw"] = _ORCH.raw_store.get(event.trace_id) if event.trace_id else None
     detail["trace_events"] = [e.to_dict()
@@ -885,7 +908,7 @@ def mint_agent(body: MintAgentRequest,
             "client_id": str(body.client_id or "") or None}
 
 
-@app.get("/api/agents", tags=["agents"], dependencies=[Depends(require_auth)])
+@app.get("/api/agents", tags=["agents"], dependencies=[Depends(require_analyst)])
 def list_agents() -> Dict[str, Any]:
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
@@ -965,7 +988,7 @@ def admin_collectors_put(body: CollectorsRequest,
     return result
 
 
-@app.get("/api/analytics", tags=["analytics"], dependencies=[Depends(require_auth)])
+@app.get("/api/analytics", tags=["analytics"], dependencies=[Depends(require_analyst)])
 def analytics(hours: int = Query(48, ge=1, le=336),
               format: str = Query("json")) -> Any:
     """Roll-up analytics over the last ``hours``.
@@ -1045,7 +1068,7 @@ def analytics(hours: int = Query(48, ge=1, le=336),
 
 
 @app.get("/api/compliance/{asset_id}/report", tags=["compliance"],
-         dependencies=[Depends(require_auth)])
+         dependencies=[Depends(require_analyst)])
 def compliance_report(asset_id: str) -> Response:
     """Standalone HTML compliance report (print / save-as-PDF friendly)."""
     if _ORCH is None:
@@ -1304,7 +1327,7 @@ def _soc400(exc: SocPolicyError):
     raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/api/watchlist", tags=["soc"], dependencies=[Depends(require_auth)])
+@app.get("/api/watchlist", tags=["soc"], dependencies=[Depends(require_analyst)])
 def watchlist(list: str = Query("watchlist")) -> Dict[str, Any]:
     if list not in ("watchlist", "blocklist"):
         raise HTTPException(status_code=400, detail="list must be watchlist or blocklist")
@@ -1344,7 +1367,7 @@ def watchlist_toggle(list: str, kind: str, value: str = Query(...),
     return {"active": active}
 
 
-@app.get("/api/rules", tags=["soc"], dependencies=[Depends(require_auth)])
+@app.get("/api/rules", tags=["soc"], dependencies=[Depends(require_analyst)])
 def rules_list() -> Dict[str, Any]:
     return {"rules": _soc().list_rules()}
 
@@ -1420,15 +1443,18 @@ def cases_detail(case_id: str,
     return {"case": case}
 
 
-@app.get("/api/cases/{case_id}/incident", tags=["soc"],
-         dependencies=[Depends(require_auth)])
-def incident_detail(case_id: str) -> Dict[str, Any]:
+@app.get("/api/cases/{case_id}/incident", tags=["soc"])
+def incident_detail(case_id: str,
+                    payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     """Full incident drill-down: case record + activity timeline (who did what),
     involved parties (who is implicated), the entity graph subgraph around them,
     and enriched context pulled from the event store."""
     case = _soc().get_case(case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="case not found")
+    scope = _client_scope(payload)
+    if scope and case.get("client_id") and case["client_id"] != scope:
+        raise HTTPException(status_code=403, detail="not your client's incident")
     involved = case.get("involved") or []
     case_evidence = case.get("evidence") or {}
     if not involved:
@@ -1476,12 +1502,15 @@ def incident_detail(case_id: str) -> Dict[str, Any]:
             "client_id": case.get("client_id") or ""}
 
 
-@app.get("/api/cases/{case_id}/graph", tags=["soc"],
-         dependencies=[Depends(require_auth)])
-def incident_graph(case_id: str) -> Dict[str, Any]:
+@app.get("/api/cases/{case_id}/graph", tags=["soc"])
+def incident_graph(case_id: str,
+                   payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
     case = _soc().get_case(case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="case not found")
+    scope = _client_scope(payload)
+    if scope and case.get("client_id") and case["client_id"] != scope:
+        raise HTTPException(status_code=403, detail="not your client's incident")
     involved = case.get("involved") or []
     if _GRAPH is None:
         return {"graph": {"nodes": [], "edges": []}, "involved": involved}

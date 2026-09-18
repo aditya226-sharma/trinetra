@@ -129,6 +129,15 @@ const ICONS = {
   ),
 };
 
+// Scoped client viewers are restricted to their portal dashboard + alerts;
+// the SOC-internal estate views belong to admins and analysts only.
+function SocRoute({ user, children }) {
+  if (user && user.role !== "admin" && user.role !== "analyst" && user.client_scope) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 const navItems = [
   { to: "/clients", label: "Clients" },
   { to: "/", label: "Dashboard", end: true },
@@ -370,6 +379,12 @@ export default function App() {
               .filter((item) => {
                 if (!user) return true;
                 if (item.to === "/settings" || item.to === "/ingest") return user.role === "admin";
+                // Scoped client viewers are read-only to one client: they may
+                // see their portal dashboard and the alert queue, but not the
+                // SOC-internal estate views (cross-client by design).
+                if (user.role !== "admin" && user.role !== "analyst" && user.client_scope) {
+                  return item.to === "/" || item.to === "/alerts";
+                }
                 return true;
               })
               .map((item) => (
@@ -560,23 +575,23 @@ export default function App() {
             </div>
           )}
           <Routes>
-            <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/clients/onboard" element={<OnboardingPage role={user?.role} />} />
-            <Route path="/clients/:id" element={<LogConsolePage />} />
+            <Route path="/clients" element={<SocRoute user={user}><ClientsPage /></SocRoute>} />
+            <Route path="/clients/onboard" element={<SocRoute user={user}><OnboardingPage role={user?.role} /></SocRoute>} />
+            <Route path="/clients/:id" element={<SocRoute user={user}><LogConsolePage /></SocRoute>} />
             <Route path="/" element={<DashboardPage role={user?.role} clientScope={user?.client_scope || ""} />} />
             <Route path="/incidents/:id" element={<IncidentPage role={user?.role} />} />
-            <Route path="/events" element={<EventsPage />} />
+            <Route path="/events" element={<SocRoute user={user}><EventsPage /></SocRoute>} />
             <Route path="/alerts" element={<AlertsPage role={user?.role} />} />
-            <Route path="/rules" element={<RulesPage role={user?.role} />} />
-            <Route path="/watchlist" element={<WatchlistPage role={user?.role} />} />
-            <Route path="/graph" element={<GraphPage />} />
-            <Route path="/assets" element={<AssetsPage />} />
-            <Route path="/compliance" element={<CompliancePage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/fleet" element={<FleetPage role={user?.role} />} />
-            <Route path="/report/:assetId" element={<ReportPage />} />
+            <Route path="/rules" element={<SocRoute user={user}><RulesPage role={user?.role} /></SocRoute>} />
+            <Route path="/watchlist" element={<SocRoute user={user}><WatchlistPage role={user?.role} /></SocRoute>} />
+            <Route path="/graph" element={<SocRoute user={user}><GraphPage /></SocRoute>} />
+            <Route path="/assets" element={<SocRoute user={user}><AssetsPage /></SocRoute>} />
+            <Route path="/compliance" element={<SocRoute user={user}><CompliancePage /></SocRoute>} />
+            <Route path="/analytics" element={<SocRoute user={user}><AnalyticsPage /></SocRoute>} />
+            <Route path="/fleet" element={<SocRoute user={user}><FleetPage role={user?.role} /></SocRoute>} />
+            <Route path="/report/:assetId" element={<SocRoute user={user}><ReportPage /></SocRoute>} />
             <Route path="/ingest" element={user?.role === "admin" ? <IngestPage /> : <Navigate to="/" replace />} />
-            <Route path="/console" element={<ConsolePage />} />
+            <Route path="/console" element={<SocRoute user={user}><ConsolePage /></SocRoute>} />
             <Route path="/settings" element={user?.role === "admin" ? <SettingsPage role={user.role} /> : <Navigate to="/" replace />} />
             <Route path="/login" element={authState === "authed"
               ? <Navigate to="/" replace />
