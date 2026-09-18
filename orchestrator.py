@@ -463,13 +463,20 @@ class Orchestrator:
             elif event.category != "flow":
                 self.graph.add_auth(event)
             events += 1
-        # Re-run the threat window once over the full dataset and overlay its
-        # findings on the graph (findings are deterministic for stored events).
+            # The detector buffers every flow in _flows: flush periodically so
+            # a large store can't balloon memory or keep one giant window.
+            # Mirrors live batches (~500 events) so findings stay comparable.
+            if events % 500 == 0:
+                self._overlay_threat_findings(log)
+        self._overlay_threat_findings(log)
+        log.info("replayed %d events into derived state", events)
+
+    def _overlay_threat_findings(self, log: Any = None) -> None:
+        """Flush the detector's current window and overlay onto the graph."""
         for finding in self.threats.flush():
             self.graph.add_finding(finding)
             self.findings_log.append(finding)
             if len(self.findings_log) > 2000:
                 self.findings_log.pop(0)
-        log.info("replayed %d events into derived state", events)
 
 
