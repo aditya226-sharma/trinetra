@@ -1,0 +1,44 @@
+# Live edge deployment — the containers that actually run TriNetra in public
+# (container facing the tunnel at 127.0.0.1:8001 + a fixed-domain ngrok edge).
+#
+# Requires a pre-existing named volume `trinetra-public-data` so case/event
+# state survives restarts. Usable as a drop-in for the temp compose file that
+# the old /tmp/trinetra-deploy/trinetra.sh used to maintain.
+#
+#   docker compose -f compose.public.yml pull
+#   ADMIN_PASSWORD=... AGENT_TOKEN=... NGROK_AUTHTOKEN=... \
+#     docker compose -f compose.public.yml up -d
+#
+services:
+  trinetra-public:
+    image: ghcr.io/aditya226-sharma/trinetra:latest
+    container_name: trinetra-public
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      AGENT_TOKEN: ${AGENT_TOKEN:-}
+      TRINETRA_RETENTION_DAYS: ${TRINETRA_RETENTION_DAYS:-30}
+      TRINETRA_STORE_PATH: /app/data/trinetra.db
+      TRINETRA_RAW_DIR: /app/data/raw
+    volumes:
+      - trinetra-public-data:/app/data
+    restart: unless-stopped
+
+  trinetra-ngrok:
+    image: ngrok/ngrok:latest
+    container_name: trinetra-ngrok
+    command:
+      - "http"
+      - "--url=https://unease-chummy-outburst.ngrok-free.dev"
+      - "trinetra-public:8000"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - trinetra-public
+    restart: unless-stopped
+
+volumes:
+  trinetra-public-data:
+    external: true
