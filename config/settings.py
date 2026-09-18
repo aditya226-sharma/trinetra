@@ -49,6 +49,10 @@ class Settings:
             "ADMIN_USER": ("auth", "admin_user"),
             "ADMIN_PASSWORD": ("auth", "admin_password"),
             "TRINETRA_JWT_SECRET": ("auth", "jwt_secret"),
+            "TRINETRA_GEO_DB_PATH": ("enrichment", "geo", "db_path"),
+            "TRINETRA_INTEL_PROVIDER": ("enrichment", "intel", "provider"),
+            "ABUSEIPDB_API_KEY": ("enrichment", "intel", "api_key"),
+            "VIRUSTOTAL_API_KEY": ("enrichment", "intel", "api_key"),
         }
         for env, path in mapping.items():
             value = os.environ.get(env)

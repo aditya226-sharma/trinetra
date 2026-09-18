@@ -553,6 +553,46 @@ export async function getCaseStats() {
 }
 
 // ------------------------------------------------------------------
+// tasks (admin assigns work items; clients see them on their dashboard)
+// ------------------------------------------------------------------
+
+export async function getTasks(params = {}) {
+  if (OFFLINE) {
+    return { total: 0, by_status: { todo: 0, in_progress: 0, done: 0 }, overdue: 0, list: [] };
+  }
+  const { data } = await api.get("/tasks", { params });
+  return data;
+}
+
+export async function createTask(payload) {
+  if (OFFLINE) return { task: { ...payload, status: "todo" } };
+  const { data } = await api.post("/tasks", payload);
+  return data;
+}
+
+export async function patchTask(id, payload) {
+  if (OFFLINE) return { task: { id, ...payload } };
+  const { data } = await api.patch(`/tasks/${encodeURIComponent(id)}`, payload);
+  return data;
+}
+
+export async function getTaskDetail(id) {
+  if (OFFLINE) return { task: { id, status: "todo" } };
+  const { data } = await api.get(`/tasks/${encodeURIComponent(id)}`);
+  return data;
+}
+
+// ------------------------------------------------------------------
+// enrichment (geo/ASN + threat-intel for an entity)
+// ------------------------------------------------------------------
+
+export async function enrichEntity(kind, value) {
+  if (OFFLINE) return { kind, value, geo: {}, intel: {} };
+  const { data } = await api.get(`/enrich/entity/${encodeURIComponent(kind)}/${encodeURIComponent(value)}`);
+  return data;
+}
+
+// ------------------------------------------------------------------
 // notifications & digest delivery
 // ------------------------------------------------------------------
 

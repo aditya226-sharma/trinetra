@@ -364,3 +364,85 @@ def test_email_port_tls_route_selection():
     assert r["status"] == "skipped"
     assert e465.port == 465
     assert e587.port == 587
+
+
+# ---------------------------------------------------------------- tasks
+
+def test_create_task_defaults_and_fields(soc):
+    t = soc.create_task("rotate vpn certs", client_id="acme-corp",
+                        description="expiry in 30d", priority="P2",
+                        due_at="2030-01-15", actor="alice")
+    assert t["status"] == "todo"
+    assert t["priority"] == "P2"
+    assert t["client_id"] == "acme-corp"
+    assert t["created_by"] == "alice"
+    assert t["due_at"] == "2030-01-15"
+    assert any(x["action"] == "created" for x in t["timeline"])
+    assert t["notes"] == []
+
+
+def test_create_task_validation(soc):
+    with pytest.raises(SocPolicyError):
+        soc.create_task("   ", client_id="acme")  # title required
+    with pytest.raises(SocPolicyError):
+        soc.create_task("t", client_id="acme", priority="P9")  # bad priority
+
+
+def test_task_lifecycle_status_notes_timeline(soc):
+    t = soc.create_task("apply firewall rule", client_id="acme-corp",
+                        actor="admin")
+    soc.patch_task(t["id"], status="in_progress", actor="operator@acme-corp")
+    soc.patch_task(t["id"], note="rolled out to edge-fw-01", actor="operator@acme-corp")
+    soc.patch_task(t["id"], status="done", actor="operator@acme-corp")
+    done = soc.get_task(t["id"])
+    assert done["status"] == "done"
+    assert [x["action"] for x in done["timeline"]].count("status") == 2
+    assert done["notes"][-1]["note"] == "rolled out to edge-fw-01"
+    # timeline records who changed status
+    assert any(x["actor"] == "operator@acme-corp" for x in done["timeline"])
+
+
+def test_task_status_and_priority_validation(soc):
+    t = soc.create_task("work", client_id="acme")
+    with pytest.raises(SocPolicyError):
+        soc.patch_task(t["id"], status="banana")
+    with pytest.raises(SocPolicyError):
+        soc.patch_task(t["id"], priority="P0")
+    with pytest.raises(SocPolicyError):
+        soc.patch_task(t["id"])  # nothing to update
+    with pytest.raises(SocPolicyError):
+        soc.patch_task("missing-id", status="done")  # not found
+
+
+def test_list_tasks_scope_and_search(soc):
+    soc.create_task("task-alpha", client_id="acme", priority="P1")
+    soc.create_task("task-beta", client_id="globex", priority="P2")
+    soc.create_task("other", client_id="acme")
+    only_acme = soc.list_tasks(client_id="acme")
+    assert {t["title"] for t in only_acme} == {"task-alpha", "other"}
+    found = soc.list_tasks(q="alpha")
+    assert [t["title"] for t in found] == ["task-alpha"]
+    open_ = soc.list_tasks(status="open")
+    assert len(open_) == 3
+    assert (soc.task_stats()["total"]) == 3
+    stats = soc.task_stats(client_id="acme")
+    assert stats["total"] == 2 and stats["by_status"]["todo"] == 2
+
+
+def test_task_stats_overdue(soc):
+    soc.create_task("late one", client_id="acme", due_at="2020-01-01")
+    soc.create_task("later one", client_id="acme", due_at="2030-01-01")
+    soc.create_task("done late", client_id="acme", due_at="2020-01-01")
+    ids = soc.list_tasks(client_id="acme")
+    soc.patch_task([t["id"] for t in ids if t["title"] == "done late"][0],
+                   status="done")
+    stats = soc.task_stats(client_id="acme")
+    assert stats["overdue"] == 1  # the still-todo overdue one
+
+
+def test_task_priority_ordering(soc):
+    soc.create_task("low", client_id="a", priority="P4")
+    soc.create_task("urgent", client_id="a", priority="P1")
+    soc.create_task("mid", client_id="a", priority="P2")
+    titles = [t["title"] for t in soc.list_tasks(client_id="a")]
+    assert titles == ["urgent", "mid", "low"]

@@ -400,3 +400,73 @@ def test_llm_analyzer_health_tracks_failures():
     assert a.health()["healthy"] is True
     a._stats["failed"] = 3
     assert a.health()["healthy"] is False
+
+
+def test_tasks_api_create_list_patch_and_dashboard():
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        headers = _login_headers(client)
+        d = client.get("/api/dashboard", headers=headers).json()
+        assert "tasks" in d and d["tasks"]["total"] >= 0
+
+        resp = client.post("/api/tasks", headers=headers, json={
+            "title": "patch the edge gateway",
+            "client_id": "web01",
+            "description": "apply the firewall rule",
+            "priority": "P1",
+            "due_at": "2030-05-01",
+        })
+        assert resp.status_code == 200, resp.text
+        task = resp.json()["task"]
+        assert task["status"] == "todo"
+        assert task["client_id"] == "web01"
+
+        listing = client.get("/api/tasks", headers=headers).json()
+        assert listing["total"] >= 1
+        assert any(t["title"] == "patch the edge gateway" for t in listing["list"])
+
+        scoped = client.get("/api/tasks?client_id=web01", headers=headers).json()
+        assert all(t["client_id"] == "web01" for t in scoped["list"])
+        assert scoped["total"] >= 1
+
+        detail = client.get(f"/api/tasks/{task['id']}", headers=headers)
+        assert detail.status_code == 200
+        assert detail.json()["task"]["id"] == task["id"]
+
+        patched = client.patch(f"/api/tasks/{task['id']}", headers=headers,
+                               json={"status": "in_progress", "note": "on it"})
+        assert patched.status_code == 200, patched.text
+        body = patched.json()["task"]
+        assert body["status"] == "in_progress"
+        assert body["notes"][-1]["note"] == "on it"
+
+        dash = client.get("/api/dashboard", headers=headers).json()
+        assert dash["tasks"]["total"] >= 1
+
+        missing = client.patch("/api/tasks/nope", headers=headers, json={"status": "done"})
+        assert missing.status_code == 404
+
+        bad = client.post("/api/tasks", headers=headers, json={"title": "x",
+                                                               "client_id": "w",
+                                                               "priority": "P9"})
+        assert bad.status_code == 400
+
+
+def test_enrich_entity_endpoint_private_ip():
+    import backend.app.main as api_module
+    from fastapi.testclient import TestClient
+
+    client = TestClient(api_module.app)
+    with client:
+        headers = _login_headers(client)
+        resp = client.get("/api/enrich/entity/ip/10.0.0.5", headers=headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["kind"] == "ip"
+        assert body["geo"] == {} and body["intel"] == {}
+        non_ip = client.get("/api/enrich/entity/domain/evil.top", headers=headers)
+        assert non_ip.status_code == 200
+        assert non_ip.json()["geo"] == {}

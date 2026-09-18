@@ -4,6 +4,7 @@ import { bootstrapDemo, getHealth, getAlerts, getCaseStats, isPreview, authMe, l
 import { getToken, setToken } from "./lib/auth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
+import IncidentPage from "./pages/IncidentPage";
 import EventsPage from "./pages/EventsPage";
 import AlertsPage from "./pages/AlertsPage";
 import GraphPage from "./pages/GraphPage";
@@ -558,6 +559,7 @@ export default function App() {
             <Route path="/clients/onboard" element={<OnboardingPage role={user?.role} />} />
             <Route path="/clients/:id" element={<LogConsolePage />} />
             <Route path="/" element={<DashboardPage role={user?.role} clientScope={user?.client_scope || ""} />} />
+            <Route path="/incidents/:id" element={<IncidentPage role={user?.role} />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/alerts" element={<AlertsPage role={user?.role} />} />
             <Route path="/rules" element={<RulesPage role={user?.role} />} />

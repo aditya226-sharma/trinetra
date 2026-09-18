@@ -46,6 +46,9 @@ _STATUSES = ("open", "investigation", "closed")
 _ACTIONS = ("investigate", "uninvestigate", "close", "reopen", "assign", "note")
 _LEGACY_ACTIONS = {"ack": "investigate", "unack": "uninvestigate", "resolve": "close"}
 
+_TASK_STATUSES = ("todo", "in_progress", "done")
+_TASK_PRIORITIES = ("P1", "P2", "P3", "P4")
+
 _ENTITY_KINDS = ("ip", "client", "user", "domain", "asset")
 _MATCH_OPS = ("eq", "neq", "contains", "regex")
 _DEFAULT_THROTTLE_S = 300        # close-together duplicate matches collapse into hits
@@ -175,6 +178,24 @@ class SocPolicy:
         # Migrate legacy statuses -> open/investigation/closed.
         conn.execute("UPDATE cases SET status = 'investigation' WHERE status = 'acknowledged'")
         conn.execute("UPDATE cases SET status = 'closed' WHERE status = 'resolved'")
+        # Task ledger — admin-assigned work items surfaced on each client's
+        # individual dashboard (assign a task -> appears on the client view).
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tasks ("
+            " id TEXT PRIMARY KEY,"
+            " title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',"
+            " priority TEXT NOT NULL DEFAULT 'P3',"
+            " status TEXT NOT NULL DEFAULT 'todo',"
+            " due_at TEXT NOT NULL DEFAULT '',"
+            " client_id TEXT NOT NULL DEFAULT '',"
+            " created_by TEXT NOT NULL DEFAULT 'system',"
+            " linked_case_id TEXT NOT NULL DEFAULT '',"
+            " notes TEXT NOT NULL DEFAULT '[]',"
+            " timeline TEXT NOT NULL DEFAULT '[]',"
+            " timer TEXT NOT NULL DEFAULT 'null',"
+            " created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_client ON tasks(client_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
         conn.commit()
         return conn
 
@@ -954,6 +975,210 @@ class SocPolicy:
             audit_log(self.settings, actor, f"soc.case.{action}",
                       f"case={case_id} status={new_status} {detail} {note}".strip())
             return case
+        finally:
+            conn.close()
+
+    # ---------------------------------------------------------------- tasks
+
+    def _task_row(self, row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
+        """Decode the durable JSON columns of a tasks row."""
+        if row is None:
+            return None
+        task = dict(row)
+        for key in ("notes", "timeline"):
+            try:
+                task[key] = json.loads(task[key]) if task[key] else []
+            except (TypeError, ValueError):
+                task[key] = []
+        try:
+            task["timer"] = json.loads(task["timer"]) if task["timer"] else None
+        except (TypeError, ValueError):
+            task["timer"] = None
+        return task
+
+    def _task_query_builder(self, status: str = "", client_id: str = "",
+                            q: str = "") -> tuple:
+        where: List[str] = []
+        args: List[Any] = []
+        if status in _TASK_STATUSES:
+            where.append("status = ?")
+            args.append(status)
+        elif status == "open":
+            where.append("status != 'done'")
+        if client_id:
+            where.append("client_id = ?")
+            args.append(client_id)
+        if str(q).strip():
+            where.append("(title LIKE ? OR description LIKE ?)")
+            like = f"%{q.strip()}%"
+            args += [like, like]
+        return where, args
+
+    def create_task(self, title: str, client_id: str = "",
+                    description: str = "", priority: str = "P3",
+                    due_at: str = "", actor: str = "admin",
+                    linked_case_id: str = "") -> Dict[str, Any]:
+        """Create a work item for a client workspace (shows on their dashboard)."""
+        title = str(title or "").strip()
+        if not title or len(title) > 256:
+            raise SocPolicyError("title is required (max 256 chars)")
+        if priority.upper() not in _TASK_PRIORITIES:
+            raise SocPolicyError(f"priority must be one of {_TASK_PRIORITIES}")
+        description = str(description or "").strip()[:4000]
+        client_id = str(client_id or "").strip()[:128]
+        due_at = str(due_at or "").strip()[:40]
+        linked_case_id = str(linked_case_id or "").strip()[:128]
+        task_id = new_uuid()
+        ts = _iso_now()
+        conn = self._connect()
+        try:
+            conn.execute(
+                "INSERT INTO tasks (id, title, description, priority, status, due_at,"
+                " client_id, created_by, linked_case_id, notes, timeline, timer,"
+                " created_at, updated_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (task_id, title, description, priority.upper(), "todo", due_at,
+                 client_id, str(actor)[:64], linked_case_id, "[]",
+                 json.dumps([{"ts": ts, "action": "created",
+                              "actor": str(actor)[:64], "detail": "task created"}]),
+                 "null", ts, ts))
+            conn.commit()
+            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            audit_log(self.settings, actor, "soc.task.create",
+                      f"task={task_id} client={client_id} title={title}")
+            return self._task_row(row)
+        finally:
+            conn.close()
+
+    def list_tasks(self, status: str = "", client_id: str = "", q: str = "",
+                   limit: int = 200) -> List[Dict[str, Any]]:
+        limit = max(1, min(int(limit), 500))
+        conn = self._connect()
+        try:
+            where, args = self._task_query_builder(status, client_id, q)
+            query = "SELECT * FROM tasks"
+            if where:
+                query += " WHERE " + " AND ".join(where)
+            query += " ORDER BY (status = 'done'),"
+            query += " (CASE priority WHEN 'P1' THEN 0 WHEN 'P2' THEN 1 WHEN 'P3' THEN 2 ELSE 3 END),"
+            query += " due_at IS NOT '' AND due_at ASC, created_at DESC LIMIT ?"
+            args.append(limit)
+            rows = conn.execute(query, args).fetchall()
+            return [self._task_row(r) for r in rows]
+        finally:
+            conn.close()
+
+    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        conn = self._connect()
+        try:
+            return self._task_row(conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
+        finally:
+            conn.close()
+
+    def patch_task(self, task_id: str, status: str = "", note: str = "",
+                   due_at: str = "", priority: str = "",
+                   actor: str = "system") -> Dict[str, Any]:
+        """Update status / note / due / priority; every change is time-stamped
+        into the timeline so the client can see who did what."""
+        conn = self._connect()
+        try:
+            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            if row is None:
+                raise SocPolicyError("task not found")
+            task = self._task_row(row)
+            ts = _iso_now()
+            timeline = task["timeline"]
+            sets: List[str] = []
+            args: List[Any] = []
+            now_status = task["status"]
+            if status:
+                status = str(status).lower()
+                if status not in _TASK_STATUSES:
+                    raise SocPolicyError(f"status must be one of {_TASK_STATUSES}")
+                if status != now_status:
+                    sets.append("status = ?")
+                    args.append(status)
+                    timeline.append({"ts": ts, "action": "status",
+                                     "actor": str(actor)[:64],
+                                     "detail": f"{now_status} → {status}"})
+                    now_status = status
+            if note:
+                note = str(note).strip()[:1000]
+                if not note:
+                    raise SocPolicyError("note is required")
+                notes = task["notes"]
+                notes.append({"ts": ts, "actor": str(actor)[:64], "note": note})
+                sets.append("notes = ?")
+                args.append(json.dumps(notes))
+                timeline.append({"ts": ts, "action": "note",
+                                 "actor": str(actor)[:64], "detail": "note added"})
+            if due_at:
+                due_at = str(due_at).strip()[:40]
+                sets.append("due_at = ?")
+                args.append(due_at)
+                timeline.append({"ts": ts, "action": "due",
+                                 "actor": str(actor)[:64],
+                                 "detail": f"due {due_at}"})
+            if priority:
+                priority = str(priority).upper()
+                if priority not in _TASK_PRIORITIES:
+                    raise SocPolicyError(f"priority must be one of {_TASK_PRIORITIES}")
+                if priority != task["priority"]:
+                    sets.append("priority = ?")
+                    args.append(priority)
+                    timeline.append({"ts": ts, "action": "priority",
+                                     "actor": str(actor)[:64],
+                                     "detail": f"{task['priority']} → {priority}"})
+            if not sets:
+                raise SocPolicyError("nothing to update")
+            sets.append("updated_at = ?")
+            args.append(ts)
+            sets.append("timeline = ?")
+            args.append(json.dumps(timeline))
+            args.append(task_id)
+            conn.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id = ?", args)
+            conn.commit()
+            task.update(self._task_row(conn.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()))
+            audit_log(self.settings, actor, f"soc.task.update",
+                      f"task={task_id} status={now_status} note={note}".strip())
+            return task
+        finally:
+            conn.close()
+
+    def task_stats(self, client_id: str = "") -> Dict[str, Any]:
+        """Aggregate task counts; '' client_id counts across all workspaces."""
+        conn = self._connect()
+        try:
+            sql = ("SELECT status, COUNT(*) AS c FROM tasks"
+                   f" {'WHERE client_id = ?' if client_id else ''}"
+                   " GROUP BY status")
+            args = (client_id,) if client_id else ()
+            rows = conn.execute(sql, args).fetchall()
+            tasks = {s: 0 for s in _TASK_STATUSES}
+            total = 0
+            for r in rows:
+                count = int(r["c"])
+                total += count
+                if r["status"] in tasks:
+                    tasks[r["status"]] += count
+            overdue = 0
+            if total:
+                today = _today()
+                if client_id:
+                    overdue = int(conn.execute(
+                        "SELECT COUNT(*) AS c FROM tasks WHERE client_id = ? "
+                        "AND status != 'done' AND due_at != '' "
+                        "AND substr(due_at, 1, 10) < ?",
+                        (client_id, today)).fetchone()["c"])
+                else:
+                    overdue = int(conn.execute(
+                        "SELECT COUNT(*) AS c FROM tasks "
+                        "WHERE status != 'done' AND due_at != '' "
+                        "AND substr(due_at, 1, 10) < ?",
+                        (today,)).fetchone()["c"])
+            return {"total": total, "by_status": tasks, "overdue": overdue}
         finally:
             conn.close()
 

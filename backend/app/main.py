@@ -116,6 +116,10 @@ _COLLECTORS: Optional[CollectorsManager] = None
 _SOC: Optional[SocPolicy] = None
 _settings: Settings = get_settings()
 
+from modules.enricher import build_enricher  # noqa: E402 — after settings load
+
+_ENRICHER = build_enricher(_settings)
+
 # In-memory rate buckets for the agent ingest endpoint (per token / source IP).
 _AGENT_WINDOW_SECONDS = 60
 _AGENT_LIMIT_PER_WINDOW = 5000
@@ -190,6 +194,24 @@ class CaseActionRequest(BaseModel):
     action: str
     assignee: str = ""
     note: str = ""
+
+
+class TaskCreateRequest(BaseModel):
+    """Admin assigns a work item to a client workspace."""
+    title: str
+    description: str = ""
+    priority: str = "P3"
+    due_at: str = ""
+    client_id: str = ""
+    linked_case_id: str = ""
+
+
+class TaskPatchRequest(BaseModel):
+    """Client or admin updates a task's status/note/due/priority."""
+    status: str = ""
+    note: str = ""
+    due_at: str = ""
+    priority: str = ""
 
 
 # Bulk upload size caps: guards /api/ingest/bulk against paging the whole
@@ -317,6 +339,7 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
         "findings": _ORCH.findings_log[-50:],
         "scope": "",
         "case_stats": case_stats,
+        "tasks": _task_dashboard(""),
         "incidents": {
             "open": [c for c in all_cases if c["status"] == "open"],
             "investigation": [c for c in all_cases if c["status"] == "investigation"],
@@ -504,6 +527,18 @@ def _client_scope(payload: Dict[str, Any]) -> str:
     return str(payload.get("scope") or "")
 
 
+def _task_dashboard(client_id: str) -> Dict[str, Any]:
+    """Task aggregate + visible list for a client workspace (or the whole
+    fleet when ``client_id`` is ''). Survives a world without any SOC store."""
+    soc = getattr(_ORCH, "soc", None)
+    if soc is None:
+        return {"total": 0, "by_status": {"todo": 0, "in_progress": 0, "done": 0},
+                "overdue": 0, "list": []}
+    stats = soc.task_stats(client_id)
+    stats["list"] = soc.list_tasks(client_id=client_id, status="open", limit=12)
+    return stats
+
+
 def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
     """Dashboard payload restricted to one client workspace: its events,
     its module findings (via the analytic search), its open incidents and a
@@ -528,6 +563,7 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
                   "raw_lines": _ORCH.stats.get("raw_lines", 0)},
         "dedup_rate": _ORCH.dedup.duplicate_rate,
         "threat_detections": threat_counts,
+        "tasks": _task_dashboard(client_id),
         "incidents": {
             "open": [c for c in all_cases if c["status"] == "open"],
             "investigation": [c for c in all_cases if c["status"] == "investigation"],
@@ -1412,6 +1448,11 @@ def incident_detail(case_id: str) -> Dict[str, Any]:
                     limit=3)]
             except Exception as exc:  # noqa: BLE001 — enrichment must never 500
                 log.warning("incident enrichment failed: %s", exc)
+        if ent.get("kind") == "ip" and ent.get("value"):
+            try:
+                row["enrichment"] = _ENRICHER.enrich(str(ent["value"]))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("ip enrichment failed: %s", exc)
         enriched.append(row)
     # Entity graph subgraph restricted to involved parties.
     subgraph = {"nodes": [], "edges": []}
@@ -1458,6 +1499,22 @@ def incident_graph(case_id: str) -> Dict[str, Any]:
     return {"graph": {"nodes": nodes, "edges": edges}, "involved": involved}
 
 
+@app.get("/api/enrich/entity/{kind}/{value}", tags=["enrich"],
+         dependencies=[Depends(require_auth)])
+def enrich_entity(kind: str, value: str) -> Dict[str, Any]:
+    """On-demand enrichment for one entity (geo/ASN for IPs, threat-intel
+    verdict when a provider is configured). Fail-soft: always 200 + a dict."""
+    if kind != "ip":
+        return {"kind": kind, "value": value, "geo": {}, "intel": {}}
+    try:
+        result = _ENRICHER.enrich(value)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("enrich endpoint failed for %s: %s", value, exc)
+        result = {"geo": {}, "intel": {}}
+    return {"kind": kind, "value": value, "geo": result.get("geo", {}),
+            "intel": result.get("intel", {})}
+
+
 @app.patch("/api/cases/{case_id}", tags=["soc"], dependencies=[Depends(require_analyst)])
 def cases_action(case_id: str, body: CaseActionRequest,
                  payload: Dict[str, Any] = Depends(require_analyst)) -> Dict[str, Any]:
@@ -1466,7 +1523,88 @@ def cases_action(case_id: str, body: CaseActionRequest,
                                  assignee=body.assignee, note=body.note)
     except SocPolicyError as exc:
         _soc400(exc)
+    if hub is not None:
+        try:
+            hub.publish({"type": "case", "case": case})
+        except Exception as exc:  # noqa: BLE001 — stream must never kill API
+            log.warning("case stream publish failed: %s", exc)
     return {"case": case}
+
+
+# ---------------------------------------------------------------- tasks
+
+
+def _task_scope(payload: Dict[str, Any]) -> str:
+    """The client workspace whose tasks a caller may manage ('' = all)."""
+    return _client_scope(payload)
+
+
+@app.get("/api/tasks", tags=["soc"])
+def tasks_list(status: str = Query(""), q: str = Query(""),
+               limit: int = Query(100, le=500),
+               payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    scope = _task_scope(payload)
+    rows = _soc().list_tasks(status=status, q=q, limit=limit, client_id=scope)
+    tasks = _soc().task_stats(scope)
+    tasks["list"] = rows
+    return tasks
+
+
+@app.post("/api/tasks", tags=["soc"], dependencies=[Depends(require_analyst)])
+def tasks_create(body: TaskCreateRequest,
+                 payload: Dict[str, Any] = Depends(require_analyst)) -> Dict[str, Any]:
+    try:
+        task = _soc().create_task(
+            title=body.title, client_id=body.client_id, description=body.description,
+            priority=body.priority, due_at=body.due_at,
+            actor=str(payload.get("sub", "admin")), linked_case_id=body.linked_case_id)
+    except SocPolicyError as exc:
+        _soc400(exc)
+    # Live alert: the client workspace sees the new assignment immediately.
+    if hub is not None:
+        try:
+            hub.publish({"type": "task", "task": task})
+        except Exception as exc:  # noqa: BLE001 — stream must never kill API
+            log.warning("task stream publish failed: %s", exc)
+    return {"task": task}
+
+
+@app.get("/api/tasks/{task_id}", tags=["soc"])
+def tasks_detail(task_id: str,
+                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    task = _soc().get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    scope = _task_scope(payload)
+    if scope and task.get("client_id") and task["client_id"] != scope:
+        raise HTTPException(status_code=403, detail="not your client's task")
+    return {"task": task}
+
+
+@app.patch("/api/tasks/{task_id}", tags=["soc"])
+def tasks_action(task_id: str, body: TaskPatchRequest,
+                 payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]:
+    task = _soc().get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    actor = str(payload.get("sub", "?"))
+    if payload.get("role") not in ("admin", "analyst"):
+        scope = _task_scope(payload)
+        if task.get("client_id") and task["client_id"] != scope:
+            raise HTTPException(status_code=403, detail="not your client's task")
+        actor = f"{actor}@{task.get('client_id', '')}"
+    try:
+        updated = _soc().patch_task(
+            task_id, status=body.status, note=body.note, due_at=body.due_at,
+            priority=body.priority, actor=actor)
+    except SocPolicyError as exc:
+        _soc400(exc)
+    if hub is not None:
+        try:
+            hub.publish({"type": "task", "task": updated})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("task stream publish failed: %s", exc)
+    return {"task": updated}
 
 
 @app.get("/api/admin/notifications", tags=["soc"],

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { caseAction, getCases, getIncidentDetail } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
@@ -309,7 +310,11 @@ function IncidentPanel({ data, loading }) {
   if (!data) return null;
   const { case: incident, involved = [], graph = { nodes: [], edges: [] } } = data;
   return (
-    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+    <div className="mt-4">
+      <Link to={`/incidents/${incident?.id || ""}`} className="mono text-[10.5px] text-cyan-300 underline-offset-2 hover:underline">
+        open dedicated incident view →
+      </Link>
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
       <div>
         <p className="eyebrow mb-2">Involved parties · who is implicated</p>
         {involved.length === 0 ? (
@@ -348,6 +353,7 @@ function IncidentPanel({ data, loading }) {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

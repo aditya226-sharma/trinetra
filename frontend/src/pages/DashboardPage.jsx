@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getDashboard, getClients, getIncidentDetail } from "../lib/api";
+import { Link } from "react-router-dom";
+import { getDashboard, getClients, getTasks, createTask, patchTask, streamEvents } from "../lib/api";
 import { SeverityBadge, LiveBadge, PulseDot, SectionTitle, Empty } from "../components/ui";
 import { Donut, Sparkline, ScoreRing } from "../components/charts";
 
@@ -50,7 +51,6 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
       <ScopedDashboard
         data={data}
         scope={data.scope || clientScope}
-        role={role}
       />
     );
   }
@@ -59,30 +59,19 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
 }
 
 /* ================================================================== scoped view */
-function ScopedDashboard({ data, scope, role }) {
+function ScopedDashboard({ data, scope }) {
   const s = data.stats || {};
   const incidents = data.incidents || { open: [], investigation: [], closed: [], stats: {} };
   const threats = data.threat_detections || {};
   const findings = (data.findings || []).slice(-6).reverse();
   const threatVals = Object.values(threats).map(Number);
-  const [openId, setOpenId] = useState(null);
-  const [incident, setIncident] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const openIncident = (id) => {
-    setOpenId(id);
-    if (!id) { setIncident(null); return; }
-    setLoading(true);
-    getIncidentDetail(id)
-      .then((d) => setIncident(d))
-      .catch(() => setIncident(null))
-      .finally(() => setLoading(false));
-  };
+  const { toast, dismiss } = useLiveChannel(scope);
 
   const totalIncidents = (incidents.open?.length || 0) + (incidents.investigation?.length || 0) + (incidents.closed?.length || 0);
 
   return (
     <div className="space-y-6">
+      <LiveToast toast={toast} onDismiss={dismiss} />
       {/* header */}
       <div className="anim-fadeup">
         <p className="eyebrow mb-1.5">Client workspace · individual dashboard</p>
@@ -118,7 +107,17 @@ function ScopedDashboard({ data, scope, role }) {
         >
           Incident board
         </SectionTitle>
-        <IncidentBoard incidents={incidents} openId={openId} onOpen={openIncident} loading={loading} incident={incident} role={role} />
+        <IncidentBoard incidents={incidents} />
+      </section>
+
+      {/* tasks assigned by the SOC team */}
+      <section className="glass p-5 anim-fadeup">
+        <SectionTitle
+          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">assigned by the SOC team</span>}
+        >
+          Tasks assigned to {scope}
+        </SectionTitle>
+        <ClientTasks clientId={scope} initial={data.tasks} />
       </section>
 
       {/* threat radar + findings */}
@@ -179,22 +178,11 @@ function AdminOverview({ data, clients }) {
   const top = clients.slice().sort((a, b) => (b.events ?? 0) - (a.events ?? 0));
   const eventsSpark = top.map((c) => c.events);
   const threatVals = Object.values(threats).map(Number);
-  const [openId, setOpenId] = useState(null);
-  const [incident, setIncident] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const openIncident = (id) => {
-    setOpenId(id);
-    if (!id) { setIncident(null); return; }
-    setLoading(true);
-    getIncidentDetail(id)
-      .then((d) => setIncident(d))
-      .catch(() => setIncident(null))
-      .finally(() => setLoading(false));
-  };
+  const { toast, dismiss } = useLiveChannel("");
 
   return (
     <div className="space-y-6">
+      <LiveToast toast={toast} onDismiss={dismiss} />
       {/* header */}
       <div className="anim-fadeup">
         <p className="eyebrow mb-1.5">Command center</p>
@@ -245,7 +233,17 @@ function AdminOverview({ data, clients }) {
         >
           Incident board
         </SectionTitle>
-        <IncidentBoard incidents={incidents} openId={openId} onOpen={openIncident} loading={loading} incident={incident} role="admin" />
+        <IncidentBoard incidents={incidents} />
+      </section>
+
+      {/* assign tasks to clients */}
+      <section className="glass p-5 anim-fadeup">
+        <SectionTitle
+          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">appears on the client's own dashboard</span>}
+        >
+          Assign a task to a client
+        </SectionTitle>
+        <AdminTaskManage clients={clients} initial={data.tasks} />
       </section>
 
       {/* radar + clients */}
@@ -363,7 +361,7 @@ function AdminOverview({ data, clients }) {
 }
 
 /* ================================================================== shared pieces */
-function IncidentBoard({ incidents, openId, onOpen, loading, incident, role }) {
+function IncidentBoard({ incidents }) {
   const lanes = STATUS_LANES.map((l) => ({
     ...l,
     items: incidents[l.key] || [],
@@ -382,10 +380,10 @@ function IncidentBoard({ incidents, openId, onOpen, loading, incident, role }) {
                 <p className="mono text-[10px] text-slate-600">—</p>
               ) : (
                 l.items.slice(0, 6).map((c) => (
-                  <button
+                  <Link
                     key={c.id}
-                    onClick={() => onOpen(openId === c.id ? null : c.id)}
-                    className={`block w-full rounded-lg border border-white/5 bg-white/[0.03] p-2 text-left transition hover:border-emerald-500/30 ${openId === c.id ? "!border-emerald-500/40" : ""}`}
+                    to={`/incidents/${c.id}`}
+                    className="block w-full rounded-lg border border-white/5 bg-white/[0.03] p-2 text-left transition hover:border-emerald-500/30"
                   >
                     <div className="flex items-center gap-1.5">
                       <SeverityBadge severity={c.severity} />
@@ -395,162 +393,231 @@ function IncidentBoard({ incidents, openId, onOpen, loading, incident, role }) {
                       {c.client_id || "—"} · {c.source_kind || "flow"}
                       {c.assignee && <span className="text-emerald-300"> @{c.assignee}</span>}
                     </p>
-                  </button>
+                    <span className="mono mt-1 block text-[9px] uppercase tracking-widest text-cyan-300/70 hover:text-cyan-200">open incident →</span>
+                  </Link>
                 ))
               )}
             </div>
-          </div>
+</div>
         ))}
       </div>
-
-      {openId && <IncidentDrawer incident={incident} loading={loading} role={role} />}
     </div>
   );
 }
 
-function IncidentDrawer({ incident, loading, role }) {
-  if (loading) return <div className="mono text-[11px] text-slate-500">Loading incident detail…</div>;
-  if (!incident) return <div className="mono text-[11px] text-rose-400">Failed to load incident context.</div>;
-  const involved = incident.involved || [];
-  const graph = incident.graph || { nodes: [], edges: [] };
-  const timeline = incident.timeline || [];
-  const c = incident.case || {};
-  const canAct = role === "admin";
-  return (
-    <div className="rounded-xl border border-emerald-500/20 bg-black/40 p-4 anim-fadeup">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="mono text-[14px] font-semibold text-slate-100">{c.threat_class}</span>
-        <SeverityBadge severity={c.severity} />
-        <StatusBadge status={c.status} />
-        {c.client_id && <span className="mono rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-violet-300">{c.client_id}</span>}
-        {c.assignee && <span className="mono text-[10.5px] text-emerald-300">investigator @{c.assignee}</span>}
-      </div>
-      <p className="mono text-[11px] uppercase tracking-widest text-slate-500">{c.message || "—"}</p>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div>
-          <p className="eyebrow mb-2">Involved parties · who is implicated</p>
-          {involved.length === 0 ? (
-            <p className="text-[11.5px] text-slate-500">No entity attribution recorded.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {involved.map((e, i) => (
-                <div key={`${e.kind}-${e.value}-${i}`} className="glass-row flex items-center gap-2 p-2.5">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${entityDot(e.kind)}`} />
-                  <span className="mono text-[10px] uppercase tracking-widest text-slate-500">{e.kind}</span>
-                  <span className="mono truncate text-[12px] text-slate-200">{e.label || e.value}</span>
-                  {typeof e.events === "number" && <span className="ml-auto mono text-[10.5px] text-slate-500">{e.events} events</span>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <p className="eyebrow mb-2 mt-4">Incident graph</p>
-          <IncidentGraph graph={graph} />
-        </div>
-
-        <div>
-          <p className="eyebrow mb-2">Who did what · investigators</p>
-          {timeline.length === 0 ? (
-            <p className="text-[11.5px] text-slate-500">No activity recorded yet.</p>
-          ) : (
-            <div className="space-y-1">
-              {timeline.map((t, ti) => (
-                <p key={ti} className="mono text-[10.5px] text-slate-500">
-                  <span className="text-slate-600">{t.ts}</span>{" "}
-                  <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
-                  {" by "}<span className="text-slate-400">{t.actor}</span>
-                  {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
-                  {t.note && <span className="text-amber-300/80"> (“{t.note}”)</span>}
-                </p>
-              ))}
-            </div>
-          )}
-
-          {(Object.keys(incident.evidence || {}).length > 0 || (c.evidence && Object.keys(c.evidence).length > 0)) && (
-            <>
-              <p className="eyebrow mb-2 mt-4">Evidence</p>
-              {Object.values(incident.evidence || c.evidence || {}).slice(0, 5).map((ev, i) => {
-                if (typeof ev !== "object") return <p key={i} className="mono text-[10.5px] text-slate-500">{String(ev)}</p>;
-                return (
-                  <div key={i} className="glass-row mb-1.5 p-2.5">
-                    <p className="mono text-[10px] uppercase tracking-widest text-cyan-300">{ev.event_type || ev.threat_class || ev.kind || `evidence ${i + 1}`}</p>
-                    <p className="mono mt-0.5 truncate text-[10.5px] text-slate-400">{String(ev.summary || ev.message || ev.src_ip || ev.dst_ip || JSON.stringify(ev)).slice(0, 90)}</p>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-      </div>
-      {!canAct && <p className="mono mt-3 text-[10px] uppercase tracking-widest text-slate-500">read-only view — manage this incident in the alert queue</p>}
-    </div>
-  );
+/* ------------------------------------------------------------------ live alerts */
+function useLiveChannel(clientScope) {
+  const [toast, setToast] = useState(null);
+  const [bumps, setBumps] = useState(0);
+  useEffect(() => {
+    const stop = streamEvents({
+      onEvent: (ev) => {
+        if (ev?.type === "task") {
+          const t = ev.task || {};
+          if (clientScope && t.client_id && t.client_id !== clientScope) return;
+          setToast({ icon: "task", title: `New task · ${t.title || "assigned work"}`, detail: `${t.priority || ""} · for ${t.client_id || "you"}`, ts: new Date().toLocaleTimeString() });
+          setBumps((n) => n + 1);
+        } else if (ev?.type === "case") {
+          const c = ev.case || {};
+          if (clientScope && c.client_id && c.client_id !== clientScope) return;
+          setToast({ icon: "case", title: `Incident ${c.status} · ${c.threat_class || "update"}`, detail: `${c.id ? c.id.slice(0, 8) : ""} · ${c.client_id || ""}`, ts: new Date().toLocaleTimeString() });
+          setBumps((n) => n + 1);
+        }
+      },
+    });
+    return stop;
+  }, [clientScope]);
+  return { toast, dismiss: () => setToast(null), bumps };
 }
 
-function IncidentGraph({ graph }) {
-  const nodes = graph.nodes || [];
-  const edges = graph.edges || [];
-  if (nodes.length === 0) return <div className="glass-row border border-white/5 p-3 text-[11px] text-slate-500">No graph data for this incident yet.</div>;
-  const rows = nodes.map((n, i) => ({ node: n, x: 18 + (i % 3) * 130 + (i % 2) * 18, y: 22 + Math.floor(i / 3) * 56 + (i % 2) * 12 }));
+function LiveToast({ toast, onDismiss }) {
+  if (!toast) return null;
+  const tone = toast.icon === "task" ? "border-cyan-500/40" : "border-rose-500/40";
   return (
-    <div className="rounded-lg border border-white/5 bg-black/40 p-2">
-      <svg viewBox="0 0 300 150" className="w-full">
-        {edges.map((e, i) => {
-          const a = rows.find((r) => r.node.id === e.source);
-          const b = rows.find((r) => r.node.id === e.target);
-          if (!a || !b) return null;
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#f43f5e" : "#334155"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
-        })}
-        {rows.map(({ node, x, y }) => (
-          <g key={node.id}>
-            <circle cx={x} cy={y} r={node.threatened || node.kind === "threat" ? 7 : 5} fill={node.color || "#6366f1"} opacity="0.9" />
-            <text x={x + 9} y={y + 3} fontSize="7.5" fill="#cbd5e1" className="mono">{node.label}</text>
-          </g>
-        ))}
-      </svg>
-      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-600">{nodes.length} nodes · {edges.length} edges</p>
-    </div>
-  );
-}
-
-function FindingRow({ f, i, sevStrip }) {
-  const alert = f.alert || f;
-  const verdict = f.analysis?.verdict || alert.verdict;
-  const storeDecision = f.analysis?.store_decision || alert.store_decision;
-  const key = f.flow_id || f.alert?.flow_id || `${f.threat_class}-${f.timestamp}-${i}`;
-  return (
-    <div key={key} className="glass-row flex items-center gap-3 p-3 feed-in" style={{ animationDelay: `${i * 60}ms` }}>
-      <span className={`sev-strip ${sevStrip(alert.severity)}`} />
+    <div className={`fixed right-4 top-20 z-50 flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border bg-black/85 p-3 shadow-2xl backdrop-blur anim-fadeup ${tone}`}>
+      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[13px] ${toast.icon === "task" ? "bg-cyan-500/15 text-cyan-300" : "bg-rose-500/15 text-rose-300"}`}>
+        {toast.icon === "task" ? "⚑" : "◉"}
+      </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="mono text-[12.5px] text-slate-100">{alert.threat_class}</span>
-          <span className="mono text-[10px] text-slate-500">conf {alert.confidence}</span>
-        </div>
-        <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
-          {verdict ? `${verdict} · ${storeDecision}` : "awaiting analyzer verdict"}
-        </p>
+        <p className="mono text-[11.5px] font-semibold text-slate-100">{toast.title}</p>
+        <p className="mono mt-0.5 truncate text-[10px] text-slate-400">{toast.detail}</p>
+        <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-600">{toast.ts}</p>
       </div>
-      <SeverityBadge severity={alert.severity} />
+      <button onClick={onDismiss} className="text-slate-600 transition hover:text-slate-300">✕</button>
     </div>
   );
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    open: "text-rose-300 border-rose-500/30 bg-rose-500/10",
-    investigation: "text-amber-300 border-amber-500/30 bg-amber-500/10",
-    closed: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
-    acknowledged: "text-amber-300 border-amber-500/30 bg-amber-500/10",
-    resolved: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
-  };
-  return <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${map[status] || ""}`}>{status}</span>;
+/* ------------------------------------------------------------------ tasks */
+const PRIORITY_TONES = {
+  P1: "text-rose-300 border-rose-500/40 bg-rose-500/10",
+  P2: "text-amber-300 border-amber-500/40 bg-amber-500/10",
+  P3: "text-cyan-300 border-cyan-500/40 bg-cyan-500/10",
+  P4: "text-slate-400 border-slate-500/40 bg-slate-500/10",
+};
+
+function TaskPriority({ priority }) {
+  return <span className={`mono rounded border px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_TONES[priority] || PRIORITY_TONES.P3}`}>{priority}</span>;
 }
 
-const entityDot = (kind) => {
-  const m = { ip: "bg-indigo-500", user: "bg-emerald-500", domain: "bg-cyan-500", client: "bg-violet-500", proc: "bg-amber-500" };
-  return m[kind] || "bg-slate-500";
-};
+function TaskRow({ task, onPatch, canPatch }) {
+  const [note, setNote] = useState("");
+  const overdue = task.due_at && task.status !== "done" && task.due_at.slice(0, 10) < new Date().toISOString().slice(0, 10);
+  const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
+  return (
+    <div className={`glass-row p-3 ${overdue ? "border-rose-500/30" : ""}`}>
+      <div className="flex items-start gap-2">
+        {canPatch && (
+          <button
+            onClick={() => onPatch(task.id, { status: nextStatus })}
+            className="mt-0.5 grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full border border-slate-600 text-slate-500 transition hover:border-emerald-400 hover:text-emerald-300"
+            title={`Mark ${nextStatus}`}
+          >
+            {task.status === "done" && <span className="text-[9px]">✓</span>}
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mono text-[12.5px] text-slate-100">{task.title}</span>
+            <TaskPriority priority={task.priority} />
+            <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-slate-400">{task.status}</span>
+            {overdue && <span className="mono rounded border border-rose-500/40 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-rose-300">overdue</span>}
+          </div>
+          {task.description && <p className="mono mt-1 truncate text-[10.5px] text-slate-500">{task.description}</p>}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
+            {task.due_at && <span className="mono">{task.due_at.slice(0, 10)} due</span>}
+            {task.linked_case_id && (
+              <Link to={`/incidents/${task.linked_case_id}`} className="mono text-cyan-300 underline-offset-2 hover:underline">incident {task.linked_case_id.slice(0, 8)}</Link>
+            )}
+            {task.created_by && <span className="mono text-slate-600">by {task.created_by}</span>}
+          </div>
+          {canPatch && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { onPatch(task.id, { note: note.trim() }); setNote(""); } }}
+                placeholder="add a note (enter to post)"
+                className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200 outline-none placeholder:text-slate-600"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientTasks({ clientId, initial }) {
+  const [tasks, setTasks] = useState([]);
+  const [done, setDone] = useState([]);
+  const [patched, setPatched] = useState(0);
+  useEffect(() => {
+    getTasks().then((d) => {
+      const all = d.list || [];
+      setTasks(all.filter((t) => t.status !== "done"));
+      setDone(all.filter((t) => t.status === "done"));
+    }).catch(() => {});
+  }, [patched]);
+  const patch = (id, body) => {
+    patchTask(id, body)
+      .then(() => setPatched((n) => n + 1))
+      .catch(() => {});
+  };
+  const all = [...tasks, ...done];
+  return (
+    <div className="mt-2">
+      {all.length === 0 ? (
+        <Empty title="No tasks assigned" hint={initial?.total ? `It looks like everything's handled · ${initial.total} total` : "The SOC team will post remediation tasks here."} />
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((t) => <TaskRow key={t.id} task={t} onPatch={patch} canPatch />)}
+          {done.length > 0 && (
+            <details className="mt-2">
+              <summary className="mono cursor-pointer text-[10px] uppercase tracking-widest text-slate-500">completed · {done.length}</summary>
+              <div className="mt-2 space-y-2">
+                {done.map((t) => <TaskRow key={t.id} task={t} onPatch={patch} canPatch />)}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminTaskManage({ clients, initial }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("P3");
+  const [due, setDue] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [openTasks, setOpenTasks] = useState([]);
+  const [flash, setFlash] = useState("");
+  const [patched, setPatched] = useState(0);
+  useEffect(() => {
+    getTasks({ status: "open" }).then((d) => setOpenTasks(d.list || [])).catch(() => {});
+  }, [patched]);
+  const submit = (e) => {
+    e.preventDefault();
+    if (!title.trim() || !clientId) return;
+    setBusy(true);
+    createTask({ title: title.trim(), description, priority, due_at: due, client_id: clientId })
+      .then(() => {
+        setTitle(""); setDescription(""); setDue(""); setClientId("");
+        setFlash(`task assigned to ${clientId}`);
+        setPatched((n) => n + 1);
+        setTimeout(() => setFlash(""), 3200);
+      })
+      .catch((err) => setFlash(err?.message || "assign failed"))
+      .finally(() => setBusy(false));
+  };
+  const patch = (id, body) => patchTask(id, body).then(() => setPatched((n) => n + 1)).catch(() => {});
+  return (
+    <div className="mt-2 grid gap-6 lg:grid-cols-2">
+      <div className="rounded-xl border border-white/5 bg-black/30 p-4">
+        {flash && <p className="mono mb-3 text-[11px] text-emerald-300">✓ {flash}</p>}
+        <form onSubmit={submit} className="space-y-3">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required
+            placeholder="Task title · what needs to be done"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12.5px] text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+            placeholder="Instructions / context for the client"
+            className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)} required
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50">
+              <option value="">assign to…</option>
+              {clients.map((c) => <option key={c.client_id} value={c.client_id}>{c.client_id}</option>)}
+            </select>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50">
+              {["P1", "P2", "P3", "P4"].map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50" />
+          </div>
+          <button disabled={busy} className="btn-primary mono w-full !py-2 text-[11px]">
+            {busy ? "assigning…" : "assign task →"}
+          </button>
+        </form>
+      </div>
+      <div>
+        <p className="eyebrow mb-2">Open tasks · every client</p>
+        {openTasks.length === 0 ? (
+          <Empty title="No open tasks" hint="Assign work to a client and it appears here + on their dashboard." />
+        ) : (
+          <div className="space-y-2">
+            {openTasks.map((t) => (
+              <TaskRow key={t.id} task={t} onPatch={patch} canPatch />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ local pieces */
 function KpiCard({ label, value, sub, tone, icon, spark, delay }) {

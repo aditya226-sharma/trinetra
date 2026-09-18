@@ -41,6 +41,15 @@ events:
   client_online_grace_s: 180    # clients with no heartbeat/event in this window show offline
   client_rate_window_s: 300     # fleet "events_recent" volume window
 
+enrichment:
+  ttl: 3600                     # seconds to cache a lookup before re-checking
+  timeout: 4                    # provider request timeout (seconds)
+  geo:
+    db_path: ""                 # optional MaxMind GeoLite2-City.mmdb (TRINETRA_GEO_DB_PATH)
+  intel:
+    provider: ""                # abuseipdb | virustotal ('' = disabled)
+    api_key: ""                 # set via ABUSEIPDB_API_KEY / VIRUSTOTAL_API_KEY
+
 auth:
   agent_token: ""               # shared X-Agent-Token for POST /api/ingest-events (set AGENT_TOKEN in prod)
   admin_user: ""                # seed admin account (env ADMIN_USER)
