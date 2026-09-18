@@ -94,6 +94,7 @@ export default function LogConsolePage() {
     closeStream.current = streamEvents({
       clientFilter: clientId,
       onEvent: (ev) => {
+        if (!ev || !ev.event_id) return; // SOC task/case envelopes aren't raw rows
         setLiveCount((n) => n + 1);
         if (pausedRef.current) {
           missedRef.current.push(ev);

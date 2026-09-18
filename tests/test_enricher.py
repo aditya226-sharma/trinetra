@@ -93,3 +93,85 @@ def test_unknown_intel_provider_disables(monkeypatch):
     from modules.enricher import IpEnricher
     e = IpEnricher(None, intel_provider="klextube", intel_api_key="k")
     assert e._intel_provider == ""
+
+def test_abuseipdb_normalizes_verdict(monkeypatch):
+    from modules.enricher import IpEnricher
+
+    def _fake(self, url, headers=None):
+        return {"data": {"abuseConfidenceScore": 88, "totalReports": 12,
+                         "usageType": "Data Center/Web Hosting/Transit"}}
+
+    monkeypatch.setattr(IpEnricher, "_get_json", _fake)
+    e = IpEnricher(None, intel_provider="abuseipdb", intel_api_key="k")
+    out = e._abuseipdb("8.8.8.8")
+    assert out["source"] == "abuseipdb"
+    assert out["verdict"] == "malicious"
+    assert out["confidence"] == 88
+    assert out["is_flagged"] is True
+
+
+def test_abuseipdb_suspicious_threshold(monkeypatch):
+    from modules.enricher import IpEnricher
+
+    def _fake(self, url, headers=None):
+        return {"data": {"abuseConfidenceScore": 40, "totalReports": 2}}
+
+    monkeypatch.setattr(IpEnricher, "_get_json", _fake)
+    e = IpEnricher(None, intel_provider="abuseipdb", intel_api_key="k")
+    out = e._abuseipdb("8.8.8.8")
+    assert out["verdict"] == "suspicious"
+    assert out["is_flagged"] is False
+
+
+def test_virustotal_normalizes_verdict(monkeypatch):
+    from modules.enricher import IpEnricher
+
+    def _fake(self, url, headers=None):
+        return {"data": {"attributes": {
+            "last_analysis_stats": {"malicious": 16, "suspicious": 3,
+                                    "harmless": 50, "total": 80},
+            "last_analysis_results": {
+                "A": {"category": "malicious"}, "B": {"category": "suspicious"},
+                "C": {"category": "undetected"},
+            },
+        }}}
+
+    monkeypatch.setattr(IpEnricher, "_get_json", _fake)
+    e = IpEnricher(None, intel_provider="virustotal", intel_api_key="k")
+    out = e._virustotal("8.8.8.8")
+    assert out["source"] == "virustotal"
+    assert out["verdict"] == "malicious"
+    assert out["confidence"] > 0
+    assert out["flagged_vendors"] == 2
+    assert out["is_flagged"] is True
+
+
+def test_virustotal_clean(monkeypatch):
+    from modules.enricher import IpEnricher
+
+    def _fake(self, url, headers=None):
+        return {"data": {"attributes": {
+            "last_analysis_stats": {"malicious": 0, "suspicious": 0,
+                                    "harmless": 60, "total": 65},
+            "last_analysis_results": {},
+        }}}
+
+    monkeypatch.setattr(IpEnricher, "_get_json", _fake)
+    e = IpEnricher(None, intel_provider="virustotal", intel_api_key="k")
+    out = e._virustotal("8.8.8.8")
+    assert out["verdict"] == "clean"
+    assert out["confidence"] == 0
+
+
+def test_settings_env_wires_provider_and_key(monkeypatch):
+    """A single env key (ABUSEIPDB/VIRUSTOTAL_API_KEY + TRINETRA_INTEL_PROVIDER)
+    activates the enricher without touching config.yaml."""
+    import config.settings as settings_mod
+    from modules.enricher import build_enricher
+    monkeypatch.setenv("TRINETRA_INTEL_PROVIDER", "virustotal")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "vt-secret")
+    monkeypatch.setattr(settings_mod, "_DEFAULT", None)  # drop the cached singleton
+    e = build_enricher(settings_mod.get_settings())
+    assert e._intel_provider == "virustotal"
+    assert e._intel_api_key == "vt-secret"
+    assert e.enabled is True

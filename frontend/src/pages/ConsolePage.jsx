@@ -57,6 +57,9 @@ export default function ConsolePage() {
     }
     closeStream.current = streamEvents({
       onEvent: (ev) => {
+        // Only raw telemetry rows belong here; task/case notifications from
+        // the SOC stream are envelopes without event_id — skip them.
+        if (!ev || !ev.event_id) return;
         setLiveCount((n) => n + 1);
         if (pausedRef.current) {
           missedRef.current.push(ev);

@@ -492,8 +492,9 @@ const PRIORITY_TONES = {
 function TaskPriority({ priority }) {
   return <span className={`mono rounded border px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_TONES[priority] || PRIORITY_TONES.P3}`}>{priority}</span>;
 }
+export { TaskPriority };
 
-function TaskRow({ task, onPatch, canPatch }) {
+export function TaskRow({ task, onPatch, canPatch }) {
   const [note, setNote] = useState("");
   const overdue = task.due_at && task.status !== "done" && task.due_at.slice(0, 10) < new Date().toISOString().slice(0, 10);
   const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
@@ -541,7 +542,7 @@ function TaskRow({ task, onPatch, canPatch }) {
   );
 }
 
-function ClientTasks({ clientId, initial }) {
+export function ClientTasks({ clientId, initial }) {
   const [tasks, setTasks] = useState([]);
   const [done, setDone] = useState([]);
   const [patched, setPatched] = useState(0);
@@ -579,7 +580,7 @@ function ClientTasks({ clientId, initial }) {
   );
 }
 
-function AdminTaskManage({ clients, initial }) {
+export function AdminTaskManage({ clients, initial }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("P3");

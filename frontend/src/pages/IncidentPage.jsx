@@ -29,7 +29,7 @@ export default function IncidentPage({ role }) {
   const [busy, setBusy] = useState(false);
   const [enrich, setEnrich] = useState({});
   const enrichFetched = useRef(new Set());
-  const canAct = role === "admin";
+  const canAct = role === "admin" || role === "analyst";
 
   useEffect(() => {
     let alive = true;

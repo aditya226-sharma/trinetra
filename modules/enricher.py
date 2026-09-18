@@ -156,14 +156,18 @@ class IpEnricher:
         data = self._get_json(url, {"Key": self._intel_api_key,
                                     "Accept": "application/json"}) or {}
         rec = data.get("data") or {}
+        score = int(rec.get("abuseConfidenceScore") or 0)
+        verdict = "malicious" if score >= 75 else ("suspicious" if score >= 30 else "clean")
         return {
             "source": "abuseipdb",
+            "verdict": verdict,
+            "confidence": score,
             "abuse_confidence": rec.get("abuseConfidenceScore"),
             "total_reports": rec.get("totalReports"),
             "last_reported": rec.get("lastReportedAt"),
             "is_whitelisted": rec.get("isWhitelisted"),
             "usage_type": rec.get("usageType"),
-            "is_flagged": bool(int(rec.get("abuseConfidenceScore") or 0) >= 50),
+            "is_flagged": bool(score >= 50),
         }
 
     def _virustotal(self, ip: str) -> Dict[str, Any]:
@@ -172,16 +176,26 @@ class IpEnricher:
         attrs = (data.get("data") or {}).get("attributes") or {}
         stats = attrs.get("last_analysis_stats") or {}
         verdicts = attrs.get("last_analysis_results") or {}
+        malicious = int(stats.get("malicious") or 0)
         flagged = sum(1 for v in verdicts.values() if (v or {}).get("category", "").lower()
                       in ("malicious", "suspicious"))
+        # Normalized contract the incident drawer renders: verdict + confidence
+        # (0-100) + source, alongside the raw engine stats.
+        total = int(stats.get("total") or 1)
+        malicious_share = (malicious + flagged) / max(total, 1)
+        verdict = ("malicious" if malicious_share >= 0.2
+                   else "suspicious" if malicious_share > 0 else "clean")
+        confidence = int(round(malicious_share * 100))
         return {
             "source": "virustotal",
-            "malicious": stats.get("malicious", 0),
+            "verdict": verdict,
+            "confidence": confidence,
+            "malicious": malicious,
             "suspicious": stats.get("suspicious", 0),
             "harmless": stats.get("harmless", 0),
-            "total": stats.get("total", 1),
+            "total": total,
             "flagged_vendors": flagged,
-            "is_flagged": bool(int(stats.get("malicious") or 0) + flagged > 0),
+            "is_flagged": bool(malicious + flagged > 0),
             "last_analysis": attrs.get("last_analysis_date"),
         }
 
