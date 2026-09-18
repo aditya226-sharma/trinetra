@@ -6,22 +6,18 @@
 # the old /tmp/trinetra-deploy/trinetra.sh used to maintain.
 #
 #   docker compose -f compose.public.yml pull
-#   ADMIN_PASSWORD=... AGENT_TOKEN=... NGROK_AUTHTOKEN=... \
-#     docker compose -f compose.public.yml up -d
+#   docker compose -f compose.public.yml up -d
+#
+# Credentials come from the sibling `.env.public` (gitignored) via env_file; no
+# shell env is required.
 #
 services:
   trinetra-public:
     image: ghcr.io/aditya226-sharma/trinetra:latest
     container_name: trinetra-public
+    env_file: .env.public
     ports:
       - "127.0.0.1:8001:8000"
-    environment:
-      ADMIN_USER: ${ADMIN_USER:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      AGENT_TOKEN: ${AGENT_TOKEN:-}
-      TRINETRA_RETENTION_DAYS: ${TRINETRA_RETENTION_DAYS:-30}
-      TRINETRA_STORE_PATH: /app/data/trinetra.db
-      TRINETRA_RAW_DIR: /app/data/raw
     volumes:
       - trinetra-public-data:/app/data
     restart: unless-stopped
@@ -29,12 +25,11 @@ services:
   trinetra-ngrok:
     image: ngrok/ngrok:latest
     container_name: trinetra-ngrok
+    env_file: .env.public
     command:
       - "http"
       - "--url=https://unease-chummy-outburst.ngrok-free.dev"
       - "trinetra-public:8000"
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
     depends_on:
       - trinetra-public
     restart: unless-stopped

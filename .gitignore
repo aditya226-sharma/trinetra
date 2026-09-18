@@ -13,4 +13,4 @@ frontend/dist/
 .env
 .env.*
 !.env.example
-/logo.png
+/logo.png.env.public

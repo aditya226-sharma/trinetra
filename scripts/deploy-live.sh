@@ -5,24 +5,19 @@
 # without touching the persistent `trinetra-public-data` volume (cases, events,
 # users, JWT secret all survive).
 #
-# Requires: ADMIN_PASSWORD, AGENT_TOKEN, NGROK_AUTHTOKEN in the environment.
-# Look at .env.example for the full variable list.
+# Requires: credential values in the sibling `.env.public` (gitignored), which
+# compose loads via env_file — no shell env needed. Look at .env.example for
+# the full variable list.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_NAME="${TRINETRA_PROJECT:-trinetra-deploy}"
 
-require_env() {
-  for v in "$@"; do
-    if [ -z "${!v:-}" ]; then
-      echo "error: $v is not set (see .env.example)" >&2
-      exit 1
-    fi
-  done
-}
-
 main() {
-  require_env ADMIN_PASSWORD AGENT_TOKEN NGROK_AUTHTOKEN
+  if [ ! -f "$REPO/.env.public" ]; then
+    echo "error: $REPO/.env.public not found (copy from .env.example and fill in)" >&2
+    exit 1
+  fi
 
   echo "==> pulling ghcr.io/aditya226-sharma/trinetra:latest"
   docker compose -f "$REPO/compose.public.yml" \
