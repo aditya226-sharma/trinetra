@@ -201,12 +201,22 @@ class IpEnricher:
 
 
 def build_enricher(settings) -> IpEnricher:
-    """Construct an enricher from settings/config (all optional)."""
+    """Construct an enricher from settings/config (all optional).
+
+    The provider-specific keys live at separate config paths so setting both
+    environment variables can never clobber each other; only the key matching
+    the active ``provider`` is used.
+    """
+    provider = str(settings.get("enrichment.intel.provider") or "")
+    key_path = {
+        "abuseipdb": "enrichment.intel.abuseipdb_api_key",
+        "virustotal": "enrichment.intel.virustotal_api_key",
+    }.get(provider, "")
     return IpEnricher(
         settings,
         db_path=str(settings.get("enrichment.geo.db_path") or ""),
-        intel_provider=str(settings.get("enrichment.intel.provider") or ""),
-        intel_api_key=str(settings.get("enrichment.intel.api_key") or ""),
+        intel_provider=provider,
+        intel_api_key=str(settings.get(key_path) or "") if key_path else "",
         ttl=int(settings.get("enrichment.ttl", _DEFAULT_TTL)),
         timeout=int(settings.get("enrichment.timeout", _DEFAULT_TIMEOUT)),
     )

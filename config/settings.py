@@ -51,8 +51,8 @@ class Settings:
             "TRINETRA_JWT_SECRET": ("auth", "jwt_secret"),
             "TRINETRA_GEO_DB_PATH": ("enrichment", "geo", "db_path"),
             "TRINETRA_INTEL_PROVIDER": ("enrichment", "intel", "provider"),
-            "ABUSEIPDB_API_KEY": ("enrichment", "intel", "api_key"),
-            "VIRUSTOTAL_API_KEY": ("enrichment", "intel", "api_key"),
+            "ABUSEIPDB_API_KEY": ("enrichment", "intel", "abuseipdb_api_key"),
+            "VIRUSTOTAL_API_KEY": ("enrichment", "intel", "virustotal_api_key"),
             "TRINETRA_CORS_ORIGINS": ("web", "cors_origins"),
         }
         for env, path in mapping.items():

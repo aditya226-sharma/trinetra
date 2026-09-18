@@ -175,3 +175,22 @@ def test_settings_env_wires_provider_and_key(monkeypatch):
     assert e._intel_provider == "virustotal"
     assert e._intel_api_key == "vt-secret"
     assert e.enabled is True
+
+
+def test_provider_keys_do_not_collide(monkeypatch):
+    """Both provider keys live at separate env→config paths; the enricher only
+    picks the key matching the active provider (previously the later env var
+    silently overwrote the other)."""
+    import config.settings as settings_mod
+    from modules.enricher import build_enricher
+    monkeypatch.setenv("TRINETRA_INTEL_PROVIDER", "abuseipdb")
+    monkeypatch.setenv("ABUSEIPDB_API_KEY", "abuse-key")
+    monkeypatch.setenv("VIRUSTOTAL_API_KEY", "vt-key")
+    monkeypatch.setattr(settings_mod, "_DEFAULT", None)
+    s = settings_mod.get_settings()
+    assert s.get("enrichment.intel.abuseipdb_api_key") == "abuse-key"
+    assert s.get("enrichment.intel.virustotal_api_key") == "vt-key"
+    e = build_enricher(s)
+    assert e._intel_provider == "abuseipdb"
+    assert e._intel_api_key == "abuse-key"
+    assert e.enabled is True

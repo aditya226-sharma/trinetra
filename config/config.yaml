@@ -48,7 +48,8 @@ enrichment:
     db_path: ""                 # optional MaxMind GeoLite2-City.mmdb (TRINETRA_GEO_DB_PATH)
   intel:
     provider: ""                # abuseipdb | virustotal ('' = disabled)
-    api_key: ""                 # set via ABUSEIPDB_API_KEY / VIRUSTOTAL_API_KEY
+    abuseipdb_api_key: ""       # set via ABUSEIPDB_API_KEY
+    virustotal_api_key: ""      # set via VIRUSTOTAL_API_KEY
 
 auth:
   agent_token: ""               # shared X-Agent-Token for POST /api/ingest-events (set AGENT_TOKEN in prod)
