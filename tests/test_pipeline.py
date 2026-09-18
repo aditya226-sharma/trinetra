@@ -132,6 +132,37 @@ def test_prefilter_flow_passes_with_findings():
     assert p.should_pass(flow) is True
 
 
+def test_rebuild_derived_restores_graph_after_restart(monkeypatch, tmp_path):
+    """A fresh orchestrator over the same store rebuilds the entity graph.
+
+    The graph + threat detector are memory-only; after a container restart
+    persisted events must be replayed so /api/graph isn't empty.
+    """
+    monkeypatch.setenv("TRINETRA_STORE_PATH", str(tmp_path / "events.db"))
+    monkeypatch.setenv("TRINETRA_RAW_DIR", str(tmp_path / "raw"))
+    from config.settings import Settings as TSettings
+    from collectors.demo_feed import DemoFeed
+    from orchestrator import Orchestrator
+
+    live = Orchestrator(TSettings())
+    for i, (raw, source, client, host) in enumerate(DemoFeed().iterate(max_items=200)):
+        live.ingest(raw, source, client, host)
+    live.flush_batch()
+    expected = live.graph.summary()
+    assert expected["nodes"] > 0 and expected["edges"] > 0
+
+    restarted = Orchestrator(TSettings())
+    assert restarted.graph.summary()["nodes"] == 0  # memory cleared
+
+    restarted.rebuild_derived()
+    rebuilt = restarted.graph.summary()
+    assert rebuilt["nodes"] == expected["nodes"]
+    assert rebuilt["edges"] == expected["edges"]
+    assert rebuilt["threatened"] == expected["threatened"]
+    assert rebuilt["findings"] == expected["findings"]
+    assert restarted.threats.detection_counts == live.threats.detection_counts
+
+
 def test_dedup_counter_bounded():
     """m6: the fingerprint set is capped so long-running ingestion does not
     grow memory without bound."""

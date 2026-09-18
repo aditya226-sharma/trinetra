@@ -260,6 +260,30 @@ class EventStore:
             row = self._staleness_retry(_do)
         return int(row["c"])
 
+    def iter_all(self, page: int = 500) -> Iterable[Event]:
+        """Yield every stored event, oldest first, in bounded pages.
+
+        Used to rebuild in-memory derived state (graph / threats) after a
+        restart so persisted events keep the dashboard populated.
+        """
+        offset = 0
+        while True:
+            with self._lock:
+                def _do() -> List[sqlite3.Row]:
+                    return self._conn.execute(
+                        "SELECT * FROM events ORDER BY timestamp ASC, event_id "
+                        "LIMIT ? OFFSET ?", (page, offset)).fetchall()
+                rows = self._staleness_retry(_do)
+            if not rows:
+                return
+            for r in rows:
+                event = _row_to_event(r)
+                if event is not None:
+                    yield event
+            offset += page
+            if len(rows) < page:
+                return
+
     def count_by(self, column: str) -> Dict[str, int]:
         with self._lock:
             def _do() -> List[sqlite3.Row]:

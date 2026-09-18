@@ -90,6 +90,13 @@ async def lifespan(_app: FastAPI):
             _ORCH.stats["raw_lines"] = len(_ORCH.raw_store)
         except Exception:
             pass
+        # The graph + threat detector are memory-only: replay persisted events
+        # into them so the entity graph isn't empty after a redeploy.
+        try:
+            _ORCH.rebuild_derived()
+        except Exception as exc:  # noqa: BLE001 — derived state must never block boot
+            logging.getLogger("trinetra.main").warning(
+                "derived-state rebuild failed: %s", exc)
     ensure_admin(_settings)
     start_retention_loop(_settings)
     if _SOC is None:

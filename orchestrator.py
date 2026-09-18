@@ -443,4 +443,33 @@ class Orchestrator:
             "findings": self.findings_log[-20:],
         }
 
+    def rebuild_derived(self) -> None:
+        """Rebuild in-memory graph + threat state from persisted events.
+
+        The graph and threat detector are memory-only, so after a container
+        restart the dashboard would report events stored but an empty entity
+        graph / threat radar. Replaying the store into those modules (without
+        re-running dedup, the analyzer, or notifiers) restores them.
+        """
+        import logging
+        log = logging.getLogger("trinetra.orchestrator")
+        log.info("rebuilding graph/threats from %d persisted events",
+                 self.event_store.count())
+        events = 0
+        for event in self.event_store.iter_all():
+            self.graph.add_event(event)
+            if event.category == "flow":
+                self.threats.add_event(event)
+            elif event.category != "flow":
+                self.graph.add_auth(event)
+            events += 1
+        # Re-run the threat window once over the full dataset and overlay its
+        # findings on the graph (findings are deterministic for stored events).
+        for finding in self.threats.flush():
+            self.graph.add_finding(finding)
+            self.findings_log.append(finding)
+            if len(self.findings_log) > 2000:
+                self.findings_log.pop(0)
+        log.info("replayed %d events into derived state", events)
+
 
