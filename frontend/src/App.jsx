@@ -503,6 +503,11 @@ export default function App() {
                     <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
                       {user?.username} · {user?.role}
                     </span>
+                    {user?.client_scope && (
+                      <span className="mono rounded border border-cyan-400/30 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-cyan-300">
+                        {user.client_scope}
+                      </span>
+                    )}
                     <button
                       onClick={signOut}
                       className="mono text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-rose-300"

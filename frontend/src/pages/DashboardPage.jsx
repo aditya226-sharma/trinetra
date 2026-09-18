@@ -72,52 +72,70 @@ function ScopedDashboard({ data, scope }) {
   return (
     <div className="space-y-6">
       <LiveToast toast={toast} onDismiss={dismiss} />
-      {/* header */}
+      {/* scoped portal banner — unmistakably different from the admin command center */}
       <div className="anim-fadeup">
-        <p className="eyebrow mb-1.5">Client workspace · individual dashboard</p>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-50">
-              <span className="mono text-emerald-300">{scope}</span>
-              <span className="text-slate-400"> · overview</span>
+        <div className="flex items-center gap-3 rounded-xl border border-cyan-400/25 bg-gradient-to-r from-cyan-500/10 via-sky-500/5 to-transparent px-5 py-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-xl text-[#67e8f9]">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 01-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 011-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 011.52 0C14.51 3.81 17 5 19 5a1 1 0 011 1z" />
+            </svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="mono text-[10px] uppercase tracking-[0.22em] text-cyan-300">Client portal · scoped workspace</p>
+            <h1 className="mt-0.5 text-[22px] font-bold leading-tight tracking-tight text-slate-50">
+              <span className="text-[#67e8f9]">{scope}</span>
+              <span className="text-slate-400"> · this workspace</span>
             </h1>
-            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-400">
-              What this client sees:{" "}
-              <b className="mono text-emerald-300">{s.events ?? 0}</b> normalized events,{" "}
-              <b className="mono text-amber-300">{s.findings ?? 0}</b> findings and{" "}
-              <b className="mono text-rose-300">{totalIncidents}</b> incidents.
+            <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-slate-400">
+              You are signed in as a <b className="mono text-cyan-200">viewer</b> scoped to{" "}
+              <b className="mono text-cyan-200">{scope}</b> — you only see this client's telemetry,
+              incidents and SOC tasks. <span className="text-slate-500">Read-only view · managed by the SOC team.</span>
             </p>
           </div>
-          <LiveBadge text="Live · 10s" />
+          <span className="mono shrink-0 rounded-md border border-cyan-400/30 bg-black/30 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-200">
+            scope: {scope}
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" /> <b className="mono text-cyan-300">{s.events ?? 0}</b> normalized events
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> <b className="mono text-amber-300">{s.findings ?? 0}</b> findings
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> <b className="mono text-rose-300">{totalIncidents}</b> incidents
+          </span>
+          <span className="ml-auto"><LiveBadge text="Live · 10s" /></span>
         </div>
       </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Events (this client)" value={s.events ?? 0} sub={`dedup ${Math.round((data.dedup_rate || 0) * 100)}%`} tone="emerald" icon={<ChartIcon />} delay={0} />
-        <KpiCard label="Findings" value={s.findings ?? 0} sub={`alerts on this workspace`} tone="danger" icon={<ThreatIcon />} delay={60} />
-        <KpiCard label="Open incidents" value={incidents.open?.length ?? 0} sub="awaiting triage" tone="danger" icon={<GraphIcon />} delay={120} />
+        <KpiCard label="Events this client" value={s.events ?? 0} sub={`dedup ${Math.round((data.dedup_rate || 0) * 100)}%`} tone="emerald" icon={<ChartIcon />} delay={0} />
+        <KpiCard label="Findings" value={s.findings ?? 0} sub="on this workspace" tone="danger" icon={<ThreatIcon />} delay={60} />
+        <KpiCard label="Open incidents" value={incidents.open?.length ?? 0} sub="awaiting SOC triage" tone="danger" icon={<GraphIcon />} delay={120} />
         <KpiCard label="Investigation" value={incidents.investigation?.length ?? 0} sub="actively worked" tone="violet" icon={<DedupIcon />} delay={180} />
       </div>
 
-      {/* incident board */}
-      <section className="glass p-5 anim-fadeup">
-        <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">who investigated, who is involved</span>}
-        >
-          Incident board
-        </SectionTitle>
-        <IncidentBoard incidents={incidents} />
-      </section>
-
       {/* tasks assigned by the SOC team */}
-      <section className="glass p-5 anim-fadeup">
+      <section className="glass p-5 anim-fadeup !border-cyan-400/20 !bg-cyan-950/10">
         <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">assigned by the SOC team</span>}
+          right={<span className="mono text-[10px] uppercase tracking-widest text-cyan-300/70">from the SOC team → you</span>}
         >
           Tasks assigned to {scope}
         </SectionTitle>
         <ClientTasks clientId={scope} initial={data.tasks} />
+      </section>
+
+      {/* incident board */}
+      <section className="glass p-5 anim-fadeup">
+        <SectionTitle
+          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">{scope} only</span>}
+        >
+          Incidents on this workspace
+        </SectionTitle>
+        <IncidentBoard incidents={incidents} />
       </section>
 
       {/* threat radar + findings */}
@@ -139,7 +157,7 @@ function ScopedDashboard({ data, scope }) {
                       <span className="mono text-[11px] text-rose-300">{count} hits</span>
                     </div>
                     <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#059669,#10b981,#f43f5e)", boxShadow: "0 0 12px rgba(244,63,94,0.5)" }} />
+                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f43f5e)", boxShadow: "0 0 12px rgba(34,211,238,0.4)" }} />
                     </div>
                   </div>
                 );
@@ -163,8 +181,18 @@ function ScopedDashboard({ data, scope }) {
           )}
         </section>
       </div>
+
+      {/* read-only footer note */}
+      <p className="mono text-center text-[9.5px] uppercase tracking-[0.2em] text-slate-600">
+        TriNetra client portal · restricted to {scope} · questions? contact your SOC team
+      </p>
     </div>
   );
+
+  function sevStrip(sev) {
+    const known = ["critical", "high", "medium", "warning", "error", "info", "low"];
+    return `sev-${(known.includes(sev) ? sev : "info")}`;
+  }
 }
 
 /* ================================================================== admin view */
