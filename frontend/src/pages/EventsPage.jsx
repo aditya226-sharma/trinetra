@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { searchEvents, getClients, getEvent, streamEvents, exportCsv } from "../lib/api";
+import { searchEvents, getClients, getEvent, streamEvents, exportCsv, enrichEntity, getCases } from "../lib/api";
 import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
@@ -37,6 +37,7 @@ export default function EventsPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [detailMeta, setDetailMeta] = useState(null); // geo + related cases + detection context for the open event
   const [error, setError] = useState(null);
 
   // Saved searches (persisted per-browser via localStorage).
@@ -224,10 +225,14 @@ export default function EventsPage() {
   async function openDetail(e) {
     const my = ++detailSeq.current;
     setDetail(null);
+    setDetailMeta(null);
     try {
       const full = await getEvent(e.event_id);
       if (my !== detailSeq.current) return;
-      setDetail({ ...e, ...full, raw: full.raw ?? e.raw_event ?? null });
+      const derived = deriveDetection(full);
+      setDetail({ ...e, ...full, raw: full.raw ?? e.raw_event ?? null, ...derived });
+      const meta = await enrichDetail(full, e);
+      if (my === detailSeq.current) setDetailMeta(meta);
     } catch {
       if (my === detailSeq.current) setDetail(e);
     }
@@ -426,37 +431,84 @@ export default function EventsPage() {
         </div>
 
         {detail && (
-          <aside className="slide-in w-[360px] shrink-0">
-            <div className="glass p-5">
+          <aside className="slide-in w-[460px] shrink-0">
+            <div className="glass max-h-[calc(100vh-120px)] overflow-y-auto p-5">
               <div className="mb-4 flex items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <p className="eyebrow">Event detail</p>
-                  <p className="mt-1 mono text-[13px] text-slate-100">{detail.event_id}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="mono text-[13px] text-slate-100">{detail.event_id}</p>
+                    <SeverityBadge severity={detail.severity} />
+                  </div>
                 </div>
-                <button onClick={() => setDetail(null)} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-slate-400 hover:text-slate-100">
+                <button onClick={() => { setDetail(null); setDetailMeta(null); }} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-slate-400 hover:text-slate-100">
                   ×
                 </button>
               </div>
+
               <dl className="space-y-2 text-[12px]">
+                <Row k="timestamp" v={detail.timestamp} mono />
+                <Row k="log id" v={detail.trace_id || detail.event_id} mono />
+                <Row k="event type" v={detail.category} />
+                <Row k="event id" v={findEventCode(detail)} mono />
                 <Row k="client" v={detail.client_id} />
-                <Row k="category" v={detail.category} />
                 <Row k="source" v={detail.source_type} />
-                <Row k="trace" v={detail.trace_id} mono />
-                <Row k="severity" v={<SeverityBadge severity={detail.severity} />} />
                 <Row k="message" v={detail.message} />
               </dl>
-              <p className="eyebrow mb-1.5 mt-5">Parsed fields</p>
-              <CodeBlock maxH="max-h-44">{JSON.stringify(detail.fields, null, 2)}</CodeBlock>
-              {detail.trace_id && detail.trace_events && detail.trace_events.length > 0 && (
-                <TraceTimeline events={detail.trace_events} current={detail.event_id} />
+
+              <p className="eyebrow mb-1.5 mt-5">Network</p>
+              <dl className="space-y-2 text-[12px]">
+                <Row k="src ip" v={<span className="flex flex-wrap items-center gap-2">{f(detail, "src_ip") ? <><span className="mono text-[11px]">{f(detail, "src_ip")}</span>{geoChip(detailMeta, f(detail, "src_ip"))}</> : "—"}</span>} />
+                <Row k="dst ip" v={<span className="flex flex-wrap items-center gap-2">{f(detail, "dst_ip") ? <><span className="mono text-[11px]">{f(detail, "dst_ip")}</span>{geoChip(detailMeta, f(detail, "dst_ip"))}</> : "—"}</span>} />
+                <Row k="src port" v={f(detail, "sport")} mono />
+                <Row k="dst port" v={f(detail, "dport")} mono />
+                <Row k="protocol" v={f(detail, "proto")} mono />
+                <Row k="action" v={f(detail, "action")} />
+              </dl>
+
+              <p className="eyebrow mb-1.5 mt-5">Identity & system</p>
+              <dl className="space-y-2 text-[12px]">
+                <Row k="username" v={f(detail, "username", "user", "attempted_user", "account_name")} mono />
+                <Row k="hostname" v={f(detail, "hostname")} mono />
+                <Row k="device type" v={deviceType(detail)} />
+                <Row k="process / app" v={f(detail, "process", "process_name", "provider", "application", "app")} mono />
+                <Row k="trace" v={detail.trace_id} mono />
+              </dl>
+
+              {(detail.modulesList?.length > 0 || detail.threat) && (
+                <>
+                  <p className="eyebrow mb-1.5 mt-5">Detection</p>
+                  <dl className="space-y-2 text-[12px]">
+                    <Row k="threat signature" v={detail.threat || "—"} />
+                    <Row k="detection rule" v={detectionRule(detail, detailMeta)} />
+                    <Row k="mitre att&ck" v={mitreIds(detail)} />
+                    <Row k="risk score" v={<RiskMeter detail={detail} />} />
+                    <Row k="confidence" v={confidenceOf(detail)} />
+                    {detail.modulesList.length > 0 && <Row k="modules" v={detail.modulesList.join(", ")} mono />}
+                  </dl>
+                </>
               )}
+
               {detail.raw && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
-                    original raw line ({detail.raw.length} bytes)
+                    raw log ({detail.raw.length} bytes)
                   </summary>
                   <CodeBlock maxH="max-h-40">{detail.raw}</CodeBlock>
                 </details>
+              )}
+
+              <p className="eyebrow mb-1.5 mt-4">Normalized data</p>
+              <CodeBlock maxH="max-h-44">{JSON.stringify(detail.fields || {}, null, 2)}</CodeBlock>
+
+              <p className="eyebrow mb-1.5 mt-4">Related events</p>
+              <RelatedEvents detail={detail} onOpen={(id) => { const fetcher = { event_id: id }; openDetail(fetcher); }} />
+
+              <p className="eyebrow mb-1.5 mt-4">Investigation</p>
+              <InvestigationPanel detail={detail} meta={detailMeta} />
+
+              {detail.trace_id && detail.trace_events && detail.trace_events.length > 0 && (
+                <TraceTimeline events={detail.trace_events} current={detail.event_id} />
               )}
             </div>
           </aside>
@@ -468,11 +520,251 @@ export default function EventsPage() {
 
 function Row({ k, v, mono }) {
   return (
-    <div className="grid grid-cols-[84px_1fr] gap-2">
+    <div className="grid grid-cols-[96px_1fr] gap-2">
       <dt className="text-slate-500">{k}</dt>
       <dd className={`break-all text-slate-300 ${mono ? "mono text-[11px]" : ""}`}>{v || "—"}</dd>
     </div>
   );
+}
+
+// -- forensic detail enrichment -------------------------------------------
+
+// MITRE ATT&CK technique ids per threat class (mirrors backend compliance.py).
+const MITRE_MAP = {
+  port_scan: ["T1046", "T1046.001"],
+  ddos: ["T1498"],
+  c2_beaconing: ["T1071.001"],
+  dga_dns: ["T1568.002"],
+  data_exfiltration: ["T1048"],
+  weak_ipsec_config: ["T1021.004", "T1552"],
+  vpn_ok: [],
+  exfiltration: ["T1048"],
+};
+
+const DEVICE_BY_SOURCE = {
+  windows: "Windows host",
+  windows_event_log: "Windows host",
+  macos_unified_log: "macOS host",
+  macos_system_log: "macOS host",
+  syslog: "Linux / network device",
+  netflow: "flow exporter",
+  cef: "CEF appliance",
+  csv: "CSV feed",
+  json: "JSON feed",
+  file_log: "file log",
+  live_flow: "flow sensor",
+  live_vpn: "VPN gateway",
+};
+
+// Which single field value to show for the requested attribute, preferring the
+// normalized fields blob (any alias) before falling back to the event root.
+function f(detail, ...keys) {
+  const blob = detail?.fields || {};
+  for (const k of keys) {
+    const v = blob[k];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  for (const k of keys) {
+    const v = detail?.[k];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return null;
+}
+
+// Windows events carry their own event code (e.g. 4624); otherwise the UES id.
+function findEventCode(detail) {
+  return f(detail, "event_id", "code", "record_id") ?? detail?.event_id ?? "—";
+}
+
+function deviceType(detail) {
+  return f(detail, "device_type", "device") || DEVICE_BY_SOURCE[detail?.source_type] || detail?.source_type || "—";
+}
+
+function confidenceOf(detail) {
+  const mf = detail?.module_findings || {};
+  const first = firstFinding(detail);
+  const conf = first?.confidence ?? mf?.confidence ?? detail?.fields?.confidence;
+  return conf != null ? `${Math.round(Number(conf) * 100)}%` : "—";
+}
+
+function firstFinding(detail) {
+  const mf = detail?.module_findings || {};
+  for (const mod of Object.keys(mf)) {
+    const val = mf[mod];
+    if (Array.isArray(val)) {
+      const hit = val.find((m) => m && typeof m === "object" && m.threat_class);
+      if (hit) return hit;
+      const hit2 = val.find((m) => m && typeof m === "object");
+      if (hit2) return hit2;
+    } else if (val && typeof val === "object" && val.threat_class) {
+      return val;
+    } else if (val && typeof val === "object") {
+      return val;
+    }
+  }
+  return null;
+}
+
+// Normalize module_findings into [threat_class, ...] + first finding object.
+function deriveDetection(detail) {
+  const mf = detail?.module_findings || {};
+  const modulesList = Object.keys(mf).filter((mod) => {
+    const v = mf[mod];
+    return Array.isArray(v) ? v.length > 0 : Boolean(v);
+  });
+  let threat = firstFinding(detail)?.threat_class || null;
+  if (!threat && detail?.fields?.threat_class) threat = detail.fields.threat_class;
+  const confidence = confidenceOf(detail);
+  return { modulesList, threat, confidence };
+}
+
+// SOC detection rule that produced this finding: prefer a matched case's
+// rule_id/name, else the analyzer's rule label.
+function detectionRule(detail, meta = {}) {
+  const matched = meta.relatedCases?.[0];
+  if (matched?.rule_id) return matched.rule_id;
+  if (matched?.source_kind === "flow") return "correlated flow detection";
+  if (detail?.threat) return `${detail.threat} detector`;
+  return "—";
+}
+
+function mitreIds(detail) {
+  const t = detail?.threat;
+  if (!t) return "—";
+  if (MITRE_MAP[t]?.length) return MITRE_MAP[t].join(" · ");
+  return "—";
+}
+
+function RiskMeter({ detail }) {
+  const sevRank = {
+    critical: 95, high: 80, error: 75, medium: 60, warning: 55, low: 30, info: 25,
+  }[detail?.severity] ?? 25;
+  const conf = firstFinding(detail)?.confidence;
+  const score = Math.round(conf != null ? sevRank * 0.6 + Number(conf) * 100 * 0.4 : sevRank);
+  const color = score >= 80 ? "from-rose-500 to-orange-500" : score >= 50 ? "from-amber-500 to-orange-400" : "from-emerald-500 to-cyan-500";
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`mono text-[11px] ${score >= 80 ? "text-rose-300" : score >= 50 ? "text-amber-300" : "text-emerald-300"}`}>{score}/100</span>
+      <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/5">
+        <span className={`bar-grow block h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${score}%` }} />
+      </span>
+    </div>
+  );
+}
+
+function geoChip(meta, ip) {
+  if (!ip || !meta?.geo?.[ip]) return null;
+  const g = meta.geo[ip];
+  return (
+    <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9.5px] text-cyan-300/80" title={ip}>
+      {[g.country, g.city].filter(Boolean).join(" · ") || (g.asn ? `AS${g.asn}` : "geo")}
+    </span>
+  );
+}
+
+function RelatedEvents({ detail, onOpen }) {
+  const ids = new Set();
+  (detail?.trace_events || []).forEach((ev) => ids.add(ev.event_id));
+  const finding = firstFinding(detail);
+  if (finding) {
+    const mf = detail?.module_findings || {};
+    for (const mod of Object.keys(mf)) {
+      const val = mf[mod];
+      const list = Array.isArray(val) ? val : val?.event_ids ? [val.event_ids] : [];
+      list.forEach((item) => {
+        const arr = Array.isArray(item) ? item : [item];
+        arr.forEach((x) => ids.add(String(x)));
+      });
+    }
+  }
+  ids.delete(detail?.event_id);
+  const related = [...ids].slice(0, 40);
+  if (related.length === 0) return <p className="text-[11px] text-slate-600">no correlated events</p>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {related.map((id) => (
+        <button
+          key={id}
+          onClick={() => onOpen(id)}
+          className="mono max-w-[180px] truncate rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-slate-400 transition hover:border-cyan-500/40 hover:text-cyan-300"
+          title="open related event"
+        >
+          {id}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function InvestigationPanel({ detail, meta }) {
+  const cases = meta?.relatedCases || [];
+  if (cases.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-white/10 p-3 text-[11px] text-slate-600">
+        not linked to any SOC case · {meta?.loading ? "correlating…" : "no alert created for this event"}
+      </div>
+    );
+  }
+  const statusMap = {
+    open: "border-rose-500/30 bg-rose-500/10 text-rose-300",
+    investigation: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    acknowledged: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  };
+  return (
+    <div className="space-y-2">
+      {cases.map((c) => (
+        <div key={c.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${statusMap[c.status] || "border-white/10 text-slate-400"}`}>{c.status || "open"}</span>
+            <span className="mono text-[10.5px] text-slate-400">{c.threat_class}</span>
+            {c.assignee && <span className="mono text-[10px] text-emerald-300">@{c.assignee}</span>}
+          </div>
+          <p className="mono mt-1.5 break-all text-[10px] text-slate-500">case {c.id}</p>
+          <p className="mt-1 text-[11px] text-slate-300">{c.message || "—"}</p>
+          {(c.notes || []).length > 0 && (
+            <div className="mt-2 space-y-1">
+              {(c.notes || []).map((n, ni) => (
+                <p key={ni} className="mono rounded bg-black/30 px-2 py-1 text-[10px] text-amber-200/80">
+                  <span className="text-slate-600">[{n.ts || ""}] {n.actor || ""}</span> — {n.note || ""}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Correlate the open event with geo enrichment + any SOC cases that reference it.
+async function enrichDetail(full, e) {
+  const fields = full?.fields || e?.fields || {};
+  const want = new Set([fields.src_ip, fields.dst_ip, e?.client_ip].filter(Boolean));
+  const geo = {};
+  await Promise.all([...want].map(async (ip) => {
+    try {
+      const r = await enrichEntity("ip", ip);
+      if (r?.geo && Object.keys(r.geo).length) geo[ip] = r.geo;
+    } catch { /* enrichment is best-effort */ }
+  }));
+  try {
+    const { cases = [] } = await getCases({ limit: 500 });
+    const relatedCases = cases.filter((c) => {
+      const ev = c?.evidence || {};
+      const evIds = [ev.event_id, ...(Array.isArray(ev.event_ids) ? ev.event_ids : [])].filter(Boolean).map(String);
+      const flowIds = String(c?.flows || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const source = String(c?.source_value || "");
+      return evIds.includes(full?.event_id)
+        || flowIds.includes(full?.event_id)
+        || source === full?.event_id
+        || (full?.fields?.threat_class && c?.threat_class === full.fields.threat_class && flowIds.length > 0);
+    });
+    return { geo, relatedCases };
+  } catch {
+    return { geo, relatedCases: [] };
+  }
 }
 
 function TraceTimeline({ events, current }) {
