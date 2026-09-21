@@ -200,6 +200,28 @@ function ScopedDashboard({ data, scope }) {
   }
 }
 
+function FindingRow({ f, i, sevStrip }) {
+  const alert = f.alert || f;
+  const verdict = f.analysis?.verdict || alert.verdict;
+  const storeDecision = f.analysis?.store_decision || alert.store_decision;
+  const key = f.flow_id || f.alert?.flow_id || `${f.threat_class}-${f.timestamp}-${i}`;
+  return (
+    <div key={key} className="glass-row flex items-center gap-3 p-3 feed-in" style={{ animationDelay: `${i * 60}ms` }}>
+      <span className={`sev-strip ${sevStrip(alert.severity)}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="mono text-[12.5px] text-slate-100">{alert.threat_class}</span>
+          <span className="mono text-[10px] text-slate-500">conf {alert.confidence}</span>
+        </div>
+        <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
+          {verdict ? `${verdict} · ${storeDecision}` : "awaiting analyzer verdict"}
+        </p>
+      </div>
+      <SeverityBadge severity={alert.severity} />
+    </div>
+  );
+}
+
 /* ================================================================== admin view */
 function AdminOverview({ data, clients }) {
   const s = data.stats || {};
