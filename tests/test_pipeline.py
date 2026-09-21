@@ -161,6 +161,15 @@ def test_rebuild_derived_restores_graph_after_restart(monkeypatch, tmp_path):
     assert rebuilt["threatened"] == expected["threatened"]
     assert rebuilt["findings"] == expected["findings"]
     assert restarted.threats.detection_counts == live.threats.detection_counts
+    # The rebuild must mirror flush_batch bookkeeping so the dashboard KPI
+    # and alerts fan-out match the live run (see _overlay_threat_findings).
+    assert restarted.stats["findings"] == expected["findings"]
+    assert len(restarted.findings_log) == len(live.findings_log)
+    assert len(restarted.alerts_log) == len(live.alerts_log), "alerts log lost on rebuild"
+    for got, want in zip(restarted.alerts_log, live.alerts_log):
+        assert got["threat_class"] == want["threat_class"]
+        assert got["severity"] == want["severity"]
+        assert got["confidence"] == want["confidence"]
 
 
 def test_dedup_counter_bounded():

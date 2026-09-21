@@ -472,11 +472,35 @@ class Orchestrator:
         log.info("replayed %d events into derived state", events)
 
     def _overlay_threat_findings(self, log: Any = None) -> None:
-        """Flush the detector's current window and overlay onto the graph."""
+        """Flush the detector's current window and overlay onto the graph,
+        mirroring the stats + alert bookkeeping live flush_batch performs so
+        a restart rebuild yields an identical dashboard/alerts surface."""
         for finding in self.threats.flush():
             self.graph.add_finding(finding)
+            self.stats["findings"] += 1
             self.findings_log.append(finding)
             if len(self.findings_log) > 2000:
                 self.findings_log.pop(0)
+            analysis = finding.get("analysis") or {}
+            try:
+                confidence = float(finding.get("confidence", 0))
+            except (TypeError, ValueError):
+                confidence = 0.0
+            self.alerts_log.append({
+                "timestamp": (finding.get("alert", {}).get("timestamp") or
+                              finding.get("timestamp") or
+                              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+                "threat_class": finding.get("threat_class", "unknown"),
+                "severity": finding.get("severity", "high"),
+                "confidence": round(confidence, 3),
+                "verdict": analysis.get("verdict"),
+                "store_decision": analysis.get("store_decision", "keep"),
+                "evidence": finding.get("alert", {}).get("evidence", {}),
+                "client_id": finding.get("client_id") or "",
+                "flows": (finding.get("alert", {}).get("flows") or
+                          finding.get("alert", {}).get("flow_id") or ""),
+            })
+            if len(self.alerts_log) > 2000:
+                self.alerts_log.pop(0)
 
 
