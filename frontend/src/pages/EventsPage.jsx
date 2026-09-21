@@ -670,11 +670,12 @@ function RelatedEvents({ detail, onOpen }) {
     const mf = detail?.module_findings || {};
     for (const mod of Object.keys(mf)) {
       const val = mf[mod];
-      const list = Array.isArray(val) ? val : val?.event_ids ? [val.event_ids] : [];
-      list.forEach((item) => {
-        const arr = Array.isArray(item) ? item : [item];
+      const items = Array.isArray(val) ? val : [val];
+      for (const findingObj of items) {
+        const idsList = findingObj?.event_ids ? findingObj.event_ids : [];
+        const arr = Array.isArray(idsList) ? idsList : [idsList];
         arr.forEach((x) => ids.add(String(x)));
-      });
+      }
     }
   }
   ids.delete(detail?.event_id);
