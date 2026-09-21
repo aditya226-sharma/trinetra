@@ -621,7 +621,7 @@ function deriveDetection(detail) {
 // SOC detection rule that produced this finding: prefer a matched case's
 // rule_id/name, else the analyzer's rule label.
 function detectionRule(detail, meta = {}) {
-  const matched = meta.relatedCases?.[0];
+  const matched = meta?.relatedCases?.[0];
   if (matched?.rule_id) return matched.rule_id;
   if (matched?.source_kind === "flow") return "correlated flow detection";
   if (detail?.threat) return `${detail.threat} detector`;
