@@ -357,9 +357,9 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
         "case_stats": case_stats,
         "tasks": _task_dashboard(""),
         "incidents": {
-            "open": [c for c in all_cases if c["status"] == "open"],
-            "investigation": [c for c in all_cases if c["status"] == "investigation"],
-            "closed": [c for c in all_cases if c["status"] == "closed"],
+            "open": [_case_card(c) for c in all_cases if c["status"] == "open"],
+            "investigation": [_case_card(c) for c in all_cases if c["status"] == "investigation"],
+            "closed": [_case_card(c) for c in all_cases if c["status"] == "closed"],
             "stats": case_stats.get("by_status", {}),
         },
     }
@@ -580,14 +580,31 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
         "threat_detections": threat_counts,
         "tasks": _task_dashboard(client_id),
         "incidents": {
-            "open": [c for c in all_cases if c["status"] == "open"],
-            "investigation": [c for c in all_cases if c["status"] == "investigation"],
-            "closed": [c for c in all_cases if c["status"] == "closed"],
+            "open": [_case_card(c) for c in all_cases if c["status"] == "open"],
+            "investigation": [_case_card(c) for c in all_cases if c["status"] == "investigation"],
+            "closed": [_case_card(c) for c in all_cases if c["status"] == "closed"],
             "stats": stats.get("by_status", {}),
         },
         "graph_summary": graph.summary() if graph else {},
         "vpn": {"profiles": _ORCH.vpn_profiles},
         "findings": [_finding_card(f) for f in findings],
+    }
+
+
+def _case_card(c: Dict[str, Any]) -> Dict[str, Any]:
+    """Light projection of a case for dashboard incident boards — the board only
+    renders id/severity/threat_class/client_id/source_kind/assignee, so shipping
+    the full case (evidence, timeline, notes) wastes tunnel bandwidth."""
+    return {
+        "id": c.get("id"),
+        "severity": c.get("severity"),
+        "threat_class": c.get("threat_class"),
+        "client_id": c.get("client_id"),
+        "source_kind": c.get("source_kind"),
+        "assignee": c.get("assignee"),
+        "status": c.get("status"),
+        "timestamp": c.get("timestamp"),
+        "verdict": c.get("verdict"),
     }
 
 
