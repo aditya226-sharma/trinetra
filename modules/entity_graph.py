@@ -246,7 +246,17 @@ class EntityGraph:
             "flows": d.get("weight", 1), "threat": d.get("threat", 0),
         } for u, v, k, d in self.graph.edges(keys=True, data=True)]
         return {"nodes": nodes, "edges": edges,
-                "findings": self._findings, "client_id": self.client_id}
+                "findings": self.findings_summary(), "client_id": self.client_id}
+
+    def findings_summary(self) -> Dict[str, Any]:
+        """Compact per-threat counts (the full finding records with their
+        event_ids arrays are heavy — emitting them in graph payloads blows
+        up tunnel bandwidth for no rendering benefit)."""
+        counts: Dict[str, int] = {}
+        for f in self._findings:
+            counts[f.get("threat_class", "unknown")] = \
+                counts.get(f.get("threat_class", "unknown"), 0) + 1
+        return {"count": len(self._findings), "by_threat_class": counts}
 
     def summary(self) -> Dict[str, Any]:
         return {
