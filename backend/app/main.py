@@ -684,8 +684,14 @@ def events_to_rows(events: List[Any]) -> List[List[str]]:
         fields = getattr(e, "fields", None) or {}
         tc = ""
         mf = getattr(e, "module_findings", None) or fields.get("module_findings") or {}
-        nt = mf.get("network_threat") or {}
-        tc = (nt.get("threat_class") or fields.get("threat_class") or "")
+        mf = mf if isinstance(mf, dict) else {}
+        nt = mf.get("network_threat")
+        if isinstance(nt, list):
+            tc = next((x.get("threat_class") for x in nt
+                       if isinstance(x, dict) and x.get("threat_class")), "") or ""
+        elif isinstance(nt, dict):
+            tc = nt.get("threat_class") or ""
+        tc = tc or fields.get("threat_class") or ""
         rows.append([
             str(getattr(e, "event_id", "") or ""),
             str(getattr(e, "timestamp", "") or ""),
