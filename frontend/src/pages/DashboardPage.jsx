@@ -29,6 +29,7 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
   useEffect(() => {
     let alive = true;
     const tick = () => {
+      if (document.hidden) return;
       getDashboard()
         .then((d) => alive && setData(d))
         .catch((e) => alive && setError(e.message));
@@ -41,7 +42,7 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
       }
     };
     tick();
-    const id = setInterval(tick, 10000);
+    const id = setInterval(tick, 30000);
     return () => {
       alive = false;
       clearInterval(id);

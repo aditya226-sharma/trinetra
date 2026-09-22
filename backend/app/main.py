@@ -352,7 +352,7 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
         "threat_detections": _ORCH.threats.detection_counts,
         "graph_summary": _ORCH.graph.summary(),
         "vpn": {"profiles": _ORCH.vpn_profiles},
-        "findings": _ORCH.findings_log[-50:],
+        "findings": [_finding_card(f) for f in _ORCH.findings_log[-50:]],
         "scope": "",
         "case_stats": case_stats,
         "tasks": _task_dashboard(""),
@@ -587,7 +587,25 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
         },
         "graph_summary": graph.summary() if graph else {},
         "vpn": {"profiles": _ORCH.vpn_profiles},
-        "findings": findings,
+        "findings": [_finding_card(f) for f in findings],
+    }
+
+
+def _finding_card(f: Dict[str, Any]) -> Dict[str, Any]:
+    """Light projection of a finding for dashboard cards (drops the heavy
+    event_ids/evidence arrays — bandwidth & payload friendly for the tunnel)."""
+    alert = f.get("alert") or {}
+    analysis = f.get("analysis") or {}
+    return {
+        "threat_class": f.get("threat_class") or alert.get("threat_class"),
+        "threat_category": f.get("threat_category") or alert.get("threat_category"),
+        "severity": f.get("severity") or alert.get("severity"),
+        "confidence": f.get("confidence", alert.get("confidence")),
+        "flow_id": f.get("flow_id") or alert.get("flow_id"),
+        "client_id": f.get("client_id") or alert.get("client_id"),
+        "timestamp": f.get("timestamp") or alert.get("timestamp"),
+        "verdict": analysis.get("verdict") or alert.get("verdict"),
+        "store_decision": analysis.get("store_decision") or alert.get("store_decision"),
     }
 
 

@@ -36,12 +36,14 @@ export default function ClientsPage() {
 
   useEffect(() => {
     let alive = true;
-    const load = () =>
+    const load = () => {
+      if (document.hidden) return;
       getClients()
         .then((d) => alive && setData(d))
         .catch((e) => alive && setError(e.message));
+    };
     load();
-    const id = setInterval(load, 8000);
+    const id = setInterval(load, 15000);
     return () => { alive = false; clearInterval(id); };
   }, []);
 

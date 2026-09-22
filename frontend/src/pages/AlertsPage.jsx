@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { caseAction, getCases, getIncidentDetail } from "../lib/api";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
-const POLL_MS = 5000;
+const POLL_MS = 15000;
 const STATUS_FILTERS = ["", "unresolved", "open", "investigation", "closed"];
 const SEVERS = ["", "critical", "high", "warning", "info"];
 const KINDS = ["", "flow", "watch", "block", "rule"];
@@ -38,6 +38,7 @@ export default function AlertsPage({ role }) {
   useEffect(() => {
     let alive = true;
     const tick = () => {
+      if (document.hidden) return;
       const my = ++reqSeq.current;
       return getCases({ limit: 500, status: statusFilter || undefined, severity: sevFilter || undefined })
         .then((d) => { if (alive && my === reqSeq.current) { setData(d); setError(null); } })

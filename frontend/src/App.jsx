@@ -208,15 +208,17 @@ export default function App() {
   useEffect(() => {
     if (authState !== "authed") return;
     let alive = true;
-    const poll = () =>
+    const poll = () => {
+      if (document.hidden) return;
       getCaseStats()
         .then((s) => {
           if (!alive) return;
           setOpenCaseCount((s?.by_status?.open || 0) + (s?.by_status?.acknowledged || 0));
         })
         .catch(() => {});
+    };
     poll();
-    const t = setInterval(poll, 5000);
+    const t = setInterval(poll, 15000);
     return () => { alive = false; clearInterval(t); };
   }, [authState]);
 
