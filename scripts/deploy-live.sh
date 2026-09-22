@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refresh the live edge deployment from GHCR.
 #
-# Pulls the latest published image and recreates trinetra-public / trinetra-ngrok
+# Pulls the latest published image and recreates trinetra-public / trinetra-tunnel
 # without touching the persistent `trinetra-public-data` volume (cases, events,
 # users, JWT secret all survive).
 #

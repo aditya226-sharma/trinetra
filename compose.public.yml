@@ -1,5 +1,5 @@
 # Live edge deployment — the containers that actually run TriNetra in public
-# (container facing the tunnel at 127.0.0.1:8001 + a fixed-domain ngrok edge).
+# (container facing the tunnel at 127.0.0.1:8001 + a Cloudflare quick tunnel).
 #
 # Requires a pre-existing named volume `trinetra-public-data` so case/event
 # state survives restarts. Usable as a drop-in for the temp compose file that
@@ -22,14 +22,10 @@ services:
       - trinetra-public-data:/app/data
     restart: unless-stopped
 
-  trinetra-ngrok:
-    image: ngrok/ngrok:latest
-    container_name: trinetra-ngrok
-    env_file: .env.public
-    command:
-      - "http"
-      - "--url=https://unease-chummy-outburst.ngrok-free.dev"
-      - "trinetra-public:8000"
+  trinetra-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: trinetra-tunnel
+    command: tunnel --no-autoupdate --url http://trinetra-public:8000
     depends_on:
       - trinetra-public
     restart: unless-stopped
