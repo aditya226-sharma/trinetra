@@ -342,7 +342,6 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
         raise HTTPException(status_code=428,
                             detail="Bootstrap first: POST /api/demo/run")
     scope = _client_scope(payload)
-    graph_payload = _GRAPH.to_dashboard() if _GRAPH else {"nodes": [], "edges": []}
     if scope:
         return _scoped_dashboard(scope)
     all_cases = _ORCH.soc.list_cases(limit=500) if _ORCH.soc else []
@@ -351,7 +350,6 @@ def dashboard(payload: Dict[str, Any] = Depends(require_auth)) -> Dict[str, Any]
         "stats": _ORCH.stats,
         "dedup_rate": _ORCH.dedup.duplicate_rate,
         "threat_detections": _ORCH.threats.detection_counts,
-        "graph": graph_payload,
         "graph_summary": _ORCH.graph.summary(),
         "vpn": {"profiles": _ORCH.vpn_profiles},
         "findings": _ORCH.findings_log[-50:],
@@ -572,7 +570,6 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
         threat_counts[c["threat_class"]] = threat_counts.get(c["threat_class"], 0) + 1
     findings = [f for f in _ORCH.findings_log
                 if _touches_client(f, client_id)][-50:]
-    graph_payload = graph.to_dashboard() if graph else {"nodes": [], "edges": []}
     return {
         "client_id": client_id,
         "scope": client_id,
@@ -588,7 +585,6 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
             "closed": [c for c in all_cases if c["status"] == "closed"],
             "stats": stats.get("by_status", {}),
         },
-        "graph": graph_payload,
         "graph_summary": graph.summary() if graph else {},
         "vpn": {"profiles": _ORCH.vpn_profiles},
         "findings": findings,
