@@ -28,7 +28,11 @@ DOCKER="${TRINETRA_DOCKER:-/usr/local/bin/docker}"
 
 # URL is dynamic (cloudflared quick tunnel) — derive it from the container's
 # own logs so we always probe the CURRENT edge, never a hardcoded one.
-TUNNEL_URL="$(docker logs trinetra-tunnel 2>/dev/null | grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' | tail -1)"
+# Docker Desktop's log reader can return truncated output over a pipe, so
+# spill to a temp file first (deterministic) before grepping.
+TUNNEL_DIR="${TUNNEL_DIR:-$(mktemp -d)}"
+docker logs trinetra-tunnel > "$TUNNEL_DIR/tunnel.log" 2>&1 || true
+TUNNEL_URL="$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$TUNNEL_DIR/tunnel.log" | tail -1)"
 TUNNEL_URL="${TUNNEL_URL:-}"
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG"; }
@@ -111,7 +115,8 @@ if /usr/bin/shlock -f "$LOCK" -p $$ 2>/dev/null; then
     log "tunnel offline for consecutive probes — restoring stack"
     "$DOCKER" compose -f "$COMPOSE" -p "$PROJECT" up -d --force-recreate trinetra-public trinetra-tunnel >>"$LOG" 2>&1
     sleep 12
-    TUNNEL_URL="$(docker logs trinetra-tunnel 2>/dev/null | grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' | tail -1)"
+    docker logs trinetra-tunnel > "$TUNNEL_DIR/tunnel.log" 2>&1 || true
+    TUNNEL_URL="$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$TUNNEL_DIR/tunnel.log" | tail -1)"
     refresh_live_refs "$TUNNEL_URL"
     if probe; then
       log "tunnel recovered"
