@@ -112,8 +112,13 @@ fi
 # Claim the lock so two launchd runs never restack simultaneously.
 if /usr/bin/shlock -f "$LOCK" -p $$ 2>/dev/null; then
   if down_after_retries; then
-    log "tunnel offline for consecutive probes — restoring stack"
-    "$DOCKER" compose -f "$COMPOSE" -p "$PROJECT" up -d --force-recreate trinetra-public trinetra-tunnel >>"$LOG" 2>&1
+    log "tunnel offline for consecutive probes — restoring tunnel edge"
+    # Only the tunnel edge is recreated. The API container is heavy (its cold
+    # boot re-indexes the 100MB+ corpus for 60-90s) and stable; force-
+    # recreating it here would repeatedly nuke that boot and rotate the
+    # tunnel URL into a restart loop. `compose up -d` at the top already
+    # ensures the API container exists / is running.
+    "$DOCKER" compose -f "$COMPOSE" -p "$PROJECT" up -d --force-recreate trinetra-tunnel >>"$LOG" 2>&1
     sleep 12
     docker logs trinetra-tunnel > "$TUNNEL_DIR/tunnel.log" 2>&1 || true
     TUNNEL_URL="$(grep -oE 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$TUNNEL_DIR/tunnel.log" | tail -1)"
