@@ -683,7 +683,7 @@ def events_to_rows(events: List[Any]) -> List[List[str]]:
     for e in events:
         fields = getattr(e, "fields", None) or {}
         tc = ""
-        mf = fields.get("module_findings") or {}
+        mf = getattr(e, "module_findings", None) or fields.get("module_findings") or {}
         nt = mf.get("network_threat") or {}
         tc = (nt.get("threat_class") or fields.get("threat_class") or "")
         rows.append([

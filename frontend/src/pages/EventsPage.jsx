@@ -836,9 +836,9 @@ function runFiltersMatch(ev, { query = "", src = "", sev = "", cat = "", client 
   if (client && ev.client_id !== client) return false;
   if (threat) {
     const f = ev.fields || {};
-    const mf = f.module_findings || {};
-    const evtc = String(mf?.find?.((m) => m.threat_class)?.threat_class ||
-                        mf?.network_threat?.threat_class ||
+    const mf = ev.module_findings || f.module_findings || {};
+    const evtc = String(firstFinding(ev)?.threat_class ||
+                        mf.network_threat?.threat_class ||
                         f.threat_class || "").toLowerCase();
     if (!evtc.includes(threat.toLowerCase())) return false;
   }

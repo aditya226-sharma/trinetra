@@ -80,9 +80,8 @@ function offlineSearch(list, { query = "", source_type = "", severity = "", cate
     if (client_id && e.client_id !== client_id) return false;
     if (tc) {
       const f = e.fields || {};
-      const mf = f.module_findings || {};
-      const evtc = String(mf?.find?.((m) => m.threat_class)?.threat_class ||
-                          mf?.network_threat?.threat_class ||
+      const mf = e.module_findings || f.module_findings || {};
+      const evtc = String(mf.network_threat?.threat_class ||
                           f.threat_class || "").toLowerCase();
       if (!evtc.includes(tc)) return false;
     }
@@ -220,7 +219,7 @@ export async function exportCsv(params = {}) {
     return new Blob([rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" });
   }
   const { data } = await api.get("/events/search", {
-    params: { ...params, limit: 5000, offset: 0, format: "csv" },
+    params: { ...params, format: "csv" },
     responseType: "blob",
   });
   return new Blob([data], { type: "text/csv" });
@@ -435,7 +434,10 @@ export async function setCollectors(patch) {
 }
 
 export function complianceReportUrl(assetId) {
-  return `/report/${encodeURIComponent(assetId)}`;
+  const base = import.meta.env.BASE_URL || "/";
+  return base === "/"
+    ? `/report/${encodeURIComponent(assetId)}`
+    : `${base}#/report/${encodeURIComponent(assetId)}`;
 }
 
 // ------------------------------------------------------------------

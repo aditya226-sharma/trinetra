@@ -89,7 +89,7 @@ export default function IncidentPage({ role }) {
         </div>
         {canAct && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {c.status !== "investigation" && (
+            {c.status !== "investigation" && c.status !== "closed" && (
               <button onClick={() => act("investigate")} disabled={busy} className="btn-primary mono !py-1.5 text-[10.5px]">investigate</button>
             )}
             {c.status !== "open" && c.status !== "investigation" && (
