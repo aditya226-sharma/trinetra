@@ -90,6 +90,21 @@ async def lifespan(_app: FastAPI):
             _ORCH.stats["raw_lines"] = len(_ORCH.raw_store)
         except Exception:
             pass
+        # Rebuild per-client raw-line counters so scoped dashboards report
+        # their own volume (not the estate-wide total) right after restart.
+        try:
+            raw_by_client: Dict[str, int] = {}
+            for rec in _ORCH.raw_store.iter_records():
+                cid = str(rec.get("client_id") or "")
+                if cid:
+                    raw_by_client[cid] = raw_by_client.get(cid, 0) + 1
+            for cid, n in raw_by_client.items():
+                _ORCH.client_stats.setdefault(cid, {})["raw_lines"] = n
+            for cid, n in (_ORCH.event_store.count_by("client_id") or {}).items():
+                if str(cid):
+                    _ORCH.client_stats.setdefault(str(cid), {})["events"] = n
+        except Exception:
+            pass
         # The graph + threat detector are memory-only: replay persisted events
         # into them so the entity graph isn't empty after a redeploy.
         try:
@@ -454,11 +469,13 @@ def alerts(limit: int = Query(50, le=500),
         raise HTTPException(status_code=428, detail="Bootstrap first")
     scope = _client_scope(payload)
     log_rows = _ORCH.alerts_log[::-1]
+    sent = _ORCH.stats.get("alerts_sent", 0)
     if scope:
         log_rows = [a for a in log_rows if _alert_for_scope(a, scope)]
+        sent = _ORCH.client_stats.get(str(scope), {}).get("alerts_sent", 0)
     return {"alerts": log_rows[:limit],
             "count": len(log_rows),
-            "sent": _ORCH.stats.get("alerts_sent", 0)}
+            "sent": sent}
 
 
 def _alert_for_scope(alert: Dict[str, Any], client_id: str) -> bool:
@@ -570,13 +587,17 @@ def _scoped_dashboard(client_id: str) -> Dict[str, Any]:
         threat_counts[c["threat_class"]] = threat_counts.get(c["threat_class"], 0) + 1
     findings = [f for f in _ORCH.findings_log
                 if _touches_client(f, client_id)][-50:]
+    cstats = _ORCH.client_stats.get(str(client_id or ""), {})
+    raw_lines = cstats.get("raw_lines", 0)
+    dupes = cstats.get("duplicates", 0)
+    dedup_rate = (dupes / raw_lines) if raw_lines else 0.0
     return {
         "client_id": client_id,
         "scope": client_id,
         "stats": {"events": events, "findings": len(findings),
                   "alerts_sent": stats.get("total", 0),
-                  "raw_lines": _ORCH.stats.get("raw_lines", 0)},
-        "dedup_rate": _ORCH.dedup.duplicate_rate,
+                  "raw_lines": raw_lines},
+        "dedup_rate": dedup_rate,
         "threat_detections": threat_counts,
         "tasks": _task_dashboard(client_id),
         "incidents": {

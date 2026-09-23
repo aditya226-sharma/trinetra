@@ -98,8 +98,18 @@ class Orchestrator:
         self.vpn_profiles: List[Dict] = []
         self.stats = {"raw_lines": 0, "events": 0, "duplicates": 0, "findings": 0,
                       "alerts_sent": 0, "analyzer_calls": 0}
+        # Per-client pipeline counters so scoped (client) dashboards report
+        # only their own telemetry instead of leaking estate-wide totals.
+        self.client_stats: Dict[str, Dict[str, int]] = {}
         self.findings_log: List[Dict] = []
         self.alerts_log: List[Dict] = []
+
+    def _bump_client(self, client_id: str, key: str) -> None:
+        cid = str(client_id or "").strip()
+        if not cid:
+            return
+        row = self.client_stats.setdefault(cid, {})
+        row[key] = row.get(key, 0) + 1
 
     # ------------------------------------------------------------------ run
     def ingest(self, raw: str, source: str = "", client_id: str = "",
@@ -112,6 +122,7 @@ class Orchestrator:
         not an event, e.g. a CSV header row).
         """
         self.stats["raw_lines"] += 1
+        self._bump_client(client_id, "raw_lines")
         event = self.normalizer.normalize(raw, source, client_id, host_hint)
         if event is None:
             return "invalid"
@@ -206,8 +217,10 @@ class Orchestrator:
         """
         if not self.dedup.track(event):
             self.stats["duplicates"] += 1
+            self._bump_client(event.client_id, "duplicates")
             return "duplicate"
         self.stats["events"] += 1
+        self._bump_client(event.client_id, "events")
 
         # SOC policy gate (watchlist / blocklist / custom rules). Runs before
         # persistence so a blocklist hit can flag the stored event; policy
@@ -280,6 +293,7 @@ class Orchestrator:
         for finding in window_findings:
             self.stats["findings"] += 1
             self.findings_log.append(finding)
+            self._bump_client(finding.get("client_id"), "findings")
             self.graph.add_finding(finding)
             # M3: persist the module finding back onto the source flow events
             # so /api/events/search?threat_class= returns correlated events.
@@ -307,6 +321,7 @@ class Orchestrator:
             findings_alerts = self.notifier.alert(finding)
             self.stats["alerts_sent"] += sum(
                 1 for r in findings_alerts if r.get("status") == "sent")
+            self._bump_client(finding.get("client_id"), "alerts_sent")
             self.alerts_log.append({
                 "timestamp": finding.get("alert", {}).get("timestamp") or
                              finding.get("timestamp") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
