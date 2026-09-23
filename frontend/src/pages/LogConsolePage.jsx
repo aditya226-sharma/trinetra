@@ -70,7 +70,7 @@ export default function LogConsolePage() {
     searchEvents({ client_id: clientId, limit: 200 })
       .then((d) => {
         if (!alive) return;
-        const sorted = (d.events || []).reverse();
+        const sorted = d.events || [];
         setLines(sorted);
         setTotal(d.total || 0);
         setError(null);
@@ -162,7 +162,8 @@ export default function LogConsolePage() {
       const byId = new Map();
       missed.forEach((e) => { if (e.event_id) byId.set(e.event_id, e); });
       const fresh = [...byId.values()].filter((e) => !seen.has(e.event_id));
-      let next = [...fresh.reverse(), ...prev];
+      fresh.sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
+      let next = [...fresh, ...prev];
       if (next.length > MAX_LINES) next = next.slice(0, MAX_LINES);
       return next;
     });
