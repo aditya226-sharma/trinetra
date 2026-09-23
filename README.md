@@ -117,18 +117,16 @@ and serves it with identical response shapes — search and drill-downs behave
 exactly like the live product (a small amber `PREVIEW DATA` badge indicates
 bundled data).
 
-The snapshot is kept fresh automatically: the production watchdog re-exports
-it from the live instance roughly every 20 minutes and pushes it (only when
-data changed), so the Pages URL is a stable, always-reachable **near-live
-mirror**. The live sink changes its tunnel URL on restart, but the Pages
-mirror is permanent.
+The snapshot is refreshed manually from the local instance (auth needed for
+authed endpoints), so the Pages URL is a stable, always-reachable **near-live
+mirror**:
 
 ```bash
-# refresh the snapshot manually (auth needed for authed endpoints):
+# refresh the snapshot against the running local API, then commit + push:
 TRINETRA_TOKEN=<jwt> python3 scripts/export_snapshot.py http://127.0.0.1:8000/api
 ```
 
-Run the container for the live pipeline against fresh/ingested data:
+Run locally against fresh/ingested data:
 
 ### Central log forwarding (log-agent → dashboard)
 
