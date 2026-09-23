@@ -5,6 +5,10 @@ import { PageHeader, SeverityBadge, SeverityDot, Empty, PlainBadge } from "../co
 
 const MAX_LINES = 2000;
 
+// Cloudflare quick tunnels buffer SSE heavily, so live tails also poll the
+// search endpoint on an interval as a catch-up fallback (deduped by event_id).
+const POLL_MS = 8000;
+
 function fmtAgo(iso) {
   if (!iso) return "—";
   const then = new Date(iso);
@@ -47,6 +51,8 @@ export default function LogConsolePage() {
   // Events that arrive while FREEZE is on are held here and replayed on resume
   // (instead of being silently dropped from the live tail).
   const missedRef = useRef([]);
+  const pollRef = useRef(null);
+  const pollInFlight = useRef(false);
 
   // Newest lines are PREPENDED, so "following live" means pinned at the TOP.
   // Scrolling up/down into history disables auto-follow until the user returns.
@@ -110,22 +116,56 @@ export default function LogConsolePage() {
     return () => closeStream.current?.();
   }, [live, clientId]);
 
+  // Poll catch-up: quick tunnels buffer/drop SSE, so periodically re-sync the
+  // tail against the search endpoint and merge any events that didn't arrive
+  // over the stream (deduped by event_id, newest kept at the top).
+  useEffect(() => {
+    if (!live) return () => clearInterval(pollRef.current);
+    const tick = async () => {
+      if (pollInFlight.current) return;
+      pollInFlight.current = true;
+      try {
+        const d = await searchEvents({ client_id: clientId, limit: 100 });
+        const seen = new Set(linesRef.current.map((e) => e.event_id));
+        const fresh = (d.events || []).filter((e) => e.event_id && !seen.has(e.event_id));
+        if (fresh.length > 0) {
+          if (pausedRef.current) {
+            missedRef.current.push(...fresh);
+          } else {
+            setLines((prev) => {
+              const freshIds = new Set(fresh.map((e) => e.event_id));
+              const next = [...fresh, ...prev.filter((e) => !freshIds.has(e.event_id))];
+              return next.length > MAX_LINES ? next.slice(0, MAX_LINES) : next;
+            });
+          }
+        }
+        if (typeof d.total === "number") setTotal(d.total);
+      } catch {
+        /* transient search failure — fall back to pure SSE until next tick */
+      } finally {
+        pollInFlight.current = false;
+      }
+    };
+    tick();
+    pollRef.current = setInterval(tick, POLL_MS);
+    return () => clearInterval(pollRef.current);
+  }, [live, clientId]);
+
   // Resume: replay the events buffered while frozen, most recent first.
   useEffect(() => {
     if (paused) return;
     const missed = missedRef.current;
     missedRef.current = [];
     if (missed.length === 0) return;
-    let freshCount = 0;
     setLines((prev) => {
       const seen = new Set(prev.map((e) => e.event_id));
-      const fresh = missed.filter((e) => !seen.has(e.event_id));
-      freshCount = fresh.length;
+      const byId = new Map();
+      missed.forEach((e) => { if (e.event_id) byId.set(e.event_id, e); });
+      const fresh = [...byId.values()].filter((e) => !seen.has(e.event_id));
       let next = [...fresh.reverse(), ...prev];
       if (next.length > MAX_LINES) next = next.slice(0, MAX_LINES);
       return next;
     });
-    setTotal((t) => t + freshCount);
   }, [paused]);
 
   // Auto-scroll
