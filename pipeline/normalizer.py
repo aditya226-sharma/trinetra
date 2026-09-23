@@ -57,7 +57,7 @@ class Normalizer:
         if not raw or not raw.strip():
             return None
 
-        source_type = guess_source_type(raw, source or "generic")
+        source_type = guess_source_type(raw, source)
         client_id = client_id or self.default_client_id
         trace_id = make_trace_id(client_id, source_type, raw)
 

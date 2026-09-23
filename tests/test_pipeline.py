@@ -40,6 +40,27 @@ def test_normalizer_preserves_raw_and_trace(tmp_path):
     assert n.raw_store.get(event.trace_id) == raw
 
 
+def test_normalizer_auto_detects_source_type(tmp_path):
+    """Untagged lines must be auto-detected, not forced to 'generic'.
+
+    Regression: the normalizer passed ``source or "generic"`` into
+    ``guess_source_type``, which returns any non-empty source verbatim and
+    never reached the detection heuristics — every untagged line was
+    classified 'generic' and parsed with the fallback instead of its format.
+    """
+    n = _normalizer(tmp_path)
+    cases = [
+        ('{"ts": "Sep 23 10:00:01", "level": "error", "msg": "boom"}', "json", "application"),
+        ("<134>Sep 23 10:00:01 web01 sshd[1234]: Failed password for root", "syslog", "auth"),
+        ("CEF:0|TriNetra|FW|1.0|100|x|5|src=1.2.3.4 dst=5.6.7.8", "cef", "system"),
+        ("blah nothing special", "generic", "system"),
+    ]
+    for raw, expect_type, _cat in cases:
+        event = n.normalize(raw, "", "web01")
+        assert event is not None
+        assert event.source_type == expect_type, f"{raw[:40]!r} -> {event.source_type}"
+
+
 def test_dedup_counter():
     dc = DedupCounter()
     raw = "dup line"
