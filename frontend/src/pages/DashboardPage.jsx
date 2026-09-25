@@ -232,6 +232,19 @@ function AdminOverview({ data, clients }) {
   const incidents = data.incidents || { open: [], investigation: [], closed: [], stats: {} };
   const g = data.graph_summary || {};
   const top = clients.slice().sort((a, b) => (b.events ?? 0) - (a.events ?? 0));
+  // Only clients that actually reported get a ring segment. A registered but
+  // silent sensor has no share, and colouring it like a reporting one made the
+  // legend lie about which slice was which.
+  const active = top.filter((c) => (c.events ?? 0) > 0);
+  const activeIds = new Set(active.map((c) => c.client_id));
+  const feedSegments = active.map((c, i) => ({ value: c.events, color: DONUT_COLORS[i % DONUT_COLORS.length] }));
+  // Centre the ring on the segments it actually draws so the two can never
+  // disagree when the store total and the per-client sum drift apart.
+  const feedTotal = feedSegments.reduce((acc, x) => acc + x.value, 0);
+  const feedColor = (c) => {
+    const i = active.findIndex((x) => x.client_id === c.client_id);
+    return i < 0 ? "rgba(148,163,184,0.25)" : DONUT_COLORS[i % DONUT_COLORS.length];
+  };
   const eventsSpark = top.map((c) => c.events);
   const threatVals = Object.values(threats).map(Number);
   const { toast, dismiss } = useLiveChannel("");
@@ -358,18 +371,35 @@ function AdminOverview({ data, clients }) {
           ) : (
             <>
               <div className="flex justify-center pb-2">
-                <Donut size={172} thickness={17} centerValue={s.events ?? 0} centerLabel="events" segments={top.map((c, i) => ({ value: c.events ?? 0, color: DONUT_COLORS[i % DONUT_COLORS.length] }))} />
+                <Donut
+                  size={172}
+                  thickness={17}
+                  centerValue={feedTotal}
+                  centerLabel={active.length < top.length ? "events · active" : "events"}
+                  segments={feedSegments}
+                />
               </div>
               <div className="mt-2 space-y-1.5">
-                {top.map((c, i) => (
-                  <div key={c.client_id} className="flex items-center gap-2 text-[12px]">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length], boxShadow: `0 0 8px ${DONUT_COLORS[i % DONUT_COLORS.length]}` }} />
-                    <span className="mono truncate text-slate-300">{c.client_id}</span>
-                    <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
-                    <span className="ml-auto mono tabular-nums text-slate-500">{c.events ?? 0}</span>
-                  </div>
-                ))}
+                {top.map((c) => {
+                  const color = feedColor(c);
+                  return (
+                    <div key={c.client_id} className="flex items-center gap-2 text-[12px]">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
+                      <span className="mono truncate text-slate-300">{c.client_id}</span>
+                      <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
+                      {!activeIds.has(c.client_id) && (
+                        <span className="text-[9.5px] uppercase tracking-wider text-slate-600">silent</span>
+                      )}
+                      <span className="ml-auto mono tabular-nums text-slate-500">{c.events ?? 0}</span>
+                    </div>
+                  );
+                })}
               </div>
+              {active.length < top.length && (
+                <p className="mt-2 text-[10.5px] text-slate-600">
+                  {top.length - active.length} registered sensor{top.length - active.length === 1 ? "" : "s"} reported no events and {top.length - active.length === 1 ? "is" : "are"} excluded from the ring.
+                </p>
+              )}
             </>
           )}
         </section>

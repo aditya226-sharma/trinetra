@@ -46,9 +46,15 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
       </defs>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,0.1)" strokeWidth={thickness} />
       {segments.map((s, i) => {
-        const len = (s.value / total) * c;
+        const raw = (s.value / total) * c;
+        // 2px inset between neighbouring arcs. A zero (or sub-inset) share
+        // yields a non-positive dash, and a negative strokeDasharray is
+        // invalid: the browser discards it and paints the circle as an
+        // unbroken full ring, which buried every real arc in this chart.
+        const dash = raw - 2;
+        if (!(dash > 0)) return null;
         const off = c - acc;
-        acc += len;
+        acc += raw;
         return (
           <circle
             key={i}
@@ -58,8 +64,8 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
             fill="none"
             stroke={s.color}
             strokeWidth={thickness}
-            strokeLinecap="round"
-            strokeDasharray={`${len - 2} ${c - len + 2}`}
+            strokeLinecap="butt"
+            strokeDasharray={`${dash} ${c - dash}`}
             strokeDashoffset={off}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
             style={{ filter: `drop-shadow(0 0 6px ${s.color}66)` }}
