@@ -22,6 +22,20 @@ describe("pickRenderable", () => {
     expect(r.hidden).toBe(0);
   });
 
+  it("drops dangling edges on the untrimmed fast path too", () => {
+    // A kind filter can leave edges pointing at nodes that are gone. Counting
+    // those made the legend claim relationships the canvas cannot draw.
+    const nodes = [{ id: "a", kind: "domain" }, { id: "b", kind: "ip" }];
+    const edges = [
+      { source: "a", target: "b", kind: "dns" },
+      { source: "a", target: "gone", kind: "comm" },
+      { source: "gone", target: "b", kind: "comm" },
+    ];
+    const r = pickRenderable(nodes, edges);
+    expect(r.edges).toHaveLength(1);
+    expect(r.edges[0].kind).toBe("dns");
+  });
+
   it("caps the laid-out node count and reports what it hid", () => {
     const { nodes, edges } = mk(2000);
     const r = pickRenderable(nodes, edges);
@@ -94,6 +108,50 @@ describe("pickRenderable", () => {
     const r = pickRenderable(nodes, edges, 20);
     expect(r.nodes.length).toBeLessThanOrEqual(20);
     expect(r.hidden).toBe(nodes.length - r.nodes.length);
+  });
+
+  it("keeps a pinned search hit even when it is low-degree", () => {
+    // A degree-0 node would never survive degree ranking, but the user
+    // searched for it by name, so it has to be on screen.
+    const nodes = [{ id: "needle", kind: "domain", severity: "none" }];
+    for (let i = 0; i < 400; i++) {
+      nodes.push({ id: `ip${i}`, kind: "ip", severity: "none" });
+      if (i) nodes.push({ id: `d${i}`, kind: "domain", severity: "none" });
+    }
+    const edges = [];
+    for (let i = 1; i < 400; i++) edges.push({ source: `ip${i}`, target: `ip${(i * 3) % 400}` });
+
+    const without = pickRenderable(nodes, edges, 20);
+    expect(without.nodes.map((n) => n.id)).not.toContain("needle");
+
+    const withPin = pickRenderable(nodes, edges, 20, ["needle"]);
+    expect(withPin.nodes.map((n) => n.id)).toContain("needle");
+    expect(withPin.nodes.length).toBeLessThanOrEqual(20);
+  });
+
+  it("ignores a pin that is not in the node set", () => {
+    const { nodes, edges } = mk(400);
+    const r = pickRenderable(nodes, edges, 20, ["nope", "n5"]);
+    expect(r.nodes.map((n) => n.id)).toContain("n5");
+    expect(r.nodes.map((n) => n.id)).not.toContain("nope");
+    expect(r.nodes.length).toBeLessThanOrEqual(20);
+  });
+
+  it("ranks focus nodes above ctx context nodes", () => {
+    // Context exists so a filtered node keeps its edges; it must never
+    // displace the node the user filtered for.
+    const nodes = [];
+    const edges = [];
+    for (let i = 0; i < 50; i++) {
+      nodes.push({ id: `ctx${i}`, kind: "ip", severity: "none", ctx: true });
+      edges.push({ source: `ctx${i}`, target: `focus${i}`, kind: "dns" });
+      nodes.push({ id: `focus${i}`, kind: "domain", severity: "none" });
+    }
+    const r = pickRenderable(nodes, edges, 20);
+    const keptCtx = r.nodes.filter((n) => n.ctx).length;
+    expect(keptCtx).toBe(0);
+    expect(r.nodes).toHaveLength(20);
+    expect(r.nodes.every((n) => n.kind === "domain")).toBe(true);
   });
 });
 

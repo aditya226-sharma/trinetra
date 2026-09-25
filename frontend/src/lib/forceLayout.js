@@ -23,11 +23,24 @@ const SEVERITY_RANK = { critical: 5, high: 4, warning: 3, medium: 3, low: 2, non
  * Keep the most significant nodes: degree first (hubs carry the structure),
  * then severity, so trimming never hides the interesting part of the graph.
  * A reserved slice of the budget is held for RESERVED_KINDS so their
- * relationships survive. Edges are kept only when both endpoints survive, so
- * the render is consistent.
+ * relationships survive. Ids in `pin` are kept unconditionally, which is how
+ * a search hit stays visible even when it is low-degree and would be trimmed.
+ * Nodes flagged `ctx: true` are context pulled in by a filter; they rank below
+ * every focus node so the cap is spent on what the user actually asked for.
+ * Edges are kept only when both endpoints survive, so the render is consistent.
  */
-export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES) {
-  if (nodes.length <= cap) return { nodes, edges, hidden: 0 };
+export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES, pin = []) {
+  if (nodes.length <= cap) {
+    // Nothing is trimmed, but a filtered graph can still reference nodes that
+    // are no longer in the set, and the render (and the drawn-count legend)
+    // depends on both endpoints surviving.
+    const ids = new Set(nodes.map((n) => n.id));
+    return {
+      nodes,
+      edges: edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+      hidden: 0,
+    };
+  }
 
   const degree = new Map();
   for (const e of edges) {
@@ -35,6 +48,8 @@ export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES) {
     degree.set(e.target, (degree.get(e.target) || 0) + 1);
   }
   const ranked = [...nodes].sort((a, b) => {
+    const f = Number(a.ctx === true) - Number(b.ctx === true);
+    if (f) return f;
     const d = (degree.get(b.id) || 0) - (degree.get(a.id) || 0);
     if (d) return d;
     const s = (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0);
@@ -43,6 +58,16 @@ export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES) {
   });
 
   const keep = new Set();
+  // A search hit must never be the thing that gets trimmed.
+  const present = new Set(nodes.map((n) => n.id));
+  let pinned = 0;
+  for (const id of pin) {
+    if (pinned >= cap) break;
+    if (present.has(id)) {
+      keep.add(id);
+      pinned += 1;
+    }
+  }
   const reserve = Math.max(1, Math.floor(cap * RESERVED_FRACTION));
   for (const kind of RESERVED_KINDS) {
     let taken = 0;
