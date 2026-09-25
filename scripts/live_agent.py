@@ -69,6 +69,58 @@ THREAT_TEMPLATES = [
     ("network", "critical", "dga: high-entropy DNS query to 198.108.1.1 (.top)"),
 ]
 
+# Structured fields per template, so the enrichment pipeline (entity graph,
+# auth/user edges, network-threat correlation) can consume the events the way
+# it consumes raw-parsed records. The graph keys on src_ip/dst_ip/dns_query
+# and the auth edges key on user/proc; embedding those only in the message
+# string leaves the graph empty.
+SRC = "10.10.1.{h}"
+DST = "198.51.100.{n}"
+ATTACKER = "203.0.113.{n}"
+
+
+def _fields_for(source: str, cat: str, sev: str, client_id: str,
+                threat: bool) -> dict:
+    """Structured UES fields matching what the raw parsers would have produced."""
+    rnd = random.Random()
+    h = rnd.randint(2, 250)
+    n = rnd.randint(2, 250)
+    host_ip = FLEET.get(client_id, (client_id, "", "", ""))[3] or "10.10.1.22"
+    base = {"host": client_id, "agent": "live_agent"}
+
+    if source == "flow":
+        src, dst = SRC.format(h=h), DST.format(n=n)
+        base.update({"src_ip": src, "dst_ip": dst, "proto": "tcp",
+                     "dport": rnd.choice([80, 443, 22, 8080]),
+                     "bytes": rnd.randint(200, 9000), "pkts": rnd.randint(2, 200),
+                     "flags": "S"})
+    elif source == "cef":
+        base.update({"src_ip": f"10.10.1.{h}", "dst_ip": f"198.51.100.{n}",
+                     "dpt": rnd.choice([22, 443, 3389]),
+                     "device": rnd.choice(["em0", "igb0", "ens192"])})
+    elif cat == "auth":
+        base.update({"user": rnd.choice(["deploy", "svc-batch", "root", "admin"]),
+                     "src_ip": ATTACKER.format(n=n) if sev != "info" else f"10.10.0.{h}",
+                     "proc": "sshd"})
+    elif source == "nginx":
+        base.update({"client_ip": f"10.10.1.{h}", "dst_ip": host_ip,
+                     "status": rnd.choice([200, 401, 404])})
+    elif source == "syslog":
+        base.update({"host": client_id, "dst_ip": host_ip, "proc": "sshd",
+                     "user": "deploy"})
+
+    if threat and cat == "network":
+        base.update({"src_ip": ATTACKER.format(n=n), "dst_ip": f"10.10.1.{h}",
+                     "dns_query": f"{rnd.getrandbits(48):012x}.top",
+                     "port_scan_count": rnd.randint(12, 40)})
+    if threat and cat == "auth":
+        base.update({"user": "root", "src_ip": ATTACKER.format(n=n),
+                     "failed_attempts": rnd.randint(6, 30), "proc": "sshd"})
+    if threat and cat == "flow":
+        base.update({"src_ip": f"10.10.1.{h}", "dst_ip": f"198.51.100.{n}",
+                     "beacon_interval_s": 60, "c2": True})
+    return base
+
 _RUNNING = True
 
 
@@ -98,23 +150,114 @@ def _fill(tpl: str) -> str:
     )
 
 
-def _event(client_id: str, threat_bias: float = 0.12) -> dict:
-    if random.random() < threat_bias:
-        cat, sev, msg = random.choice(THREAT_TEMPLATES)
+def _event(client_id: str, threat_bias: float = 0.12, ts: str = None) -> dict:
+    threat = random.random() < threat_bias
+    pool = THREAT_TEMPLATES if threat else TEMPLATES
+    if threat:
+        cat, sev, msg = random.choice(pool)
         source = {"network": "cef", "auth": "auth", "flow": "flow"}[cat]
     else:
-        source, cat, sev, msg = random.choice(TEMPLATES)
+        source, cat, sev, msg = random.choice(pool)
+    body = _fill(msg)
     return {
         "event_id": str(uuid.uuid4()),
-        "timestamp": _now_iso(),
+        "timestamp": ts or _now_iso(),
         "source": source,
         "level": sev,
         "category": cat,
-        "message": _fill(msg),
-        "raw": _fill(msg),
+        "message": body,
+        "raw": body,
         "client_id": client_id,
-        "metadata": {"host": client_id, "agent": "live_agent"},
+        "metadata": _fields_for(source, cat, sev, client_id, threat),
     }
+
+
+# -- correlated threat scenarios ------------------------------------------
+# modules/network_threat.py only alerts on *correlated* traffic, so isolated
+# random events never trip a rule. These bursts are shaped to satisfy the real
+# detector thresholds so the live feed exercises the detection pipeline.
+
+SCENARIOS = ("port_scan", "ddos", "c2_beacon", "dga")
+
+_SCAN_PORTS = (21, 22, 23, 25, 53, 80, 110, 135, 139, 445,
+               1433, 3306, 3389, 5432, 8080, 9200)
+
+
+def _flow_ev(client_id, ts, src, dst, dport, pkts, bytez, flags="S",
+             level="info", extra=None):
+    msg = f"proto=tcp src={src} dst={dst} dport={dport} pkts={pkts} bytes={bytez} flags={flags}"
+    fields = {"host": client_id, "src_ip": src, "dst_ip": dst, "proto": "tcp",
+              "dport": dport, "pkts": pkts, "bytes": bytez, "flags": flags}
+    if extra:
+        fields.update(extra)
+    return {
+        "event_id": str(uuid.uuid4()),
+        "timestamp": ts,
+        "source": "flow",
+        "level": level,
+        # orchestrator only routes category == "flow" into ThreatDetector
+        "category": "flow",
+        "message": msg,
+        "raw": msg,
+        "client_id": client_id,
+        "metadata": fields,
+    }
+
+
+def _burst(client_id: str, kind: str) -> list:
+    """Emit a correlated burst that satisfies one network-threat detector."""
+    ts = _now_iso()
+    attacker = f"203.0.113.{random.randint(2, 250)}"
+    out = []
+
+    if kind == "port_scan":
+        # one source, high dst fan-out, <=3 packets/flow
+        for i in range(18):
+            dst = f"10.10.1.{2 + (i * 13) % 240}"
+            out.append(_flow_ev(client_id, ts, attacker, dst,
+                                random.choice(_SCAN_PORTS), 1, 40,
+                                level="warning",
+                                extra={"threat_class": "port_scan"}))
+
+    elif kind == "ddos":
+        # >=4 unique sources converging on one private target, high SYN volume
+        target = f"10.10.1.{random.randint(2, 250)}"
+        for _ in range(6):
+            src = f"198.51.100.{random.randint(2, 250)}"
+            for _ in range(4):
+                out.append(_flow_ev(client_id, ts, src, target, 443, 12, 900,
+                                    level="critical",
+                                    extra={"threat_class": "ddos"}))
+
+    elif kind == "c2_beacon":
+        # same (src,dst) pair, identical timestamps -> zero-variance inter-arrival
+        src = f"10.10.1.{random.randint(2, 250)}"
+        dst = f"198.51.100.{random.randint(2, 250)}"
+        for _ in range(8):
+            out.append(_flow_ev(client_id, ts, src, dst, 8443, 3, 380,
+                                level="critical",
+                                extra={"beacon_interval_s": 60, "c2": True}))
+
+    elif kind == "dga":
+        # >=3 high-entropy queries from one source
+        src = f"10.10.1.{random.randint(2, 250)}"
+        for _ in range(6):
+            label = f"{random.getrandbits(52):013x}"
+            query = f"{label}.top"
+            out.append({
+                "event_id": str(uuid.uuid4()),
+                "timestamp": ts,
+                "source": "flow",
+                "level": "critical",
+                "category": "flow",
+                "message": f"dns query {query} via 8.8.8.8 proto=udp",
+                "raw": f"dns query {query} via 8.8.8.8 proto=udp",
+                "client_id": client_id,
+                "metadata": {"host": client_id, "src_ip": src, "dst_ip": "8.8.8.8",
+                             "proto": "udp", "dns_query": query,
+                             "threat_class": "dga_dns"},
+            })
+    return out
 
 
 def _stop(*_a):
@@ -128,6 +271,8 @@ def main(argv=None) -> int:
     ap.add_argument("--token", default=os.environ.get("AGENT_TOKEN", ""))
     ap.add_argument("--interval", type=float, default=4.0, help="seconds between ticks")
     ap.add_argument("--batch", type=int, default=3, help="events per client per tick")
+    ap.add_argument("--scenario-every", type=int, default=5,
+                    help="emit a correlated threat burst every N ticks (0 = never)")
     ap.add_argument("--clients", default="", help="comma list; default = full FLEET")
     ap.add_argument("--duration", type=float, default=0.0, help="stop after N seconds (0 = forever)")
     ap.add_argument("--once", action="store_true", help="one tick then exit")
@@ -143,6 +288,7 @@ def main(argv=None) -> int:
 
     started = time.monotonic()
     total_sent = 0
+    tick = 0
     while _RUNNING:
         for cid in clients:
             host, platform, version, ip = FLEET.get(cid, (cid, "", "", ""))
@@ -152,6 +298,11 @@ def main(argv=None) -> int:
                     "agent_version": version, "ip": ip,
                 }, args.token)
                 batch = [_event(cid) for _ in range(max(1, args.batch))]
+                if args.scenario_every and tick and tick % args.scenario_every == 0:
+                    kind = random.choice(SCENARIOS)
+                    burst = _burst(cid, kind)
+                    batch.extend(burst)
+                    print(f"scenario={kind} client={cid} events={len(burst)}", file=sys.stderr)
                 res = _http(args.api, "/api/ingest-events", {"events": batch}, args.token)
                 total_sent += int(res.get("accepted", 0))
             except urllib.error.HTTPError as e:
@@ -169,6 +320,7 @@ def main(argv=None) -> int:
         if args.duration and (time.monotonic() - started) >= args.duration:
             print(f"done: sent ~{total_sent} events in {time.monotonic() - started:.0f}s")
             return 0
+        tick += 1
         time.sleep(args.interval)
 
     print(f"stopped: sent ~{total_sent} events")
