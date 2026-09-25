@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ingestLines, ingestBulkFile, getClients, searchEvents } from "../lib/api";
-import { PageHeader, LiveBadge, SeverityBadge, PlainBadge, Empty } from "../components/ui";
+import { ingestLines, ingestBulkFile, getClients, searchEvents, getAnalytics } from "../lib/api";
+import { PageHeader, LiveBadge, SeverityBadge, PlainBadge, Empty, SectionTitle } from "../components/ui";
+import { Donut, Sparkline } from "../components/charts";
 
 const SOURCES = ["syslog", "cef", "json", "csv", "netflow", "windows"];
 const SAMPLES = {
@@ -34,9 +35,16 @@ export default function IngestPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const fileRef = useRef(null);
 
+  const [analytics, setAnalytics] = useState(null);
+
   const refreshStored = () =>
     searchEvents({ limit: 1 })
       .then((d) => setStored(d.total))
+      .catch(() => {});
+
+  const refreshAnalytics = () =>
+    getAnalytics(48)
+      .then(setAnalytics)
       .catch(() => {});
 
   useEffect(() => {
@@ -44,6 +52,7 @@ export default function IngestPage() {
     getClients()
       .then((d) => setKnownClients(d.clients || []))
       .catch(() => {});
+    refreshAnalytics();
   }, []);
 
   // drive the terminal stage animation during ingest
@@ -83,6 +92,7 @@ export default function IngestPage() {
       setStage(PIPELINE_STAGES.length);
       setResult(data);
       refreshStored();
+      refreshAnalytics();
       setLines("");
     } catch (e) {
       setError(e.response?.data?.detail || e.message);
@@ -104,6 +114,7 @@ export default function IngestPage() {
       const data = await ingestBulkFile(bulkFile, { source: bulkSource, clientId });
       setBulkResult(data);
       refreshStored();
+      refreshAnalytics();
     } catch (e) {
       setBulkError(e.response?.data?.detail || e.message);
     } finally {
@@ -314,6 +325,35 @@ export default function IngestPage() {
         </section>
       </div>
 
+      {/* ------------------------------------------------ ingest telemetry graphs */}
+      <section className="grid gap-6 xl:grid-cols-2 anim-fadeup" style={{ animationDelay: "120ms" }}>
+        <div className="glass p-5">
+          <SectionTitle
+            right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">GET /api/analytics</span>}
+          >
+            Share by source
+          </SectionTitle>
+          {analytics ? (
+            <SourceDonut obj={analytics.by_source_type} total={analytics.totals?.events_total} />
+          ) : (
+            <Empty title="Awaiting telemetry" hint="Source mix plots here from the store roll-up." />
+          )}
+        </div>
+
+        <div className="glass p-5">
+          <SectionTitle
+            right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">last {analytics?.window_hours || 48}h · every ingest</span>}
+          >
+            Ingest volume
+          </SectionTitle>
+          {analytics ? (
+            <VolumeChart series={analytics.time_series} total={analytics.totals?.events_in_window} />
+          ) : (
+            <Empty title="Awaiting telemetry" hint="Event volume per bucket plots here as lines are ingested." />
+          )}
+        </div>
+      </section>
+
       {/* ------------------------------------------------ bulk upload */}
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "140ms" }}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
@@ -387,4 +427,56 @@ function failedNote(r) {
 
 function Blink() {
   return <span className="inline-block h-3 w-1.5 animate-pulse bg-emerald-400 align-middle" style={{ verticalAlign: "-2px" }} />;
+}
+
+/* --------------------------------------------------------------- ingest graphs */
+const SRC_COLORS = ["#34d399", "#22d3ee", "#818cf8", "#fbbf24", "#f472b6", "#60a5fa"];
+
+function SourceDonut({ obj = {}, total }) {
+  const entries = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    return <Empty title="No events in store yet" hint="Accepted lines are bucketed by source_type for this chart." />;
+  }
+  const head = entries.slice(0, 6);
+  const rest = entries.slice(6).reduce((s, [, v]) => s + v, 0);
+  const segments = head.map(([label, value], i) => ({
+    label,
+    value,
+    color: SRC_COLORS[i % SRC_COLORS.length],
+  }));
+  if (rest > 0) segments.push({ label: "other", value: rest, color: "#64748b" });
+  return (
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+      <Donut size={168} thickness={18} centerValue={(total ?? 0).toLocaleString()} centerLabel="events" segments={segments} />
+      <div className="w-full space-y-1.5">
+        {segments.map((s) => (
+          <div key={s.label} className="flex items-center gap-2 text-[12px]">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
+            <span className="mono truncate text-slate-300">{s.label}</span>
+            <span className="ml-auto mono tabular-nums text-slate-500">{s.value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VolumeChart({ series = [], total }) {
+  const data = (series || []).map((b) => b.events ?? 0);
+  if (data.length === 0) {
+    return <Empty title="No events in window" hint="Hourly buckets appear here once the store grows." />;
+  }
+  if (data.length < 2) data.push(0);
+  const peak = Math.max(...data);
+  const mean = Math.round(data.reduce((s, v) => s + v, 0) / data.length);
+  return (
+    <div>
+      <Sparkline data={data} color="#22d3ee" width={620} height={92} />
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-slate-500">
+        <span className="mono">peak <b className="text-cyan-300">{peak.toLocaleString()}</b> events/bucket</span>
+        <span className="mono">mean <b className="text-slate-300">{mean.toLocaleString()}</b>/bucket</span>
+        <span className="mono">window total <b className="text-emerald-300">{(total ?? 0).toLocaleString()}</b></span>
+      </div>
+    </div>
+  );
 }

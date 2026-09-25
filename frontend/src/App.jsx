@@ -151,7 +151,6 @@ const navItems = [
   { to: "/analytics", label: "Analytics" },
   { to: "/fleet", label: "Fleet" },
   { to: "/ingest", label: "Ingest" },
-  { to: "/console", label: "Console" },
   { to: "/settings", label: "Settings" },
 ];
 
