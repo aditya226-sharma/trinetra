@@ -51,6 +51,50 @@ describe("pickRenderable", () => {
       expect(ids.has(e.target)).toBe(true);
     }
   });
+
+  it("reserves budget for user/proc/threat so their relationships survive", () => {
+    // Mirrors the live shape: a flood of high-degree IPs plus a handful of
+    // users, processes and threat classes whose edges all point at IPs.
+    const nodes = [];
+    const edges = [];
+    for (let i = 0; i < 1000; i++) nodes.push({ id: `ip${i}`, kind: "ip", severity: "none" });
+    for (let i = 0; i < 4; i++) nodes.push({ id: `user:${i}`, kind: "user", severity: "none" });
+    for (let i = 0; i < 1; i++) nodes.push({ id: `proc:${i}`, kind: "proc", severity: "none" });
+    for (let i = 0; i < 3; i++) nodes.push({ id: `threat:${i}`, kind: "threat", severity: "high" });
+    for (let i = 0; i < 15546; i++) {
+      edges.push({ source: `ip${i % 1000}`, target: `ip${(i * 7 + 3) % 1000}`, kind: "comm" });
+    }
+    for (let i = 0; i < 25; i++) edges.push({ source: `user:${i % 4}`, target: `ip${i}`, kind: "auth" });
+    for (let i = 0; i < 4; i++) edges.push({ source: `user:${i}`, target: "proc:0", kind: "exec" });
+    for (let i = 0; i < 424; i++) {
+      edges.push({ source: `ip${i % 1000}`, target: `threat:${i % 3}`, kind: "flagged", threat: 1 });
+    }
+
+    const r = pickRenderable(nodes, edges);
+    const ids = new Set(r.nodes.map((n) => n.id));
+    for (const n of nodes) {
+      if (n.kind === "ip") continue;
+      expect(ids).toContain(n.id);
+    }
+    const kinds = new Set(r.edges.map((e) => e.kind));
+    expect(kinds).toContain("auth");
+    expect(kinds).toContain("exec");
+    expect(kinds).toContain("flagged");
+  });
+
+  it("still honours the cap when reserved kinds are numerous", () => {
+    const nodes = Array.from({ length: 900 }, (_, i) => ({
+      id: `user:${i}`,
+      kind: "user",
+      severity: "none",
+    }));
+    for (let i = 0; i < 100; i++) nodes.push({ id: `ip${i}`, kind: "ip", severity: "none" });
+    const edges = [];
+    for (let i = 0; i < 200; i++) edges.push({ source: `user:${i}`, target: `ip${i % 100}` });
+    const r = pickRenderable(nodes, edges, 20);
+    expect(r.nodes.length).toBeLessThanOrEqual(20);
+    expect(r.hidden).toBe(nodes.length - r.nodes.length);
+  });
 });
 
 describe("computeLayout", () => {

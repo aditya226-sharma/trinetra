@@ -9,12 +9,22 @@
 // only the most significant ones and tell the user how many were hidden.
 export const MAX_LAYOUT_NODES = 180;
 
+// Ranking purely by degree buried the interesting half of the graph: there are
+// ~1000 IPs but only a handful of users, processes and threat classes, so the
+// cap filled with high-degree IPs and every auth/exec/runs/flagged edge lost
+// an endpoint. Those nodes then rendered as unconnected dots even though the
+// legend advertised their colour. Reserve part of the budget for them.
+export const RESERVED_KINDS = ["threat", "user", "proc"];
+export const RESERVED_FRACTION = 0.25;
+
 const SEVERITY_RANK = { critical: 5, high: 4, warning: 3, medium: 3, low: 2, none: 1 };
 
 /**
  * Keep the most significant nodes: degree first (hubs carry the structure),
  * then severity, so trimming never hides the interesting part of the graph.
- * Edges are kept only when both endpoints survive, so the render is consistent.
+ * A reserved slice of the budget is held for RESERVED_KINDS so their
+ * relationships survive. Edges are kept only when both endpoints survive, so
+ * the render is consistent.
  */
 export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES) {
   if (nodes.length <= cap) return { nodes, edges, hidden: 0 };
@@ -31,11 +41,29 @@ export function pickRenderable(nodes, edges, cap = MAX_LAYOUT_NODES) {
     if (s) return s;
     return String(a.id).localeCompare(String(b.id));
   });
-  const keep = new Set(ranked.slice(0, cap).map((n) => n.id));
+
+  const keep = new Set();
+  const reserve = Math.max(1, Math.floor(cap * RESERVED_FRACTION));
+  for (const kind of RESERVED_KINDS) {
+    let taken = 0;
+    for (const n of ranked) {
+      if (taken >= reserve) break;
+      if (n.kind === kind) {
+        keep.add(n.id);
+        taken += 1;
+      }
+    }
+  }
+  for (const n of ranked) {
+    if (keep.size >= cap) break;
+    keep.add(n.id);
+  }
+
+  const kept = ranked.filter((n) => keep.has(n.id));
   return {
-    nodes: ranked.slice(0, cap),
+    nodes: kept,
     edges: edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
-    hidden: nodes.length - cap,
+    hidden: nodes.length - kept.length,
   };
 }
 

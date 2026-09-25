@@ -15,6 +15,19 @@ const KIND_COLOR = {
   threat: "#f43f5e",
 };
 
+// Module C records six relationship kinds. The page used to keep only `comm`
+// and threatened edges, which silently discarded every dns/auth/exec/runs edge
+// and left all domain, user and process nodes unconnected. Each kind now gets
+// its own stroke so the picture says which relationship it is showing.
+const EDGE_STYLE = {
+  comm: { stroke: "#2a3a55", width: 1, dash: null, label: "comm" },
+  dns: { stroke: "#6366f1", width: 1, dash: "3 3", label: "dns" },
+  auth: { stroke: "#34d399", width: 1.5, dash: null, label: "auth" },
+  exec: { stroke: "#fbbf24", width: 1.5, dash: "5 3", label: "exec" },
+  runs: { stroke: "#a78bfa", width: 1.2, dash: null, label: "runs" },
+  flagged: { stroke: "#f43f5e", width: 1.8, dash: null, label: "flagged" },
+};
+
 export default function GraphPage() {
   const [graph, setGraph] = useState(null);
   const [error, setError] = useState(null);
@@ -38,7 +51,10 @@ export default function GraphPage() {
   }, [graph]);
 
   const allNodes = graph?.nodes || [];
-  const allEdges = ((graph?.edges) || []).filter((e) => e.kind === "comm" || e.threat);
+  // Every relationship kind is eligible: filtering to comm+threat orphaned
+  // 4,249 of 5,000 nodes and made the node detail claim "no relationships"
+  // for users and processes that demonstrably had them.
+  const allEdges = graph?.edges || [];
   // Cap the laid-out/rendered set so a large graph cannot lock the UI thread.
   const { nodes, edges, hidden } = useMemo(
     () => pickRenderable(allNodes, allEdges),
@@ -48,6 +64,23 @@ export default function GraphPage() {
   const byId = {};
   allNodes.forEach((n) => (byId[n.id] = n));
   const selNode = selected ? byId[selected] : null;
+  const kindCounts = useMemo(() => {
+    const c = {};
+    for (const e of allEdges) c[e.kind] = (c[e.kind] || 0) + 1;
+    return c;
+  }, [allEdges]);
+  // Count what is actually on screen, so the legend cannot advertise a kind
+  // that trimming removed.
+  const drawnNodeKinds = useMemo(() => {
+    const c = {};
+    for (const n of nodes) c[n.kind] = (c[n.kind] || 0) + 1;
+    return c;
+  }, [nodes]);
+  const drawnEdgeKinds = useMemo(() => {
+    const c = {};
+    for (const e of edges) c[e.kind] = (c[e.kind] || 0) + 1;
+    return c;
+  }, [edges]);
 
   if (error) return <div className="text-sm text-rose-400">Failed to load graph: {error}</div>;
   if (!graph) return <div className="text-slate-500">Rendering entity graph…</div>;
@@ -63,8 +96,9 @@ export default function GraphPage() {
 
       {hidden > 0 && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[12px] text-amber-300">
-          Showing the {nodes.length} most connected of {allNodes.length} nodes
-          ({hidden} lower-degree nodes hidden) to keep the layout responsive.
+          Laying out {nodes.length} of {allNodes.length} nodes ({hidden.toLocaleString()} omitted)
+          to keep the layout responsive. User, process and threat nodes are always included, so
+          their relationships stay visible.
         </div>
       )}
 
@@ -72,12 +106,49 @@ export default function GraphPage() {
         title="Entity graph — click any node"
         right={
           <div className="flex flex-wrap gap-3">
-            {Object.entries(KIND_COLOR).map(([k, c]) => (
-              <LegendDot key={k} color={c} label={k} />
-            ))}
+            {Object.entries(KIND_COLOR)
+              .filter(([k]) => drawnNodeKinds[k])
+              .map(([k, c]) => (
+                <LegendDot key={k} color={c} label={`${k} ${drawnNodeKinds[k]}`} />
+              ))}
           </div>
         }
       >
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-slate-500">
+          <span className="eyebrow">Relationships</span>
+          {Object.keys(EDGE_STYLE)
+            .filter((k) => kindCounts[k])
+            .map((k) => {
+              const s = EDGE_STYLE[k];
+              const drawn = drawnEdgeKinds[k] || 0;
+              const total = kindCounts[k];
+              const partial = drawn < total;
+              return (
+                <span
+                  key={k}
+                  className={`flex items-center gap-1.5 ${partial ? "opacity-60" : ""}`}
+                  title={partial ? `${total.toLocaleString()} recorded, ${drawn.toLocaleString()} laid out` : undefined}
+                >
+                  <svg width="26" height="8" aria-hidden="true">
+                    <line
+                      x1="1"
+                      y1="4"
+                      x2="25"
+                      y2="4"
+                      stroke={s.stroke}
+                      strokeWidth={s.width}
+                      strokeDasharray={s.dash || undefined}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="mono text-slate-400">
+                    {k} {drawn.toLocaleString()}
+                    {partial ? ` of ${total.toLocaleString()}` : ""}
+                  </span>
+                </span>
+              );
+            })}
+        </div>
         <div className="terminal overflow-hidden rounded-xl border border-white/5 bg-black/50 p-3" ref={svgRef}>
           <svg width={size.w} height={size.h} className="block">
             <defs>
@@ -98,7 +169,8 @@ export default function GraphPage() {
               const a = pos[e.source];
               const b = pos[e.target];
               if (!a || !b) return null;
-              const threatened = e.threat === 1;
+              const threatened = e.threat === 1 || e.kind === "flagged";
+              const style = threatened ? EDGE_STYLE.flagged : EDGE_STYLE[e.kind] || EDGE_STYLE.comm;
               const ax = a.x, ay = a.y, bx = b.x, by = b.y;
               const mx = (ax + bx) / 2, my = (ay + by) / 2;
               const dx = bx - ax, dy = by - ay;
@@ -113,8 +185,9 @@ export default function GraphPage() {
                   <path
                     d={path}
                     fill="none"
-                    stroke={threatened ? "#f43f5e" : "#2a3a55"}
-                    strokeWidth={threatened ? 1.8 : 1}
+                    stroke={style.stroke}
+                    strokeWidth={style.width}
+                    strokeDasharray={style.dash || undefined}
                     opacity={threatened ? 0.95 : 0.6}
                     filter={threatened ? "url(#edgeGlow)" : undefined}
                     strokeLinecap="round"
@@ -167,7 +240,8 @@ export default function GraphPage() {
           </svg>
         </div>
         <p className="mt-2 text-[11px] text-slate-500">
-          Amber curves carry module-threat flags · hover nothing, click everything.
+          Rose curves carry module-threat flags · dashed lines are dns lookups · hover nothing,
+          click everything.
         </p>
       </GlassCard>
 
@@ -194,7 +268,10 @@ export default function GraphPage() {
                 );
                 return (
                   <>
-                    <p className="eyebrow mb-2">Connected edges ({linked.length})</p>
+                    <p className="eyebrow mb-2">
+                      Connected edges ({linked.length.toLocaleString()}
+                      {linked.length > 40 ? ` · showing first 40` : ""})
+                    </p>
                     <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
                       {linked.slice(0, 40).map((e, i) => (
                         <div key={i} className="glass-row flex items-center justify-between gap-2 px-3 py-1.5 text-[12px]">
