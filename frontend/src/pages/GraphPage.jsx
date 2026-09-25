@@ -1,62 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getGraph } from "../lib/api";
+import { computeLayout, pickRenderable } from "../lib/forceLayout";
 import { PageHeader, LiveBadge, GlassCard, LegendDot, SeverityBadge, PlainBadge, CodeBlock } from "../components/ui";
 
-// Minimal force-directed layout in pure SVG — no heavy deps.
 function useForceLayout(nodes, edges, width = 900, height = 540) {
-  const positions = useMemo(() => {
-    const pos = {};
-    nodes.forEach((n, i) => {
-      const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
-      pos[n.id] = { x: width / 2 + Math.cos(angle) * 190, y: height / 2 + Math.sin(angle) * 150 };
-    });
-    const k = 0.55;
-    for (let iter = 0; iter < 220; iter++) {
-      const forces = {};
-      nodes.forEach((n) => (forces[n.id] = { x: 0, y: 0 }));
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = pos[nodes[i].id];
-          const b = pos[nodes[j].id];
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const dist2 = Math.max(dx * dx + dy * dy, 20);
-          const f = (k * 9000) / dist2;
-          const d = Math.sqrt(dist2);
-          forces[nodes[i].id].x += (f * dx) / d;
-          forces[nodes[i].id].y += (f * dy) / d;
-          forces[nodes[j].id].x -= (f * dx) / d;
-          forces[nodes[j].id].y -= (f * dy) / d;
-        }
-      }
-      const adj = {};
-      edges.forEach((e) => {
-        if (!adj[e.source]) adj[e.source] = [];
-        adj[e.source].push(e.target);
-        if (!adj[e.target]) adj[e.target] = [];
-        adj[e.target].push(e.source);
-      });
-      nodes.forEach((n) => {
-        (adj[n.id] || []).forEach((t) => {
-          if (!pos[t]) return;
-          const dx = pos[t].x - pos[n.id].x;
-          const dy = pos[t].y - pos[n.id].y;
-          const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1e-6);
-          const f = 0.12 * d;
-          forces[n.id].x += (f * dx) / d;
-          forces[n.id].y += (f * dy) / d;
-        });
-      });
-      nodes.forEach((n) => {
-        pos[n.id].x += forces[n.id].x;
-        pos[n.id].y += forces[n.id].y;
-        pos[n.id].x = Math.max(20, Math.min(width - 20, pos[n.id].x));
-        pos[n.id].y = Math.max(20, Math.min(height - 20, pos[n.id].y));
-      });
-    }
-    return pos;
-  }, [nodes, edges, width, height]);
-  return positions;
+  return useMemo(() => computeLayout(nodes, edges, width, height), [nodes, edges, width, height]);
 }
 
 const KIND_COLOR = {
@@ -89,11 +37,16 @@ export default function GraphPage() {
     return () => observer.disconnect();
   }, [graph]);
 
-  const nodes = graph?.nodes || [];
-  const edges = ((graph?.edges) || []).filter((e) => e.kind === "comm" || e.threat);
+  const allNodes = graph?.nodes || [];
+  const allEdges = ((graph?.edges) || []).filter((e) => e.kind === "comm" || e.threat);
+  // Cap the laid-out/rendered set so a large graph cannot lock the UI thread.
+  const { nodes, edges, hidden } = useMemo(
+    () => pickRenderable(allNodes, allEdges),
+    [allNodes, allEdges]
+  );
   const pos = useForceLayout(nodes, edges, size.w, size.h);
   const byId = {};
-  nodes.forEach((n) => (byId[n.id] = n));
+  allNodes.forEach((n) => (byId[n.id] = n));
   const selNode = selected ? byId[selected] : null;
 
   if (error) return <div className="text-sm text-rose-400">Failed to load graph: {error}</div>;
@@ -105,8 +58,15 @@ export default function GraphPage() {
         eyebrow="Module C · entity correlations"
         title="Relationship graph"
         sub="Force-layout over IPs, users, processes, domains and threat classes. Click a node to pivot into its edges and evidence."
-        actions={<LiveBadge text={`${nodes.length} nodes · ${edges.length} edges`} />}
+        actions={<LiveBadge text={`${allNodes.length} nodes · ${allEdges.length} edges`} />}
       />
+
+      {hidden > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[12px] text-amber-300">
+          Showing the {nodes.length} most connected of {allNodes.length} nodes
+          ({hidden} lower-degree nodes hidden) to keep the layout responsive.
+        </div>
+      )}
 
       <GlassCard
         title="Entity graph — click any node"
@@ -225,22 +185,36 @@ export default function GraphPage() {
         >
           <div className="grid gap-5 md:grid-cols-[1.2fr_1fr]">
             <div>
-              <p className="eyebrow mb-2">Connected edges ({edges.filter((e) => e.source === selected || e.target === selected).length})</p>
-              <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-                {(graph.edges || [])
-                  .filter((e) => e.source === selected || e.target === selected)
-                  .slice(0, 40)
-                  .map((e, i) => (
-                    <div key={i} className="glass-row flex items-center justify-between gap-2 px-3 py-1.5 text-[12px]">
-                      <span className="mono truncate text-slate-300">{e.source} → {e.target}</span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        <PlainBadge>{e.kind}</PlainBadge>
-                        {e.flows ? <span className="mono text-[10px] text-slate-500">{e.flows}f</span> : null}
-                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" /> : null}
-                      </span>
+              {(() => {
+                // Detail view always uses the full edge set: the count and the
+                // list must agree, and a trimmed node may still have more
+                // relationships than the layout shows.
+                const linked = allEdges.filter(
+                  (e) => e.source === selected || e.target === selected
+                );
+                return (
+                  <>
+                    <p className="eyebrow mb-2">Connected edges ({linked.length})</p>
+                    <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                      {linked.slice(0, 40).map((e, i) => (
+                        <div key={i} className="glass-row flex items-center justify-between gap-2 px-3 py-1.5 text-[12px]">
+                          <span className="mono truncate text-slate-300">{e.source} → {e.target}</span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <PlainBadge>{e.kind}</PlainBadge>
+                            {e.flows ? <span className="mono text-[10px] text-slate-500">{e.flows}f</span> : null}
+                            {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" /> : null}
+                          </span>
+                        </div>
+                      ))}
+                      {linked.length === 0 && (
+                        <p className="px-3 py-2 text-[12px] text-slate-500">
+                          No relationships recorded for this node yet.
+                        </p>
+                      )}
                     </div>
-                  ))}
-              </div>
+                  </>
+                );
+              })()}
             </div>
             <div>
               <p className="eyebrow mb-2">Node payload</p>

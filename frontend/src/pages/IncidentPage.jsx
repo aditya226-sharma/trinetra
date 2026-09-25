@@ -63,6 +63,32 @@ export default function IncidentPage({ role }) {
 
   if (loading) return <div className="page-wide anim-fadeup"><div className="mono text-[12px] text-slate-500">Loading incident context…</div></div>;
 
+  // Surface load failures instead of rendering an empty shell: a 403 (scoped
+  // viewer opening another client's incident) or 404 used to look like an
+  // incident with no entity attribution and no activity.
+  if (error && !data) {
+    return (
+      <div className="page-wide space-y-4 anim-fadeup">
+        <button onClick={() => navigate(-1)} className="mono text-[11px] text-slate-500 hover:text-slate-300">← back</button>
+        <section className="glass p-6">
+          <h2 className="text-[15px] font-semibold text-rose-300">Incident unavailable</h2>
+          <p className="mt-2 text-[12.5px] text-slate-400">{error}</p>
+          <p className="mt-3 text-[12px] text-slate-500">
+            The incident may not exist, or it may belong to a client outside your scope.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => navigate("/alerts")} className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-slate-300 hover:border-cyan-400/40 hover:text-cyan-300">
+              Back to alert queue
+            </button>
+            <button onClick={() => navigate("/")} className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-slate-300 hover:border-cyan-400/40 hover:text-cyan-300">
+              Go to dashboard
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   const incident = data || {};
   const c = incident.case || {};
   const involved = incident.involved || [];

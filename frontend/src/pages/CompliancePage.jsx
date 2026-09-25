@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getAssets, getCompliance, complianceReportUrl } from "../lib/api";
+import { usePagedList, ShowMoreBar } from "../components/ShowMore";
 import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, CodeBlock } from "../components/ui";
 
 export default function CompliancePage() {
@@ -8,6 +9,7 @@ export default function CompliancePage() {
   const [compliance, setCompliance] = useState(null);
   const [error, setError] = useState(null);
   const reqSeq = useRef(0);
+  const assetPage = usePagedList(assets, 100);
 
   useEffect(() => {
     getAssets()
@@ -45,7 +47,7 @@ export default function CompliancePage() {
             <Empty title="No impacted assets" hint="Threatened assets will appear here." />
           ) : (
             <div className="space-y-1.5">
-              {assets.map((a, i) => (
+              {assetPage.shown.map((a, i) => (
                 <button
                   key={a.id}
                   onClick={() => pick(a.id)}
@@ -62,6 +64,14 @@ export default function CompliancePage() {
                   </p>
                 </button>
               ))}
+              <ShowMoreBar
+                remaining={assetPage.remaining}
+                total={assetPage.total}
+                shownCount={assetPage.shown.length}
+                onMore={assetPage.showMore}
+                onAll={assetPage.showAll}
+                noun="impacted assets"
+              />
             </div>
           )}
         </GlassCard>

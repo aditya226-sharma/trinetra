@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getAssets, getAssetRelations } from "../lib/api";
+import { usePagedList, ShowMoreBar } from "../components/ShowMore";
 import { PageHeader, LiveBadge, GlassCard, SeverityBadge, PlainBadge, Empty, SectionTitle, ProgressBar, CodeBlock } from "../components/ui";
 
 export default function AssetsPage() {
@@ -25,6 +26,7 @@ export default function AssetsPage() {
     }
   };
 
+  const paged = usePagedList(assets, 100);
   const maxDegree = Math.max(...assets.map((a) => a.degree), 1);
   const threatenedCount = assets.filter((a) => a.threatened).length;
 
@@ -45,7 +47,7 @@ export default function AssetsPage() {
             <Empty title="No assets in graph" hint="Ingest flows so Module C can map entities." />
           ) : (
             <div className="space-y-2">
-              {assets.map((a, i) => (
+              {paged.shown.map((a, i) => (
                 <button
                   key={a.id}
                   onClick={() => open(a.id)}
@@ -67,6 +69,14 @@ export default function AssetsPage() {
                   )}
                 </button>
               ))}
+              <ShowMoreBar
+                remaining={paged.remaining}
+                total={paged.total}
+                shownCount={paged.shown.length}
+                onMore={paged.showMore}
+                onAll={paged.showAll}
+                noun="assets"
+              />
             </div>
           )}
         </GlassCard>

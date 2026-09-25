@@ -39,6 +39,17 @@ api.interceptors.response.use(
       setToken(null);
       window.dispatchEvent(new Event("trinetra:unauthorized"));
     }
+    // Surface the API's own `detail` (e.g. "not your client's incident")
+    // instead of axios's "Request failed with status code 403", so panels can
+    // show something actionable. The response object is left intact.
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === "string" && detail) {
+      try {
+        err.message = detail;
+      } catch {
+        /* frozen error object — keep the original message */
+      }
+    }
     return Promise.reject(err);
   }
 );

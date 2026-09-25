@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { caseAction, getCases, getIncidentDetail } from "../lib/api";
+import { usePagedList, ShowMoreBar } from "../components/ShowMore";
 import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
 
 const POLL_MS = 15000;
@@ -102,6 +103,8 @@ export default function AlertsPage({ role }) {
     return sorted;
   }, [baseQueue, kindFilter, assigneeFilter, sortBy]);
 
+  // The queue grows with live detections; render a page at a time.
+  const queuePage = usePagedList(visible, 60);
   const selectedIds = Object.keys(sel).filter((k) => sel[k]);
   const assigneeChoices = [...new Set(cases.map((c) => c.assignee).filter(Boolean))];
 
@@ -202,7 +205,7 @@ export default function AlertsPage({ role }) {
       ) : (
         <div className="relative space-y-3 pl-6 anim-fadeup">
           <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
-          {visible.map((c, i) => {
+          {queuePage.shown.map((c, i) => {
             const open = expandedId === c.id;
             return (
               <div key={c.id} className="relative feed-in" style={{ animationDelay: `${i * 35}ms` }}>
@@ -300,6 +303,14 @@ export default function AlertsPage({ role }) {
               </div>
             );
           })}
+          <ShowMoreBar
+            remaining={queuePage.remaining}
+            total={queuePage.total}
+            shownCount={queuePage.shown.length}
+            onMore={queuePage.showMore}
+            onAll={queuePage.showAll}
+            noun="cases"
+          />
         </div>
       )}
     </div>

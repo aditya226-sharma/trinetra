@@ -93,3 +93,26 @@ describe("IncidentPage enrichment contract", () => {
     expect(screen.getByText(/read-only view/i)).toBeInTheDocument();
   });
 });
+describe("IncidentPage load failures", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Regression: the error state was captured but never rendered, so a 403
+  // (scoped viewer opening another client's incident) or a 404 showed an
+  // empty shell with "no entity attribution" and no explanation.
+  it("surfaces a 403 instead of rendering an empty incident", async () => {
+    api.getIncidentDetail.mockRejectedValue(
+      Object.assign(new Error("not your client's incident"), { response: { status: 403 } })
+    );
+    renderPage("viewer");
+    expect(await screen.findByText(/incident unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/not your client's incident/i)).toBeTruthy();
+    expect(screen.getByText(/outside your scope/i)).toBeTruthy();
+  });
+
+  it("surfaces a 404 case-not-found", async () => {
+    api.getIncidentDetail.mockRejectedValue(new Error("case not found"));
+    renderPage("admin");
+    expect(await screen.findByText(/incident unavailable/i)).toBeTruthy();
+    expect(screen.getByText(/case not found/i)).toBeTruthy();
+  });
+});
