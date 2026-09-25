@@ -1066,7 +1066,13 @@ def analytics(hours: int = Query(48, ge=1, le=336),
     if _ORCH is None:
         raise HTTPException(status_code=428, detail="Bootstrap first")
 
-    now = datetime.now(timezone.utc).replace(microsecond=0, second=0, minute=0)
+    # Buckets are aligned to whole hours, but the *current* hour is only
+    # partially elapsed. ``wall`` is the true clock reading used as the final
+    # bucket's upper bound: using the truncated ``now`` as ts_to dropped every
+    # event timestamped inside the current hour (its timestamp sorts after the
+    # hour boundary), so a live/last-hour series always plotted empty.
+    wall = datetime.now(timezone.utc).replace(microsecond=0)
+    now = wall.replace(second=0, minute=0)
     cut = now - timedelta(hours=hours)
     store = _ORCH.event_store
 
@@ -1076,8 +1082,12 @@ def analytics(hours: int = Query(48, ge=1, le=336),
     step = 1 if hours <= 96 else (hours // 96)
     while lo < now:
         hi = min(lo + timedelta(hours=step), now)
+        # The last bucket is the open-ended current hour: bound it by the wall
+        # clock so just-ingested events are counted instead of falling through
+        # the ts_to filter.
+        ts_to = wall if hi == now else hi
         n = store.count_filtered(ts_from=lo.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                 ts_to=hi.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                                 ts_to=ts_to.strftime("%Y-%m-%dT%H:%M:%SZ"))
         series.append({"bucket": hi.strftime("%Y-%m-%dT%H:%M:%SZ"), "events": n})
         lo = hi
 
