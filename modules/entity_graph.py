@@ -54,6 +54,12 @@ class EntityGraph:
         self._edge_counts: Dict[tuple, int] = {}  # ((src_id, dst_id, kind)) -> n
         self._edge_meta: Dict[tuple, Dict[str, Any]] = {}
         self._findings: List[Dict[str, Any]] = []
+        # O(1) mirror of the live edge count. ``MultiDiGraph.number_of_edges()``
+        # walks every edge, so calling it per event made ingestion O(n·E) —
+        # replaying a 65k-event store at boot took ~27 minutes and the cap
+        # checks below dominated the whole rebuild. Only ``_add_edge`` ever
+        # calls ``graph.add_edge``, so keeping the count here stays exact.
+        self._edge_total = 0
 
     # -- typed keys ----------------------------------------------------------
     @staticmethod
@@ -130,7 +136,7 @@ class EntityGraph:
         bloat memory and inflate the dashboard edge list."""
         if nx is None:
             return
-        if (self.graph.number_of_edges() >= self.max_edges
+        if (self._edge_total >= self.max_edges
                 and not self._edge_exists(u, v, kind)):
             return
         if len(self.graph) >= self.max_nodes and (
@@ -147,10 +153,11 @@ class EntityGraph:
         if extra:
             attrs.update(extra)
         self.graph.add_edge(u, v, **attrs)
+        self._edge_total += 1
 
     def _bump_comm(self, src: str, dst: str, event: Event) -> None:
         key = (src, dst, "comm")
-        if self.graph.number_of_edges() >= self.max_edges and not self._edge_exists(src, dst, "comm"):
+        if self._edge_total >= self.max_edges and not self._edge_exists(src, dst, "comm"):
             return
         proto = str(event.fields.get("proto") or "")
         self._edge_counts[key] = self._edge_counts.get(key, 0) + 1
@@ -162,7 +169,7 @@ class EntityGraph:
 
     def _bump_edge(self, a: str, b: str, kind: str, meta: Dict[str, Any]) -> None:
         key = (a, b, kind)
-        if self.graph.number_of_edges() >= self.max_edges and not self._edge_exists(a, b, kind):
+        if self._edge_total >= self.max_edges and not self._edge_exists(a, b, kind):
             return
         self._edge_counts[key] = self._edge_counts.get(key, 0) + 1
         self._edge_meta.setdefault(key, meta)

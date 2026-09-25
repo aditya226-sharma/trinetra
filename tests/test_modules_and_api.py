@@ -129,8 +129,23 @@ def test_api_demo_round_trip():
         assert "last_seen" in by_id["web01"]
 
         alerts = client.get("/api/alerts", headers=headers).json()
-        assert alerts["count"] == 5
+        # 5 Module A detections + 1 Module B weak-IPsec alert. The VPN gateway
+        # assessment only reached the graph before, so its critical posture
+        # raised no alert at all.
+        assert alerts["count"] == 6
+        # "sent" counts notifications the notifier actually dispatched. The
+        # VPN posture is re-assessed on every boot, so it is recorded and
+        # surfaced but deliberately not re-notified each restart.
         assert alerts["sent"] == 5
+        classes = {a["threat_class"] for a in alerts["alerts"]}
+        assert "weak_ipsec_config" in classes
+        # a healthy gateway is recorded but must not alert
+        assert "vpn_ok" not in classes
+        vpn_alert = next(a for a in alerts["alerts"]
+                         if a["threat_class"] == "weak_ipsec_config")
+        assert vpn_alert["client_id"] == "vpn-gw-01"
+        assert vpn_alert["severity"] in ("critical", "high")
+        assert vpn_alert["evidence"]["peer"] == "ipsec_weak.pcap"
         verdicts = {a["threat_class"]: a["verdict"] for a in alerts["alerts"]}
         assert verdicts["c2_beaconing"] == "malicious"
         assert verdicts["ddos"] == "malicious"

@@ -112,6 +112,17 @@ async def lifespan(_app: FastAPI):
         except Exception as exc:  # noqa: BLE001 — derived state must never block boot
             logging.getLogger("trinetra.main").warning(
                 "derived-state rebuild failed: %s", exc)
+        # Module B (VPN/IPsec) profiles are derived from .pcap files on disk
+        # rather than the event store, so they are lost on every restart and
+        # the dashboard's VPN/IPsec section stayed permanently empty even
+        # though the captures were on disk. Re-assess them during boot.
+        try:
+            pcap_dir = str(_settings.path("pcap"))
+            if any(Path(pcap_dir).glob("*.pcap")):
+                _ORCH.run_vpn_module(pcap_dir)
+        except Exception as exc:  # noqa: BLE001 — assessment must never block boot
+            logging.getLogger("trinetra.main").warning(
+                "vpn module rebuild failed: %s", exc)
     ensure_admin(_settings)
     start_retention_loop(_settings)
     if _SOC is None:

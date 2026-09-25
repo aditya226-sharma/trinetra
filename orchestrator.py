@@ -67,6 +67,13 @@ def _slug_source(value: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_") or "agent"
 
 
+# Module B assesses gateway captures rather than a per-agent event stream, so
+# its findings are attributed to this synthetic client id. It matches the
+# gateway named by the demo storyline so scoped views and the compliance asset
+# roll-up line the assessment up with the matching syslog/JSON events.
+VPN_GATEWAY_CLIENT = "vpn-gw-01"
+
+
 class Orchestrator:
     """End-to-end pipeline runner; reused by CLI and FastAPI demo route."""
 
@@ -362,8 +369,9 @@ class Orchestrator:
         self.vpn_profiles = []
         for result in results:
             profile = result.get("profile", {})
+            capture = Path(result.get("source_path", "capture")).name
             self.vpn_profiles.append({
-                "file": Path(result.get("source_path", "capture")).name,
+                "file": capture,
                 "ike_version": profile.get("ike_version"),
                 "encryption": profile.get("encryption"),
                 "key_length": profile.get("key_length"),
@@ -381,25 +389,36 @@ class Orchestrator:
             })
             weak = int(result.get("security_score", 100)) < 50
             severity = result.get("risk_level", "high") if weak else "info"
-            self.graph.add_finding({
+            # ``profile`` carries no filename, so key the finding off the
+            # capture name — otherwise every profile collapsed to the same
+            # "vpn::capture" flow id and lost its peer in the evidence.
+            self._record_finding({
                 "threat_class": "weak_ipsec_config" if weak else "vpn_ok",
                 "severity": severity,
                 "confidence": result.get("confidence", 0.8),
+                "client_id": VPN_GATEWAY_CLIENT,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "alert": {
-                    "flow_id": f"vpn::{profile.get('file', 'capture')}",
+                    "flow_id": f"vpn::{capture}",
                     "threat_class": "weak_ipsec_config" if weak else "vpn_ok",
                     "confidence": result.get("confidence", 0.8),
                     "severity": severity,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "client_id": VPN_GATEWAY_CLIENT,
                     "evidence": {
-                        "gateway": "vpn-gw-01",
-                        "peer": profile.get("file", "?"),
+                        # "src" is what the compliance mapper keys assets on.
+                        "src": VPN_GATEWAY_CLIENT,
+                        "gateway": VPN_GATEWAY_CLIENT,
+                        "peer": capture,
                         "score": result.get("security_score"),
                         "risk": result.get("risk_level"),
                         "encryption": profile.get("encryption"),
                         "integrity": profile.get("integrity"),
+                        "ike_version": profile.get("ike_version"),
+                        "recommendations": result.get("recommendations", [])[:4],
                     },
                 },
-            })
+            }, alert=weak)
         self.stats["vpn_profiles"] = len(self.vpn_profiles)
         return {"profiles_count": len(self.vpn_profiles),
                 "profiles": self.vpn_profiles}
@@ -486,36 +505,52 @@ class Orchestrator:
         self._overlay_threat_findings(log)
         log.info("replayed %d events into derived state", events)
 
+    def _record_finding(self, finding: Dict[str, Any], alert: bool = True) -> None:
+        """Overlay one finding on the graph and do the stats/alert bookkeeping.
+
+        Shared by the Module A threat overlay and the Module B VPN assessment so
+        both land in ``findings_log`` (which ``/api/compliance`` and the assets
+        roll-up read) and ``alerts_log``. Module B previously only pushed to
+        the graph, so a critical weak-IPsec gateway produced no alert and no
+        compliance mapping.
+
+        ``alert=False`` records the finding but keeps it out of ``alerts_log``
+        — used for healthy (``vpn_ok``) posture, which is not alert-worthy.
+        """
+        self.graph.add_finding(finding)
+        self.stats["findings"] = int(self.stats.get("findings", 0)) + 1
+        self.findings_log.append(finding)
+        if len(self.findings_log) > 2000:
+            self.findings_log.pop(0)
+        if not alert:
+            return
+        analysis = finding.get("analysis") or {}
+        try:
+            confidence = float(finding.get("confidence", 0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        self.alerts_log.append({
+            "timestamp": (finding.get("alert", {}).get("timestamp") or
+                          finding.get("timestamp") or
+                          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+            "threat_class": finding.get("threat_class", "unknown"),
+            "severity": finding.get("severity", "high"),
+            "confidence": round(confidence, 3),
+            "verdict": analysis.get("verdict"),
+            "store_decision": analysis.get("store_decision", "keep"),
+            "evidence": finding.get("alert", {}).get("evidence", {}),
+            "client_id": finding.get("client_id") or "",
+            "flows": (finding.get("alert", {}).get("flows") or
+                      finding.get("alert", {}).get("flow_id") or ""),
+        })
+        if len(self.alerts_log) > 2000:
+            self.alerts_log.pop(0)
+
     def _overlay_threat_findings(self, log: Any = None) -> None:
         """Flush the detector's current window and overlay onto the graph,
         mirroring the stats + alert bookkeeping live flush_batch performs so
         a restart rebuild yields an identical dashboard/alerts surface."""
         for finding in self.threats.flush():
-            self.graph.add_finding(finding)
-            self.stats["findings"] += 1
-            self.findings_log.append(finding)
-            if len(self.findings_log) > 2000:
-                self.findings_log.pop(0)
-            analysis = finding.get("analysis") or {}
-            try:
-                confidence = float(finding.get("confidence", 0))
-            except (TypeError, ValueError):
-                confidence = 0.0
-            self.alerts_log.append({
-                "timestamp": (finding.get("alert", {}).get("timestamp") or
-                              finding.get("timestamp") or
-                              time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
-                "threat_class": finding.get("threat_class", "unknown"),
-                "severity": finding.get("severity", "high"),
-                "confidence": round(confidence, 3),
-                "verdict": analysis.get("verdict"),
-                "store_decision": analysis.get("store_decision", "keep"),
-                "evidence": finding.get("alert", {}).get("evidence", {}),
-                "client_id": finding.get("client_id") or "",
-                "flows": (finding.get("alert", {}).get("flows") or
-                          finding.get("alert", {}).get("flow_id") or ""),
-            })
-            if len(self.alerts_log) > 2000:
-                self.alerts_log.pop(0)
+            self._record_finding(finding)
 
 
