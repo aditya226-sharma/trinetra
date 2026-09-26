@@ -251,7 +251,7 @@ export default function SettingsPage() {
               {uBusy ? "CREATING…" : "CREATE USER"}
             </button>
             {uMsg && <span className="mono text-[11px] text-emerald-400">✓ {uMsg}</span>}
-            {uErr && <span className="mono text-[11px] text-rose-400">✗ {uErr}</span>}
+            {uErr && <span className="mono text-[11px] text-red-400">✗ {uErr}</span>}
           </form>
 
           <div className="mt-4 divide-y divide-white/[0.04]">
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                 </div>
                 <PlainBadge cls={u.role === "admin" ? "!text-emerald-300" : u.role === "analyst" ? "!text-cyan-300" : "!text-slate-400"}>{u.role}</PlainBadge>
                 {u.username !== session?.username && (
-                  <button onClick={() => handleDeleteUser(u.username)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                  <button onClick={() => handleDeleteUser(u.username)} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
                 )}
               </div>
             ))}
@@ -315,7 +315,7 @@ export default function SettingsPage() {
                 {busy ? "APPLYING…" : "APPLY RETENTION"}
               </button>
               {retentMsg && <span className="mono text-[11px] text-emerald-400">{retentMsg}</span>}
-              {retentErr && <span className="mono text-[11px] text-rose-400">✗ {retentErr}</span>}
+              {retentErr && <span className="mono text-[11px] text-red-400">✗ {retentErr}</span>}
             </div>
           </div>
         </section>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="field mono w-full px-3 py-2" autoComplete="new-password" />
             </Field>
             {pwMsg && <p className="mono text-[11px] text-emerald-400">✓ {pwMsg}</p>}
-            {pwErr && <p className="mono text-[11px] text-rose-400">✗ {pwErr}</p>}
+            {pwErr && <p className="mono text-[11px] text-red-400">✗ {pwErr}</p>}
             <button type="submit" disabled={pwBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
               {pwBusy ? "ROTATING…" : "CHANGE PASSWORD"}
             </button>
@@ -424,7 +424,7 @@ export default function SettingsPage() {
                   <span className="mono min-w-0 flex-1 truncate text-[11px] text-slate-300">{p}</span>
                   <button
                     onClick={() => setTailingPaths((xs) => xs.filter((x) => x !== p))}
-                    className="text-[11px] text-rose-400 hover:text-rose-300"
+                    className="text-[11px] text-red-400 hover:text-red-300"
                   >
                     ✕
                   </button>
@@ -463,7 +463,7 @@ export default function SettingsPage() {
             {colBusy ? "RESTARTING…" : "APPLY COLLECTORS"}
           </button>
           {colMsg && <span className="mono text-[11px] text-emerald-400">✓ {colMsg}</span>}
-          {colErr && <span className="mono text-[11px] text-rose-400">✗ {colErr}</span>}
+          {colErr && <span className="mono text-[11px] text-red-400">✗ {colErr}</span>}
         </div>
       </section>
 
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                   {digestBusy ? "SENDING…" : "RUN DIGEST NOW"}
                 </button>
                 {notifMsg && <span className="mono text-[11px] text-emerald-400">✓ {notifMsg}</span>}
-                {notifErr && <span className="mono text-[11px] text-rose-400">✗ {notifErr}</span>}
+                {notifErr && <span className="mono text-[11px] text-red-400">✗ {notifErr}</span>}
               </div>
             </div>
           </div>

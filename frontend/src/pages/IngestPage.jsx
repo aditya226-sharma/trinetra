@@ -143,7 +143,7 @@ export default function IngestPage() {
         <section className="glass overflow-hidden anim-fadeup">
           {/* terminal chrome */}
           <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
             <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
             <p className="mono ml-3 text-[11px] tracking-widest text-slate-500">
@@ -247,7 +247,7 @@ export default function IngestPage() {
             </div>
 
             {error && (
-              <p className="mono mt-3 text-[12px] text-rose-400">✗ {error}</p>
+              <p className="mono mt-3 text-[12px] text-red-400">✗ {error}</p>
             )}
           </div>
         </section>
@@ -275,7 +275,7 @@ export default function IngestPage() {
                     <p className="text-grad-warn text-3xl font-bold leading-none mono">{result.duplicates ?? 0}</p>
                     <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">duplicates</p>
                   </div>
-                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-center">
+                  <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-center">
                     <p className="text-grad-danger text-3xl font-bold leading-none mono">{result.failed}</p>
                     <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">failed</p>
                   </div>
@@ -294,7 +294,7 @@ export default function IngestPage() {
                     <p className="text-slate-400">· {result.ignored} lines consumed as format scaffolding (e.g. CSV header) — raw preserved</p>
                   )}
                   {result.failed > 0 && (
-                    <p className="text-rose-400">✗ {result.failed} lines rejected — blank or malformed input</p>
+                    <p className="text-red-400">✗ {result.failed} lines rejected — blank or malformed input</p>
                   )}
                 </div>
 
@@ -308,7 +308,7 @@ export default function IngestPage() {
                             <span className="mono text-slate-300">{a}</span>
                           ) : (
                             <>
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === "critical" ? "bg-rose-500 pulse-dot-red" : "bg-amber-400"}`} />
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === "critical" ? "bg-red-400 pulse-dot-red" : "bg-amber-400"}`} />
                               <SeverityBadge severity={a.severity} />
                               <span className="mono text-slate-200">{a.threat_class}</span>
                               <span className="ml-auto text-[10px] text-slate-500">conf {a.confidence}</span>
@@ -392,7 +392,7 @@ export default function IngestPage() {
             </span>
           </div>
 
-          {bulkError && <p className="mono mt-3 text-[12px] text-rose-400">✗ {bulkError}</p>}
+          {bulkError && <p className="mono mt-3 text-[12px] text-red-400">✗ {bulkError}</p>}
 
           {bulkResult && (
             <div className="mt-4 grid gap-3 sm:grid-cols-4">
@@ -404,7 +404,7 @@ export default function IngestPage() {
                 <p className="text-grad-warn text-2xl font-bold leading-none mono">{bulkResult.duplicates ?? 0}</p>
                 <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">duplicates</p>
               </div>
-              <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-center">
+              <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-center">
                 <p className="text-grad-danger text-2xl font-bold leading-none mono">{bulkResult.failed}</p>
                 <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">failed</p>
               </div>

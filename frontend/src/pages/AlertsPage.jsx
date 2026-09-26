@@ -155,7 +155,7 @@ export default function AlertsPage({ role }) {
         <Tile label="critical open" value={statsSev.critical ?? 0} tone="tone-danger" />
       </div>
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2 anim-fadeup">
@@ -191,7 +191,7 @@ export default function AlertsPage({ role }) {
               <button onClick={() => actAll("investigate")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px]">
                 {bulkBusy ? "…" : `investigate ${selectedIds.length}`}
               </button>
-              <button onClick={() => actAll("close")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400">
+              <button onClick={() => actAll("close")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-red-400/90 hover:!bg-red-400">
                 {bulkBusy ? "…" : `close ${selectedIds.length}`}
               </button>
             </>
@@ -412,7 +412,7 @@ const kindDot = (kind) => {
 function ActionBtn({ onClick, busy, label, variant = "primary" }) {
   const cls = {
     primary: "btn-primary mono !px-3 !py-1.5 text-[10.5px]",
-    danger: "btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-rose-500/90 hover:!bg-rose-400",
+    danger: "btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-red-400/90 hover:!bg-red-400",
     ghost: "btn-ghost mono !px-3 !py-1.5 text-[10.5px]",
   }[variant];
   return (
@@ -424,7 +424,7 @@ function ActionBtn({ onClick, busy, label, variant = "primary" }) {
 
 function StatusBadge({ status }) {
   const map = {
-    open: "text-rose-300 border-rose-500/30 bg-rose-500/10",
+    open: "text-red-300 border-red-400/30 bg-red-400/10",
     investigation: "text-amber-300 border-amber-500/30 bg-amber-500/10",
     closed: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
   };
@@ -455,6 +455,6 @@ const stripCls = (sev) => {
   return m[sev] || "sev-info";
 };
 const dotCls = (sev) => {
-  const m = { critical: "bg-rose-500", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
+  const m = { critical: "bg-red-400", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
   return m[sev] || "bg-sky-500";
 };

@@ -166,8 +166,8 @@ export default function OnboardingPage({ role }) {
       )}
 
       {error && (
-        <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 text-[11px] text-rose-200">
-          <span className="mono font-semibold tracking-widest text-rose-300">ERROR</span> {error}
+        <div className="rounded-xl border border-red-400/25 bg-red-400/[0.07] px-4 py-3 text-[11px] text-red-200">
+          <span className="mono font-semibold tracking-widest text-red-300">ERROR</span> {error}
         </div>
       )}
 
@@ -240,25 +240,25 @@ export default function OnboardingPage({ role }) {
                     key={a.token_id}
                     className={`glass-row flex flex-wrap items-center gap-3 px-3 py-2.5 ${revoked ? "opacity-50" : ""}`}
                   >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${revoked ? "bg-rose-400" : (a.client_id ? "bg-emerald-400" : "bg-slate-600")}`} />
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${revoked ? "bg-red-400" : (a.client_id ? "bg-emerald-400" : "bg-slate-600")}`} />
                     <div className="min-w-0 flex-1">
                       <p className={`mono truncate text-[12px] font-semibold ${revoked ? "text-slate-500 line-through" : "text-slate-200"}`}>
                         {(a.label && `${a.label}`) || <span className="text-slate-500">(untitled)</span>}
                       </p>
                       <p className="mono truncate text-[10px] text-slate-500">
                         {a.token_id} · {revoked
-                          ? <span className="text-rose-400/80">revoked</span>
+                          ? <span className="text-red-400/80">revoked</span>
                           : (a.client_id ? `bound to ${a.client_id}` : "unbound")}
                       </p>
                     </div>
                     <span className="mono text-[10px] text-slate-600">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
                     {revoked ? (
-                      <PlainBadge cls="!text-rose-300">revoked</PlainBadge>
+                      <PlainBadge cls="!text-red-300">revoked</PlainBadge>
                     ) : (
                       !isPreview && isAdmin && (
                         <button
                           onClick={() => handleRevoke(a.token_id)}
-                          className="rounded-md border border-rose-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-rose-300 transition hover:bg-rose-500/10"
+                          className="rounded-md border border-red-400/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-300 transition hover:bg-red-400/10"
                         >
                           revoke
                         </button>

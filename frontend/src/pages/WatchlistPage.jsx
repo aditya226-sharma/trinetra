@@ -96,7 +96,7 @@ export default function WatchlistPage({ role }) {
           {busy ? "ADDING…" : `ADD TO ${tab}`}
         </button>
         {msg && <span className="mono text-[11px] text-emerald-400">✓ {msg}</span>}
-        {err && <span className="mono text-[11px] text-rose-400">✗ {err}</span>}
+        {err && <span className="mono text-[11px] text-red-400">✗ {err}</span>}
         </>)}
       </form>
 
@@ -118,7 +118,7 @@ export default function WatchlistPage({ role }) {
                   <button onClick={() => toggle(en.kind, en.value, !en.active)} className={`chip mono !px-2 !py-1 text-[10px] ${en.active ? "chip-on" : ""}`}>
                     {en.active ? "ON" : "OFF"}
                   </button>
-                  <button onClick={() => remove(en.kind, en.value)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                  <button onClick={() => remove(en.kind, en.value)} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
                 </>)}
               </div>
             ))}

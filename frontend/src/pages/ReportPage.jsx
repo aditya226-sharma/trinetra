@@ -2,11 +2,16 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCompliance } from "../lib/api";
 
+// Severity hues aligned with the command-center palette (critical #f87171,
+// warning #fbbf24, info #38bdf8). The previous values were pre-re-skin reds
+// that matched neither the shared SEV map nor the report stylesheet.
 const SEV = {
-  critical: "#b91c1c",
-  high: "#c2410c",
-  medium: "#b45309",
-  low: "#475569",
+  critical: "#f87171",
+  high: "#fca5a5",
+  medium: "#fbbf24",
+  warning: "#fbbf24",
+  info: "#38bdf8",
+  low: "#94a3b8",
 };
 
 export default function ReportPage() {
@@ -63,7 +68,7 @@ export default function ReportPage() {
             <div key={i} className="report-ctrl">
               <div className="report-ctrl-top">
                 <h3>{ctrl.threat_class}</h3>
-                <span style={{ color: SEV[ctrl.severity] || SEV.low }}>{ctrl.severity}</span>
+                <span style={{ color: SEV[String(ctrl.severity || "").toLowerCase()] || SEV.low }}>{ctrl.severity}</span>
               </div>
               <p className="report-muted">{ctrl.description}</p>
               <p><span className="report-k">NIST CSF</span> {ctrl.nist_csf || "—"}</p>

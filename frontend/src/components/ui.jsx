@@ -29,20 +29,27 @@ const SEV_HUE = {
   low: "#38bdf8",
 };
 
+// Normalise once so a severity of "Critical"/"HIGH"/" Info" resolves the same as
+// its lowercase form. Without this the SEV lookup silently fell back to info,
+// painting a critical finding blue while severityHex() reported it red.
+export const normaliseSeverity = (severity) => String(severity ?? "").trim().toLowerCase();
+
+const SEV_TONE = (severity) => SEV[normaliseSeverity(severity)] || SEV.info;
+
 export const severityRank = (severity) =>
-  SEV_RANK[String(severity || "").toLowerCase()] ?? SEV_RANK.info;
+  SEV_RANK[normaliseSeverity(severity)] ?? SEV_RANK.info;
 
 export const severityHex = (severity) =>
-  SEV_HUE[String(severity || "").toLowerCase()] ?? SEV_HUE.info;
+  SEV_HUE[normaliseSeverity(severity)] ?? SEV_HUE.info;
 
 export function SeverityDot({ severity }) {
-  const s = SEV[severity] || SEV.info;
+  const s = SEV_TONE(severity);
   const hex = severityHex(severity);
   return <span className={`inline-block h-2 w-2 rounded-full ${s.label}`} style={{ boxShadow: `0 0 8px ${hex}cc` }} />;
 }
 
 export function SeverityBadge({ severity }) {
-  const s = SEV[severity] || SEV.info;
+  const s = SEV_TONE(severity);
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.text}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${s.label}`} />
@@ -99,7 +106,7 @@ export function Kpi({
   const tones = {
     emerald: { text: "text-grad-emerald", glow: "glow-emerald", bar: "from-emerald-500 to-cyan-500" },
     cyan: { text: "text-grad-emerald", glow: "glow-cyan", bar: "from-cyan-400 to-sky-500" },
-    danger: { text: "text-grad-danger", glow: "glow-red", bar: "from-rose-500 to-orange-500" },
+    danger: { text: "text-grad-danger", glow: "glow-red", bar: "from-[#f87171] to-[#fbbf24]" },
     violet: { text: "text-grad-emerald", glow: "glow-cyan", bar: "from-indigo-400 to-fuchsia-400" },
   };
   const t = tones[tone] || tones.emerald;

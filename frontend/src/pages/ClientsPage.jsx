@@ -47,7 +47,7 @@ export default function ClientsPage() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  if (error) return <div className="text-sm text-rose-400">Failed to load fleet: {error}</div>;
+  if (error) return <div className="text-sm text-red-400">Failed to load fleet: {error}</div>;
   if (!data) return <div className="text-slate-500">Loading fleet…</div>;
 
   const totals = data?.totals ?? {};

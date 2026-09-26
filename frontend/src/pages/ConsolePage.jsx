@@ -224,7 +224,7 @@ export default function ConsolePage() {
         </span>
       </div>
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       <div
         ref={scrollRef}
@@ -245,7 +245,7 @@ export default function ConsolePage() {
 
 function LogLine({ event: e, showRaw }) {
   const sevColor = {
-    critical: "text-rose-400",
+    critical: "text-red-400",
     error: "text-violet-400",
     warning: "text-amber-400",
     info: "text-slate-300",

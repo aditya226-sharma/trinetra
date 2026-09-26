@@ -118,7 +118,7 @@ export default function AnalyticsPage() {
         }
       />
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
       {!data && !error && (
         <GlassCard title="Loading analytics…">
           <p className="mono text-[11px] text-slate-500">Fetching roll-ups…</p>
@@ -172,7 +172,7 @@ export default function AnalyticsPage() {
 function Stat({ k, v, accent = "emerald" }) {
   const color =
     accent === "rose"
-      ? "text-rose-400"
+      ? "text-red-400"
       : accent === "amber"
       ? "text-amber-400"
       : "text-emerald-400";

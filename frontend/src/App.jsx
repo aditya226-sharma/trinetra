@@ -505,7 +505,7 @@ export default function App() {
                     <path d="M13.7 21a2 2 0 01-3.4 0" />
                   </svg>
                   {bell.alerts.length > 0 && (
-                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-400 px-1 text-[9px] font-bold text-white">
                       {bell.alerts.length}
                     </span>
                   )}
@@ -555,7 +555,7 @@ export default function App() {
                     )}
                     <button
                       onClick={signOut}
-                      className="mono text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-rose-300"
+                      className="mono text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-red-300"
                     >
                       sign out
                     </button>

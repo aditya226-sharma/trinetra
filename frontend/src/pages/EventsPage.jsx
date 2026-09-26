@@ -366,14 +366,14 @@ export default function EventsPage() {
                 <button onClick={() => applySaved(s.f)} className="mono text-[11px] text-emerald-300 hover:text-emerald-200">
                   {s.name}
                 </button>
-                <button onClick={() => dropSaved(s.name)} className="text-[11px] text-slate-500 hover:text-rose-300" title="Delete saved search">×</button>
+                <button onClick={() => dropSaved(s.name)} className="text-[11px] text-slate-500 hover:text-red-300" title="Delete saved search">×</button>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       {/* feed + detail */}
       <div className="flex gap-6">
@@ -641,10 +641,10 @@ function RiskMeter({ detail }) {
   }[detail?.severity] ?? 25;
   const conf = firstFinding(detail)?.confidence;
   const score = Math.round(conf != null ? sevRank * 0.6 + Number(conf) * 100 * 0.4 : sevRank);
-  const color = score >= 80 ? "from-rose-500 to-orange-500" : score >= 50 ? "from-amber-500 to-orange-400" : "from-emerald-500 to-cyan-500";
+  const color = score >= 80 ? "from-[#f87171] to-[#fbbf24]" : score >= 50 ? "from-amber-500 to-orange-400" : "from-emerald-500 to-cyan-500";
   return (
     <div className="flex items-center gap-2">
-      <span className={`mono text-[11px] ${score >= 80 ? "text-rose-300" : score >= 50 ? "text-amber-300" : "text-emerald-300"}`}>{score}/100</span>
+      <span className={`mono text-[11px] ${score >= 80 ? "text-red-300" : score >= 50 ? "text-amber-300" : "text-emerald-300"}`}>{score}/100</span>
       <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/5">
         <span className={`bar-grow block h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${score}%` }} />
       </span>
@@ -707,7 +707,7 @@ function InvestigationPanel({ detail, meta }) {
     );
   }
   const statusMap = {
-    open: "border-rose-500/30 bg-rose-500/10 text-rose-300",
+    open: "border-red-400/30 bg-red-400/10 text-red-300",
     investigation: "border-amber-500/30 bg-amber-500/10 text-amber-300",
     acknowledged: "border-amber-500/30 bg-amber-500/10 text-amber-300",
     closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",

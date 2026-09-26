@@ -10,7 +10,7 @@ const entityDot = (kind) => {
 
 function StatusBadge({ status }) {
   const map = {
-    open: "text-rose-300 border-rose-500/30 bg-rose-500/10",
+    open: "text-red-300 border-red-400/30 bg-red-400/10",
     investigation: "text-amber-300 border-amber-500/30 bg-amber-500/10",
     closed: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
     acknowledged: "text-amber-300 border-amber-500/30 bg-amber-500/10",
@@ -71,7 +71,7 @@ export default function IncidentPage({ role }) {
       <div className="page-wide space-y-4 anim-fadeup">
         <button onClick={() => navigate(-1)} className="mono text-[11px] text-slate-500 hover:text-slate-300">← back</button>
         <section className="glass p-6">
-          <h2 className="text-[15px] font-semibold text-rose-300">Incident unavailable</h2>
+          <h2 className="text-[15px] font-semibold text-red-300">Incident unavailable</h2>
           <p className="mt-2 text-[12.5px] text-slate-400">{error}</p>
           <p className="mt-3 text-[12px] text-slate-500">
             The incident may not exist, or it may belong to a client outside your scope.
@@ -164,7 +164,7 @@ export default function IncidentPage({ role }) {
                         {geo.country && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-400">📍 {geo.country}{geo.city ? ` · ${geo.city}` : ""}</span>}
                         {geo.asn && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-400">AS{geo.asn}</span>}
                         {geo.registered_country && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-600">reg {geo.registered_country}</span>}
-                        {intel.verdict && <span className={`mono rounded border px-1.5 py-0.5 ${intel.verdict === "malicious" ? "border-rose-500/40 text-rose-300" : intel.verdict === "suspicious" ? "border-amber-500/40 text-amber-300" : "border-emerald-500/40 text-emerald-300"}`}>{intel.verdict}</span>}
+                        {intel.verdict && <span className={`mono rounded border px-1.5 py-0.5 ${intel.verdict === "malicious" ? "border-red-400/40 text-red-300" : intel.verdict === "suspicious" ? "border-amber-500/40 text-amber-300" : "border-emerald-500/40 text-emerald-300"}`}>{intel.verdict}</span>}
                         {intel.confidence && <span className="mono text-slate-600">conf {intel.confidence}</span>}
                         {intel.source && <span className="mono text-slate-600">via {intel.source}</span>}
                         {(geo.lat != null && geo.lon != null) && <span className="mono text-[9.5px] text-slate-600">{geo.lat.toFixed(2)},{geo.lon.toFixed(2)}</span>}

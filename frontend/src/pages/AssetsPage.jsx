@@ -39,7 +39,7 @@ export default function AssetsPage() {
         actions={<LiveBadge text={`${assets.length} assets · ${threatenedCount} threatened`} />}
       />
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <GlassCard title="Internal assets — risk ranked">
@@ -54,11 +54,11 @@ export default function AssetsPage() {
                   className="glass-row group flex w-full items-center gap-3 p-3 text-left feed-in"
                   style={{ animationDelay: `${Math.min(i, 15) * 40}ms` }}
                 >
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.threatened ? "bg-rose-500 pulse-dot-red" : "bg-emerald-400/70"}`} />
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.threatened ? "bg-red-400 pulse-dot-red" : "bg-emerald-400/70"}`} />
                   <div className="min-w-0 flex-1">
                     <p className="mono text-[13px] text-slate-100">{a.id}</p>
                     <div className="mt-1.5 flex items-center gap-2">
-                      <ProgressBar value={a.degree} max={maxDegree} color={a.threatened ? "from-rose-500 to-orange-400" : "from-emerald-500 to-cyan-400"} className="w-40" />
+                      <ProgressBar value={a.degree} max={maxDegree} color={a.threatened ? "from-[#f87171] to-[#fbbf24]" : "from-emerald-500 to-cyan-400"} className="w-40" />
                       <span className="mono text-[10px] text-slate-500">degree {a.degree}</span>
                     </div>
                   </div>
@@ -103,7 +103,7 @@ export default function AssetsPage() {
                       <span className="flex items-center gap-2">
                         <PlainBadge>{e.kind}</PlainBadge>
                         <span className="mono text-[10px] text-slate-500">{e.flows}f</span>
-                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" /> : null}
+                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" /> : null}
                       </span>
                     </div>
                   ))}

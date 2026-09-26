@@ -78,7 +78,7 @@ export default function FleetPage({ role }) {
         actions={<PlainBadge cls="uppercase">{clients.length} clients · {agents.length} tokens</PlainBadge>}
       />
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
       {notice && <div className="text-sm text-emerald-400">{notice}</div>}
 
       <GlassCard title="Agent tokens" right={<PlainBadge>mint · revoke</PlainBadge>}>
@@ -146,14 +146,14 @@ export default function FleetPage({ role }) {
                         {a.enabled ? (
                           <PulseDot color="bg-emerald-400" cls="pulse-dot-green" />
                         ) : (
-                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] uppercase text-rose-300">revoked</span>
+                          <span className="rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-[10px] uppercase text-red-300">revoked</span>
                         )}
                       </td>
                       <td className="py-2.5 text-right">
                         {a.enabled && canMint && (
                           <button
                             onClick={() => doRevoke(a.token_id)}
-                            className="rounded-lg border border-rose-500/30 px-2.5 py-1 text-[10px] uppercase tracking-wider text-rose-300 hover:bg-rose-500/15"
+                            className="rounded-lg border border-red-400/30 px-2.5 py-1 text-[10px] uppercase tracking-wider text-red-300 hover:bg-red-400/15"
                           >
                             Revoke
                           </button>

@@ -110,7 +110,7 @@ export default function RulesPage({ role }) {
                   {OPS.map((o) => <option key={o}>{o}</option>)}
                 </select>
                 <input value={c.value} onChange={(e) => setCond(idx, { value: e.target.value })} placeholder="value" className="field mono w-44 px-3 py-2" />
-                <button type="button" onClick={() => setForm((f) => ({ ...f, match: f.match.filter((_, i) => i !== idx) }))} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                <button type="button" onClick={() => setForm((f) => ({ ...f, match: f.match.filter((_, i) => i !== idx) }))} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
               </div>
             ))}
           </div>
@@ -128,7 +128,7 @@ export default function RulesPage({ role }) {
               cancel edit
             </button>
           )}
-          {err && <span className="mono text-[11px] text-rose-400">✗ {err}</span>}
+          {err && <span className="mono text-[11px] text-red-400">✗ {err}</span>}
         </div>
       </form>
       )}
@@ -160,7 +160,7 @@ export default function RulesPage({ role }) {
                           {r.enabled ? "ENABLED" : "DISABLED"}
                         </button>
                         <button onClick={() => startEdit(r)} className="btn-ghost mono !px-3 !py-1.5 text-[10.5px]">edit</button>
-                        <button onClick={() => remove(r.id)} className="mono text-[11px] text-rose-400 hover:text-rose-300">✕</button>
+                        <button onClick={() => remove(r.id)} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
                       </>
                     )}
                   </div>

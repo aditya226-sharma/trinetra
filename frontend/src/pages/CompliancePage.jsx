@@ -38,7 +38,7 @@ export default function CompliancePage() {
         actions={<LiveBadge text={`${assets.length} assets require action`} />}
       />
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         {/* asset rail */}
@@ -58,8 +58,8 @@ export default function CompliancePage() {
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <p className="mono text-[12.5px] text-slate-100">{a.id}</p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-rose-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" />
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-red-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" />
                     {a.degree} edges · escalated
                   </p>
                 </button>

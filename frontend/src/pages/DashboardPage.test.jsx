@@ -201,6 +201,80 @@ describe("buildReviewQueue", () => {
   it("returns an empty queue when there is nothing to review", () => {
     expect(buildReviewQueue({ findings: [], incidents: [] })).toEqual([]);
   });
+
+  it("caps repeats of one threat class so the queue shows spread", () => {
+    // A live estate is dominated by its noisiest detector; a plain top-6 was
+    // six identical "dga_dns" rows.
+    const findings = Array.from({ length: 9 }, (_, i) => ({
+      id: `f${i}`,
+      threat_class: "dga_dns",
+      severity: "high",
+      client_id: `c${i}`,
+      timestamp: `2026-06-0${i + 1}T00:00:00Z`,
+    }));
+    const rows = buildReviewQueue({ findings, incidents: [] });
+    expect(rows.filter((r) => r.title === "Dga dns")).toHaveLength(3);
+  });
+
+  it("still fills the panel from other classes when one class dominates", () => {
+    const incidents = [
+      ...Array.from({ length: 20 }, (_, i) => ({
+        id: `i${i}`,
+        threat_class: "port_scan",
+        severity: "high",
+        client_id: `c${i}`,
+        timestamp: `2026-06-01T00:00:${String(i).padStart(2, "0")}Z`,
+      })),
+      ...["dns_tunnel", "c2_beacon", "brute_force", "exfil", "lateral"].map((t, i) => ({
+        id: `x${i}`,
+        threat_class: t,
+        severity: "high",
+        client_id: `c${i}`,
+        timestamp: "2026-05-01T00:00:00Z",
+      })),
+    ];
+    const rows = buildReviewQueue({ findings: [], incidents });
+    expect(rows).toHaveLength(6);
+    expect(rows.filter((r) => r.title === "Port scan")).toHaveLength(3);
+  });
+
+  it("returns fewer rows than the cap when the whole queue is one class", () => {
+    // Honest outcome: three real rows beat six copies of the same finding.
+    const incidents = Array.from({ length: 20 }, (_, i) => ({
+      id: `i${i}`,
+      threat_class: "port_scan",
+      severity: "high",
+      client_id: `c${i}`,
+      timestamp: `2026-06-01T00:00:${String(i).padStart(2, "0")}Z`,
+    }));
+    expect(buildReviewQueue({ findings: [], incidents })).toHaveLength(3);
+  });
+
+  it("still puts criticals first when the cap defers a row", () => {
+    const findings = [
+      ...Array.from({ length: 3 }, (_, i) => ({
+        id: `n${i}`,
+        threat_class: "dga_dns",
+        severity: "high",
+        timestamp: "2026-06-01T00:00:00Z",
+      })),
+      { id: "c1", threat_class: "c2p_exfil", severity: "critical", timestamp: "2026-01-01T00:00:00Z" },
+    ];
+    const rows = buildReviewQueue({ findings, incidents: [] });
+    // The older critical must stay first despite the newer high-severity rows.
+    expect(rows[0].title).toBe("C2p exfil");
+    expect(rows[0].severity).toBe("critical");
+  });
+
+  it("keeps the panel full when classes are already varied", () => {
+    const findings = ["a", "b", "c", "d", "e", "f", "g"].map((t, i) => ({
+      id: `f${i}`,
+      threat_class: `class_${t}`,
+      severity: "high",
+      timestamp: "2026-06-01T00:00:00Z",
+    }));
+    expect(buildReviewQueue({ findings, incidents: [] })).toHaveLength(6);
+  });
 });
 
 describe("NeedsReview", () => {

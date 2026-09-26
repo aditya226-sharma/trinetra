@@ -382,7 +382,7 @@ export default function LogConsolePage() {
         )}
       </section>
 
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {error && <div className="text-sm text-red-400">{error}</div>}
 
       {/* Selected log detail */}
       {selected && <EventDetail event={selected} onClose={() => setSelected(null)} />}
@@ -554,7 +554,7 @@ function FieldTable({ fields }) {
 
 function LogLine({ event: e, showRaw, active, onSelect }) {
   const sevColor = {
-    critical: "text-rose-400",
+    critical: "text-red-400",
     error: "text-violet-400",
     warning: "text-amber-400",
     info: "text-slate-300",

@@ -174,7 +174,7 @@ export default function GraphPage() {
     return c;
   }, [allEdges]);
 
-  if (error) return <div className="text-sm text-rose-400">Failed to load graph: {error}</div>;
+  if (error) return <div className="text-sm text-red-400">Failed to load graph: {error}</div>;
   if (!graph) return <div className="text-slate-500">Rendering entity graph…</div>;
 
   const chip = (label, active, onClick, color) => (
@@ -481,7 +481,7 @@ export default function GraphPage() {
                           <span className="flex shrink-0 items-center gap-2">
                             <PlainBadge>{e.kind}</PlainBadge>
                             {e.flows ? <span className="mono text-[10px] text-slate-500">{e.flows}f</span> : null}
-                            {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500 pulse-dot-red" /> : null}
+                            {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" /> : null}
                           </span>
                         </div>
                       ))}

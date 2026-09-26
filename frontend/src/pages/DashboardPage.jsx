@@ -58,12 +58,20 @@ function reviewSubject(item) {
 // "Needs Review" merges open findings and open incidents into one ranked queue:
 // severity first, then recency. Derived from endpoints the dashboard already
 // fetches, so it costs no extra request and needs no backend change.
+//
+// A live estate is dominated by whichever detector is noisiest, so a plain
+// top-N was six near-identical "Dga dns" rows that gave an analyst no sense of
+// breadth. CLASS_CAP keeps at most N rows per threat class so the queue shows
+// spread, while the severity-then-recency order is untouched: the cap only ever
+// defers a row, and deferred rows are backfilled in rank order if slots remain.
+const CLASS_CAP = 3;
+
 function buildReviewQueue({ findings = [], incidents = [] }) {
   const rows = [
     ...findings.map((f) => ({ item: f, source: "finding" })),
     ...incidents.map((i) => ({ item: i, source: "incident" })),
   ];
-  return rows
+  const ranked = rows
     .map((r) => ({
       ...r,
       severity: String(r.item?.severity || "info").toLowerCase(),
@@ -72,8 +80,36 @@ function buildReviewQueue({ findings = [], incidents = [] }) {
       when: recency(r.item),
       ago: relativeTime(recency(r.item)),
     }))
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.when - a.when)
-    .slice(0, REVIEW_LIMIT);
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.when - a.when);
+
+  const picked = [];
+  const deferred = [];
+  const perClass = new Map();
+  const keyOf = (row) => row.item?.threat_class || row.title;
+  for (const row of ranked) {
+    const cls = keyOf(row);
+    const seen = perClass.get(cls) || 0;
+    if (seen < CLASS_CAP) {
+      perClass.set(cls, seen + 1);
+      picked.push(row);
+    } else {
+      deferred.push(row);
+    }
+    if (picked.length === REVIEW_LIMIT) break;
+  }
+  // Backfill in rank order, but only with classes still under the cap: padding
+  // with the very rows the cap deferred would defeat it. The panel can then end
+  // up shorter than REVIEW_LIMIT, which is honest — six copies of one finding
+  // is less use to an analyst than two.
+  for (const row of deferred) {
+    if (picked.length === REVIEW_LIMIT) break;
+    const cls = keyOf(row);
+    if ((perClass.get(cls) || 0) < CLASS_CAP) {
+      perClass.set(cls, (perClass.get(cls) || 0) + 1);
+      picked.push(row);
+    }
+  }
+  return picked;
 }
 
 const PIPELINE = [
@@ -84,7 +120,7 @@ const PIPELINE = [
 ];
 
 const STATUS_LANES = [
-  { key: "open", label: "open", tone: "text-rose-400 border-rose-500/30" },
+  { key: "open", label: "open", tone: "text-red-400 border-red-400/30" },
   { key: "investigation", label: "investigation", tone: "text-amber-400 border-amber-500/30" },
   { key: "closed", label: "closed", tone: "text-emerald-400 border-emerald-500/30" },
 ];
@@ -119,7 +155,7 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
     };
   }, [adminOnly]);
 
-  if (error) return <div className="text-sm text-rose-400">Failed to load dashboard: {error}</div>;
+  if (error) return <div className="text-sm text-red-400">Failed to load dashboard: {error}</div>;
   if (!data) return <div className="text-slate-500">Loading dashboard…</div>;
 
   if (scoped || data.scope) {
@@ -180,7 +216,7 @@ function ScopedDashboard({ data, scope }) {
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> <b className="mono text-amber-300">{s.findings ?? 0}</b> findings
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> <b className="mono text-rose-300">{totalIncidents}</b> incidents
+            <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> <b className="mono text-red-300">{totalIncidents}</b> incidents
           </span>
           <span className="ml-auto"><LiveBadge text="Live · 10s" /></span>
         </div>
@@ -232,7 +268,7 @@ function ScopedDashboard({ data, scope }) {
                   <div key={threat} className="feed-in" style={{ animationDelay: `${i * 60}ms` }}>
                     <div className="mb-1 flex items-center justify-between text-[12px]">
                       <span className="mono text-slate-200">{threat}</span>
-                      <span className="mono text-[11px] text-rose-300">{count} hits</span>
+                      <span className="mono text-[11px] text-red-300">{count} hits</span>
                     </div>
                     <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
                       <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(34,211,238,0.4)" }} />
@@ -414,7 +450,7 @@ function AdminOverview({ data, clients }) {
               Multi-domain intelligence over{" "}
               <b className="mono text-emerald-300">{s.events ?? 0}</b> normalized events with{" "}
               <b className="mono text-amber-300">{s.findings ?? 0}</b> module findings and{" "}
-              <b className="mono text-rose-300">{s.alerts_sent ?? 0}</b> alerts fanned out.
+              <b className="mono text-red-300">{s.alerts_sent ?? 0}</b> alerts fanned out.
             </p>
           </div>
           <LiveBadge text="Live · 10s" />
@@ -484,7 +520,7 @@ function AdminOverview({ data, clients }) {
                     <div key={threat} className="feed-in" style={{ animationDelay: `${i * 60}ms` }}>
                       <div className="mb-1 flex items-center justify-between text-[12px]">
                         <span className="mono text-slate-200">{threat}</span>
-                        <span className="mono text-[11px] text-rose-300">{count} hits</span>
+                        <span className="mono text-[11px] text-red-300">{count} hits</span>
                       </div>
                       <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
                         <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(248,113,113,0.5)" }} />
@@ -670,10 +706,10 @@ function useLiveChannel(clientScope) {
 
 function LiveToast({ toast, onDismiss }) {
   if (!toast) return null;
-  const tone = toast.icon === "task" ? "border-cyan-500/40" : "border-rose-500/40";
+  const tone = toast.icon === "task" ? "border-cyan-500/40" : "border-red-400/40";
   return (
     <div className={`fixed right-4 top-20 z-50 flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border bg-black/85 p-3 shadow-2xl backdrop-blur anim-fadeup ${tone}`}>
-      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[13px] ${toast.icon === "task" ? "bg-cyan-500/15 text-cyan-300" : "bg-rose-500/15 text-rose-300"}`}>
+      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[13px] ${toast.icon === "task" ? "bg-cyan-500/15 text-cyan-300" : "bg-red-400/15 text-red-300"}`}>
         {toast.icon === "task" ? "⚑" : "◉"}
       </span>
       <div className="min-w-0 flex-1">
@@ -688,7 +724,7 @@ function LiveToast({ toast, onDismiss }) {
 
 /* ------------------------------------------------------------------ tasks */
 const PRIORITY_TONES = {
-  P1: "text-rose-300 border-rose-500/40 bg-rose-500/10",
+  P1: "text-red-300 border-red-400/40 bg-red-400/10",
   P2: "text-amber-300 border-amber-500/40 bg-amber-500/10",
   P3: "text-cyan-300 border-cyan-500/40 bg-cyan-500/10",
   P4: "text-slate-400 border-slate-500/40 bg-slate-500/10",
@@ -705,7 +741,7 @@ export function TaskRow({ task, onPatch, canPatch }) {
   const overdue = task.due_at && task.status !== "done" && task.due_at.slice(0, 10) < new Date().toISOString().slice(0, 10);
   const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
   return (
-    <div className={`glass-row p-3 ${overdue ? "border-rose-500/30" : ""}`}>
+    <div className={`glass-row p-3 ${overdue ? "border-red-400/30" : ""}`}>
       <div className="flex items-start gap-2">
         {canPatch && (
           <button
@@ -721,7 +757,7 @@ export function TaskRow({ task, onPatch, canPatch }) {
             <span className="mono text-[12.5px] text-slate-100">{task.title}</span>
             <TaskPriority priority={task.priority} />
             <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-slate-400">{task.status}</span>
-            {overdue && <span className="mono rounded border border-rose-500/40 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-rose-300">overdue</span>}
+            {overdue && <span className="mono rounded border border-red-400/40 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-red-300">overdue</span>}
           </div>
           {task.description && <p className="mono mt-1 truncate text-[10.5px] text-slate-500">{task.description}</p>}
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">

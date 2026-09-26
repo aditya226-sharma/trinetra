@@ -60,7 +60,7 @@ export default function LoginPage({ onSuccess }) {
             />
           </label>
 
-          {error && <p className="text-[12px] text-rose-400">{error}</p>}
+          {error && <p className="text-[12px] text-red-400">{error}</p>}
 
           <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? "AUTHENTICATING…" : "SIGN IN"}
