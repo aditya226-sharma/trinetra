@@ -138,21 +138,52 @@ function SocRoute({ user, children }) {
   return children;
 }
 
-const navItems = [
-  { to: "/clients", label: "Clients" },
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/events", label: "Events" },
-  { to: "/alerts", label: "Alerts" },
-  { to: "/rules", label: "Rules" },
-  { to: "/watchlist", label: "Watchlist" },
-  { to: "/graph", label: "Graph" },
-  { to: "/assets", label: "Assets" },
-  { to: "/compliance", label: "Compliance" },
-  { to: "/analytics", label: "Analytics" },
-  { to: "/fleet", label: "Fleet" },
-  { to: "/ingest", label: "Ingest" },
-  { to: "/settings", label: "Settings" },
+// Grouped into Overview / Investigate / Govern per the command-center spec.
+// `label` doubles as the ICONS key, so labels must not change.
+const navGroups = [
+  {
+    label: "Overview",
+    items: [
+      { to: "/", label: "Dashboard", end: true },
+      { to: "/analytics", label: "Analytics" },
+      { to: "/fleet", label: "Fleet" },
+      { to: "/clients", label: "Clients" },
+    ],
+  },
+  {
+    label: "Investigate",
+    items: [
+      { to: "/alerts", label: "Alerts" },
+      { to: "/events", label: "Events" },
+      { to: "/graph", label: "Graph" },
+      { to: "/assets", label: "Assets" },
+      { to: "/watchlist", label: "Watchlist" },
+    ],
+  },
+  {
+    label: "Govern",
+    items: [
+      { to: "/rules", label: "Rules" },
+      { to: "/compliance", label: "Compliance" },
+      { to: "/ingest", label: "Ingest" },
+      { to: "/settings", label: "Settings" },
+    ],
+  },
 ];
+
+// Scoped client viewers are read-only to one client: they may see their portal
+// dashboard and the alert queue, but not the SOC-internal estate views
+// (cross-client by design).
+function navItemVisible(item, user) {
+  if (!user) return true;
+  if (item.to === "/settings" || item.to === "/ingest") return user.role === "admin";
+  if (user.role !== "admin" && user.role !== "analyst" && user.client_scope) {
+    return item.to === "/" || item.to === "/alerts";
+  }
+  return true;
+}
+
+export { navGroups, navItemVisible };
 
 const TITLES = {
   "/": "Security overview",
@@ -376,34 +407,32 @@ export default function App() {
         <div className="px-1.5 pb-2 pt-1">
           <p className="eyebrow px-4 pb-2">Command</p>
           <nav className="space-y-0.5">
-            {navItems
-              .filter((item) => {
-                if (!user) return true;
-                if (item.to === "/settings" || item.to === "/ingest") return user.role === "admin";
-                // Scoped client viewers are read-only to one client: they may
-                // see their portal dashboard and the alert queue, but not the
-                // SOC-internal estate views (cross-client by design).
-                if (user.role !== "admin" && user.role !== "analyst" && user.client_scope) {
-                  return item.to === "/" || item.to === "/alerts";
-                }
-                return true;
-              })
-              .map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => `rail-link ${isActive ? "active" : ""}`}
-              >
-                <span className="grid h-6 w-6 place-items-center opacity-80">{ICONS[item.label]}</span>
-                {item.label}
-                {item.label === "Alerts" && openCaseCount > 0 && (
-                  <span className={`ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white ${openCaseCount > 0 ? "pulse-dot-red" : ""}`}>
-                    {openCaseCount > 99 ? "99+" : openCaseCount}
-                  </span>
-                )}
-              </NavLink>
-            ))}
+            {navGroups.map((group) => {
+              const items = group.items.filter((item) => navItemVisible(item, user));
+              // Drop the caption entirely when a role can see nothing in it.
+              if (items.length === 0) return null;
+              return (
+                <div key={group.label} className="pb-1">
+                  <p className="rail-group">{group.label}</p>
+                  {items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) => `rail-link ${isActive ? "active" : ""}`}
+                    >
+                      <span className="grid h-6 w-6 place-items-center opacity-80">{ICONS[item.label]}</span>
+                      {item.label}
+                      {item.label === "Alerts" && openCaseCount > 0 && (
+                        <span className={`ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-[#f87171] px-1 text-[9px] font-bold text-white ${openCaseCount > 0 ? "pulse-dot-red" : ""}`}>
+                          {openCaseCount > 99 ? "99+" : openCaseCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              );
+            })}
           </nav>
         </div>
 

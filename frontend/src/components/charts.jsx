@@ -2,7 +2,7 @@ import React from "react";
 
 /* Pure-SVG micro-charts — no external deps. */
 
-export function Sparkline({ data = [], color = "#34d399", width = 120, height = 36, fill = true }) {
+export function Sparkline({ data = [], color = "#22d3ee", width = 120, height = 36, fill = true }) {
   if (data.length < 2) {
     return <svg width={width} height={height} className="opacity-30" />;
   }
@@ -86,7 +86,7 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
   );
 }
 
-export function ScoreRing({ score = 0, size = 96, tone = "#34d399", label }) {
+export function ScoreRing({ score = 0, size = 96, tone = "#22d3ee", label }) {
   const thickness = 8;
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
@@ -125,7 +125,7 @@ export function ScoreRing({ score = 0, size = 96, tone = "#34d399", label }) {
   );
 }
 
-export function MiniBars({ data = [], color = "#34d399", height = 44, barWidth = 8 }) {
+export function MiniBars({ data = [], color = "#22d3ee", height = 44, barWidth = 8 }) {
   const max = Math.max(...data, 1);
   return (
     <div className="flex items-end gap-1" style={{ height }}>

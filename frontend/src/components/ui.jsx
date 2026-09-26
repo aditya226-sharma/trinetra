@@ -3,19 +3,42 @@ import { Sparkline } from "./charts";
 
 /* Shared UI primitives for the TriNetra command center */
 
+// Seven severity keys preserved so existing data and call sites keep working,
+// mapped onto the three command-center hues: critical #F87171, warning
+// #FBBF24, info #38BDF8. `error` keeps violet to stay distinct from warning.
 const SEV = {
-  critical: { strip: "sev-critical", text: "sev-text-critical", label: "bg-[#e11d48]" },
-  high: { strip: "sev-high", text: "sev-text-high", label: "bg-[#ea580c]" },
-  medium: { strip: "sev-medium", text: "sev-text-warning", label: "bg-[#f59e0b]" },
-  warning: { strip: "sev-warning", text: "sev-text-warning", label: "bg-[#f59e0b]" },
-  error: { strip: "sev-error", text: "sev-text-error", label: "bg-[#7c3aed]" },
-  info: { strip: "sev-info", text: "sev-text-info", label: "bg-[#0891b2]" },
-  low: { strip: "sev-low", text: "sev-text-low", label: "bg-[#0891b2]" },
+  critical: { strip: "sev-critical", text: "sev-text-critical", label: "bg-[#f87171]" },
+  high: { strip: "sev-high", text: "sev-text-high", label: "bg-[#fca5a5]" },
+  medium: { strip: "sev-medium", text: "sev-text-warning", label: "bg-[#fbbf24]" },
+  warning: { strip: "sev-warning", text: "sev-text-warning", label: "bg-[#fbbf24]" },
+  error: { strip: "sev-error", text: "sev-text-error", label: "bg-[#a78bfa]" },
+  info: { strip: "sev-info", text: "sev-text-info", label: "bg-[#38bdf8]" },
+  low: { strip: "sev-low", text: "sev-text-low", label: "bg-[#38bdf8]" },
 };
+
+// Coarse buckets used for ranking and for picking one of the three spec hues
+// when a caller needs a single severity colour.
+const SEV_RANK = { critical: 0, high: 1, error: 2, warning: 3, medium: 4, info: 5, low: 6 };
+const SEV_HUE = {
+  critical: "#f87171",
+  high: "#f87171",
+  error: "#a78bfa",
+  warning: "#fbbf24",
+  medium: "#fbbf24",
+  info: "#38bdf8",
+  low: "#38bdf8",
+};
+
+export const severityRank = (severity) =>
+  SEV_RANK[String(severity || "").toLowerCase()] ?? SEV_RANK.info;
+
+export const severityHex = (severity) =>
+  SEV_HUE[String(severity || "").toLowerCase()] ?? SEV_HUE.info;
 
 export function SeverityDot({ severity }) {
   const s = SEV[severity] || SEV.info;
-  return <span className={`inline-block h-2 w-2 rounded-full ${s.label}`} style={{ boxShadow: `0 0 8px ${s.label === "bg-[#e11d48]" ? "rgba(225,29,72,.8)" : "rgba(148,163,184,.5)"}` }} />;
+  const hex = severityHex(severity);
+  return <span className={`inline-block h-2 w-2 rounded-full ${s.label}`} style={{ boxShadow: `0 0 8px ${hex}cc` }} />;
 }
 
 export function SeverityBadge({ severity }) {
@@ -96,7 +119,7 @@ export function Kpi({
       </div>
       {spark && spark.values.length > 0 && (
         <div className="mt-3">
-          <Sparkline data={spark.values} color={spark.color || "#34d399"} />
+          <Sparkline data={spark.values} color={spark.color || "#22d3ee"} />
         </div>
       )}
     </div>

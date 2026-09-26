@@ -1,10 +1,80 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDashboard, getClients, getTasks, createTask, patchTask, streamEvents } from "../lib/api";
-import { SeverityBadge, LiveBadge, PulseDot, SectionTitle, Empty } from "../components/ui";
+import { SeverityBadge, SeverityDot, LiveBadge, PulseDot, SectionTitle, Empty, severityRank, severityHex } from "../components/ui";
 import { Donut, Sparkline, ScoreRing } from "../components/charts";
 
-const DONUT_COLORS = ["#34d399", "#22d3ee", "#818cf8", "#fbbf24", "#f472b6", "#f87171", "#60a5fa"];
+const DONUT_COLORS = ["#22d3ee", "#34d399", "#818cf8", "#fbbf24", "#f472b6", "#f87171", "#60a5fa"];
+
+const REVIEW_LIMIT = 6;
+
+// Timestamp fields vary by source, so try the plausible ones in order. The
+// live dashboard payload stamps both findings and incidents with `timestamp`.
+function recency(item) {
+  for (const k of ["timestamp", "ts", "created_at", "opened_at", "detected_at", "updated_at"]) {
+    const v = item?.[k];
+    if (v) {
+      const t = Date.parse(v);
+      if (!Number.isNaN(t)) return t;
+    }
+  }
+  return 0;
+}
+
+function humanize(value) {
+  return String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+function relativeTime(ms) {
+  if (!ms) return null;
+  const secs = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+// Findings and incidents from /api/dashboard are identified by `threat_class`
+// (e.g. "port_scan"); they carry no title field, so fall back to it before
+// giving up, otherwise every row renders as "Untitled finding".
+function reviewTitle(item, source) {
+  const direct = item?.title || item?.rule || item?.name || item?.summary || item?.reason;
+  if (direct) return direct;
+  if (item?.threat_class) return humanize(item.threat_class);
+  if (source === "incident") return item?.id ? `Incident ${humanize(item.id).slice(0, 8)}` : "Incident";
+  return "Unclassified finding";
+}
+
+function reviewSubject(item) {
+  return item?.client_id || item?.client_name || item?.entity || item?.host || item?.src_ip || "";
+}
+
+// "Needs Review" merges open findings and open incidents into one ranked queue:
+// severity first, then recency. Derived from endpoints the dashboard already
+// fetches, so it costs no extra request and needs no backend change.
+function buildReviewQueue({ findings = [], incidents = [] }) {
+  const rows = [
+    ...findings.map((f) => ({ item: f, source: "finding" })),
+    ...incidents.map((i) => ({ item: i, source: "incident" })),
+  ];
+  return rows
+    .map((r) => ({
+      ...r,
+      severity: String(r.item?.severity || "info").toLowerCase(),
+      title: reviewTitle(r.item, r.source),
+      subject: reviewSubject(r.item),
+      when: recency(r.item),
+      ago: relativeTime(recency(r.item)),
+    }))
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.when - a.when)
+    .slice(0, REVIEW_LIMIT);
+}
 
 const PIPELINE = [
   { id: "normalize", label: "Normalize" },
@@ -124,6 +194,8 @@ function ScopedDashboard({ data, scope }) {
         <KpiCard label="Investigation" value={incidents.investigation?.length ?? 0} sub="actively worked" tone="violet" icon={<DedupIcon />} delay={180} />
       </div>
 
+      <NeedsReview rows={buildReviewQueue({ findings: data.findings || [], incidents: incidents.open || [] })} />
+
       {/* tasks assigned by the SOC team */}
       <section className="glass p-5 anim-fadeup !border-cyan-400/20 !bg-cyan-950/10">
         <SectionTitle
@@ -163,7 +235,7 @@ function ScopedDashboard({ data, scope }) {
                       <span className="mono text-[11px] text-rose-300">{count} hits</span>
                     </div>
                     <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f43f5e)", boxShadow: "0 0 12px rgba(34,211,238,0.4)" }} />
+                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(34,211,238,0.4)" }} />
                     </div>
                   </div>
                 );
@@ -220,6 +292,84 @@ function FindingRow({ f, i, sevStrip }) {
       </div>
       <SeverityBadge severity={alert.severity} />
     </div>
+  );
+}
+
+/* ================================================================== needs review */
+function NeedsReview({ rows }) {
+  const critical = rows.filter((r) => r.severity === "critical" || r.severity === "high").length;
+
+  return (
+    <section className="glass p-5 anim-fadeup">
+      <SectionTitle
+        right={
+          <span className="mono text-[10px] uppercase tracking-widest text-[#94a3b8]">
+            {critical > 0 ? `${critical} high priority` : `${rows.length} queued`}
+          </span>
+        }
+      >
+        Needs Review
+      </SectionTitle>
+
+      {rows.length === 0 ? (
+        <Empty title="Queue is clear" hint="Open findings and incidents needing triage appear here, highest severity first." />
+      ) : (
+        <ul className="mt-1 space-y-2">
+          {rows.map((r, i) => {
+            const hex = severityHex(r.severity);
+            const to = r.source === "incident" ? "/alerts" : "/graph";
+            return (
+              <li key={`${r.source}-${r.item?.id || r.item?.flow_id || i}`}>
+                <Link
+                  to={to}
+                  className="glass-row flex items-center gap-3 px-3.5 py-3 no-underline"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-9 w-[3px] shrink-0 rounded-full"
+                    style={{ background: hex, boxShadow: `0 0 12px ${hex}99` }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <SeverityDot severity={r.severity} />
+                      <span className="truncate text-[13px] font-medium text-[#e2e8f0]">{r.title}</span>
+                    </span>
+                    {(r.subject || r.ago) && (
+                      <span className="mono mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#94a3b8]">
+                        {r.subject && <span className="truncate">{r.subject}</span>}
+                        {r.subject && r.ago && <span aria-hidden="true" className="text-slate-600">·</span>}
+                        {r.ago && (
+                          <time className="shrink-0" dateTime={new Date(r.when).toISOString()}>
+                            {r.ago}
+                          </time>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                  <span className="hidden shrink-0 sm:block">
+                    <SeverityBadge severity={r.severity} />
+                  </span>
+                  <svg
+                    aria-hidden="true"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -289,11 +439,13 @@ function AdminOverview({ data, clients }) {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Events ingested" value={s.events ?? 0} sub={`${s.raw_lines ?? 0} raw lines · ${Math.round((data.dedup_rate || 0) * 100)}% dedup`} tone="emerald" icon={<ChartIcon />} spark={{ values: eventsSpark, color: "#34d399" }} delay={0} />
+        <KpiCard label="Events ingested" value={s.events ?? 0} sub={`${s.raw_lines ?? 0} raw lines · ${Math.round((data.dedup_rate || 0) * 100)}% dedup`} tone="emerald" icon={<ChartIcon />} spark={{ values: eventsSpark, color: "#22d3ee" }} delay={0} />
         <KpiCard label="Deduplication rate" value={`${Math.round((data.dedup_rate || 0) * 100)}%`} sub="fingerprint-based corpus" tone="cyan" icon={<DedupIcon />} delay={60} />
-        <KpiCard label="Module findings" value={s.findings ?? 0} sub={`${s.alerts_sent ?? 0} alerts sent to analyst queue`} tone="danger" icon={<ThreatIcon />} spark={{ values: threatVals.length ? threatVals : [1], color: "#f43f5e" }} delay={120} />
+        <KpiCard label="Module findings" value={s.findings ?? 0} sub={`${s.alerts_sent ?? 0} alerts sent to analyst queue`} tone="danger" icon={<ThreatIcon />} spark={{ values: threatVals.length ? threatVals : [1], color: "#f87171" }} delay={120} />
         <KpiCard label="Entity graph" value={`${g.nodes ?? 0}N / ${g.edges ?? 0}E`} sub={`${g.threatened?.length || 0} assets impacted`} tone="violet" icon={<GraphIcon />} spark={{ values: top.map((c) => c.events), color: "#22d3ee" }} delay={180} />
       </div>
+
+      <NeedsReview rows={buildReviewQueue({ findings: data.findings || [], incidents: incidents.open || [] })} />
 
       {/* incident board */}
       <section className="glass p-5 anim-fadeup">
@@ -335,7 +487,7 @@ function AdminOverview({ data, clients }) {
                         <span className="mono text-[11px] text-rose-300">{count} hits</span>
                       </div>
                       <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#059669,#10b981,#f43f5e)", boxShadow: "0 0 12px rgba(244,63,94,0.5)" }} />
+                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(248,113,113,0.5)" }} />
                       </div>
                     </div>
                   );
@@ -415,7 +567,7 @@ function AdminOverview({ data, clients }) {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {vpn.map((p, i) => {
-              const tone = p.risk_level === "critical" ? "#f43f5e" : p.risk_level === "high" ? "#fb923c" : p.risk_level === "medium" ? "#fbbf24" : "#34d399";
+              const tone = p.risk_level === "critical" ? "#f87171" : p.risk_level === "high" ? "#fca5a5" : p.risk_level === "medium" ? "#fbbf24" : "#38bdf8";
               return (
                 <div key={p.interface || p.file || i} className="glass-row flex items-center gap-4 p-4 feed-in" style={{ animationDelay: `${i * 70}ms` }}>
                   <ScoreRing score={p.security_score ?? p.score ?? 0} tone={tone} label="score" />
@@ -545,7 +697,8 @@ const PRIORITY_TONES = {
 function TaskPriority({ priority }) {
   return <span className={`mono rounded border px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_TONES[priority] || PRIORITY_TONES.P3}`}>{priority}</span>;
 }
-export { TaskPriority };
+export { TaskPriority, NeedsReview, buildReviewQueue };
+
 
 export function TaskRow({ task, onPatch, canPatch }) {
   const [note, setNote] = useState("");
@@ -708,16 +861,23 @@ export function AdminTaskManage({ clients, initial }) {
 
 /* ------------------------------------------------------------------ local pieces */
 function KpiCard({ label, value, sub, tone, icon, spark, delay }) {
-  const tones = { emerald: "glow-emerald", cyan: "glow-cyan", danger: "glow-red", violet: "glow-cyan" };
+  // Glow + icon tint derive from the same tone so a card reads as one object.
+  const tones = {
+    emerald: { glow: "glow-cyan", icon: "text-[#22d3ee]" },
+    cyan: { glow: "glow-cyan", icon: "text-[#22d3ee]" },
+    danger: { glow: "glow-red", icon: "text-[#f87171]" },
+    violet: { glow: "glow-cyan", icon: "text-[#818cf8]" },
+  };
+  const t = tones[tone] || tones.cyan;
   return (
-    <div className={`glass p-4 anim-fadeup ${tones[tone]}`} style={{ animationDelay: `${delay}ms` }}>
+    <div className={`glass p-4 anim-fadeup ${t.glow}`} style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow truncate">{label}</p>
-          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-slate-50">{value}</p>
-          <p className="mt-2 text-[11px] leading-snug text-slate-500">{sub}</p>
+          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-[#e2e8f0]">{value}</p>
+          <p className="mt-2 text-[11px] leading-snug text-[#94a3b8]">{sub}</p>
         </div>
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-emerald-300 ${tone === "danger" ? "!text-rose-300" : ""}`}>{icon}</span>
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 ${t.icon}`}>{icon}</span>
       </div>
       {spark && <div className="mt-3"><Sparkline data={spark.values} color={spark.color} width={140} /></div>}
     </div>

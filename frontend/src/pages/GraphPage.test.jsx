@@ -68,12 +68,12 @@ describe("GraphPage", () => {
     const dashes = Array.from(paths).map((p) => p.getAttribute("stroke-dasharray"));
     const strokes = Array.from(paths).map((p) => p.getAttribute("stroke"));
 
-    // dns is dashed, auth/exec/runs use their own colours, flagged is red.
+    // dns is dashed, auth/exec/runs use their own colours, flagged is critical red.
     expect(dashes).toContain("3 3");
     expect(strokes).toContain("#34d399"); // auth
     expect(strokes).toContain("#fbbf24"); // exec
     expect(strokes).toContain("#a78bfa"); // runs
-    expect(strokes).toContain("#f43f5e"); // flagged
+    expect(strokes).toContain("#f87171"); // flagged
   });
 
   it("counts and labels each relationship kind in the legend", async () => {

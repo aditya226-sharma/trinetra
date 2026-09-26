@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { TaskRow, TaskPriority, ClientTasks, AdminTaskManage } from "./DashboardPage";
+import { TaskRow, TaskPriority, ClientTasks, AdminTaskManage, NeedsReview, buildReviewQueue } from "./DashboardPage";
 import * as api from "../lib/api";
 
 vi.mock("../lib/api", () => ({
@@ -130,5 +130,102 @@ describe("AdminTaskManage", () => {
       })
     );
     expect(await screen.findByText(/✓ task assigned to edge-fw-01/i)).toBeInTheDocument();
+  });
+});
+describe("buildReviewQueue", () => {
+  it("ranks by severity before recency", () => {
+    const rows = buildReviewQueue({
+      findings: [
+        { id: "f1", title: "info one", severity: "info", ts: "2026-02-01T00:00:00Z" },
+        { id: "f2", title: "critical one", severity: "critical", ts: "2026-01-01T00:00:00Z" },
+      ],
+      incidents: [
+        { id: "i1", title: "warning one", severity: "warning", ts: "2026-03-01T00:00:00Z" },
+      ],
+    });
+    // The older critical outranks both newer, lower-severity rows.
+    expect(rows.map((r) => r.title)).toEqual(["critical one", "warning one", "info one"]);
+  });
+
+  it("falls back to info for a missing severity so a row is never dropped", () => {
+    const rows = buildReviewQueue({ findings: [{ id: "f1", title: "no severity" }], incidents: [] });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].severity).toBe("info");
+    expect(rows[0].title).toBe("no severity");
+  });
+
+  it("uses the source label when a row has no title", () => {
+    const rows = buildReviewQueue({ findings: [], incidents: [{ id: "i9", severity: "high" }] });
+    expect(rows[0].title).toBe("Incident I9");
+    expect(rows[0].source).toBe("incident");
+  });
+
+  it("titles rows from threat_class, the field the dashboard actually returns", () => {
+    // /api/dashboard findings carry threat_class and no title, so without this
+    // fallback every real row rendered as "Untitled finding".
+    const rows = buildReviewQueue({
+      findings: [
+        { threat_class: "port_scan", severity: "warning", client_id: "db-primary", timestamp: "2026-09-26T07:36:44Z" },
+        { threat_class: "dga_dns", severity: "high", client_id: "app-srv-01", timestamp: "2026-09-26T07:37:11Z" },
+      ],
+      incidents: [],
+    });
+    expect(rows.map((r) => r.title)).toEqual(["Dga dns", "Port scan"]);
+  });
+
+  it("never renders an empty title", () => {
+    const rows = buildReviewQueue({ findings: [{ severity: "info" }], incidents: [{ severity: "info" }] });
+    rows.forEach((r) => expect(r.title.trim().length).toBeGreaterThan(0));
+  });
+
+  it("orders by recency within the same severity", () => {
+    const rows = buildReviewQueue({
+      findings: [
+        { threat_class: "old_one", severity: "high", timestamp: "2026-01-01T00:00:00Z" },
+        { threat_class: "new_one", severity: "high", timestamp: "2026-06-01T00:00:00Z" },
+      ],
+      incidents: [],
+    });
+    expect(rows.map((r) => r.title)).toEqual(["New one", "Old one"]);
+  });
+
+  it("caps the queue so the panel cannot grow without bound", () => {
+    const findings = Array.from({ length: 40 }, (_, i) => ({
+      id: `f${i}`,
+      title: `finding ${i}`,
+      severity: "info",
+    }));
+    expect(buildReviewQueue({ findings, incidents: [] })).toHaveLength(6);
+  });
+
+  it("returns an empty queue when there is nothing to review", () => {
+    expect(buildReviewQueue({ findings: [], incidents: [] })).toEqual([]);
+  });
+});
+
+describe("NeedsReview", () => {
+  it("shows the clear state when the queue is empty", () => {
+    render(wrap(<NeedsReview rows={[]} />));
+    expect(screen.getByText("Queue is clear")).toBeInTheDocument();
+  });
+
+  it("lists rows with a severity pill and links into triage", () => {
+    render(
+      wrap(
+        <NeedsReview
+          rows={buildReviewQueue({
+            findings: [{ id: "f1", title: "beacon to C2", severity: "critical", client_id: "acme" }],
+            incidents: [],
+          })}
+        />
+      )
+    );
+    expect(screen.getByText("Needs Review")).toBeInTheDocument();
+    expect(screen.getByText("beacon to C2")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+    expect(screen.getByText("critical")).toBeInTheDocument();
+    expect(screen.getByText("1 high priority")).toBeInTheDocument();
+    // Findings route to the graph, incidents to the alert queue.
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/graph");
   });
 });

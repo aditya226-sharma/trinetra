@@ -12,7 +12,7 @@ const KIND_COLOR = {
   user: "#34d399",
   proc: "#fbbf24",
   domain: "#818cf8",
-  threat: "#f43f5e",
+  threat: "#f87171",
 };
 
 // Module C records six relationship kinds. The page used to keep only `comm`
@@ -25,7 +25,7 @@ const EDGE_STYLE = {
   auth: { stroke: "#34d399", width: 1.5, dash: null, label: "auth" },
   exec: { stroke: "#fbbf24", width: 1.5, dash: "5 3", label: "exec" },
   runs: { stroke: "#a78bfa", width: 1.2, dash: null, label: "runs" },
-  flagged: { stroke: "#f43f5e", width: 1.8, dash: null, label: "flagged" },
+  flagged: { stroke: "#f87171", width: 1.8, dash: null, label: "flagged" },
 };
 
 const NODE_KIND_UNIVERSE = Object.keys(KIND_COLOR);

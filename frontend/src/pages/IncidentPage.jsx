@@ -259,7 +259,7 @@ function IncidentGraph({ graph }) {
           const a = rows.find((r) => r.node.id === e.source);
           const b = rows.find((r) => r.node.id === e.target);
           if (!a || !b) return null;
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#f43f5e" : "#334155"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
+          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#f87171" : "#334155"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
         })}
         {rows.map(({ node, x, y }) => (
           <g key={node.id}>
