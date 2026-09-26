@@ -2,16 +2,17 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCompliance } from "../lib/api";
 
-// Severity hues aligned with the command-center palette (critical #f87171,
-// warning #fbbf24, info #38bdf8). The previous values were pre-re-skin reds
+// Severity hues aligned with the command-center palette (critical #ec4899,
+// warning #c084fc, info #d8b4fe). The previous values were pre-re-skin reds
 // that matched neither the shared SEV map nor the report stylesheet.
 const SEV = {
-  critical: "#f87171",
-  high: "#fca5a5",
-  medium: "#fbbf24",
-  warning: "#fbbf24",
-  info: "#38bdf8",
-  low: "#94a3b8",
+  critical: "#ec4899",
+  high: "#f472b6",
+  error: "#7c3aed",
+  medium: "#c084fc",
+  warning: "#c084fc",
+  info: "#d8b4fe",
+  low: "#6b5b8a",
 };
 
 export default function ReportPage() {

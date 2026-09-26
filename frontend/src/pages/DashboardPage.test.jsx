@@ -23,7 +23,7 @@ describe("TaskPriority", () => {
 
   it("falls back to P3 tone for unknown priorities", () => {
     const { container } = render(wrap(<TaskPriority priority="P9" />));
-    expect(container.querySelector("span").className).toContain("text-cyan-300");
+    expect(container.querySelector("span").className).toContain("text-violet-300");
   });
 });
 

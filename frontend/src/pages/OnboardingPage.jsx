@@ -153,21 +153,21 @@ export default function OnboardingPage({ role }) {
         }
         sub="Mint a per-machine token and drop the generated config onto the agent. Agents appear in the fleet once they send their first heartbeat."
         actions={
-          <PlainBadge cls="!text-emerald-300">
+          <PlainBadge cls="!text-violet-300">
             <PulseDot /> 3 target platforms
           </PlainBadge>
         }
       />
 
       {isPreview && (
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-[11px] leading-relaxed text-slate-400">
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-[11px] leading-relaxed text-violet-200">
           Preview builds are read-only — minting tokens requires the live TriNetra API.
         </div>
       )}
 
       {error && (
-        <div className="rounded-xl border border-red-400/25 bg-red-400/[0.07] px-4 py-3 text-[11px] text-red-200">
-          <span className="mono font-semibold tracking-widest text-red-300">ERROR</span> {error}
+        <div className="rounded-xl border border-pink-500/25 bg-pink-500/[0.07] px-4 py-3 text-[11px] text-pink-200">
+          <span className="mono font-semibold tracking-widest text-pink-300">ERROR</span> {error}
         </div>
       )}
 
@@ -194,23 +194,23 @@ export default function OnboardingPage({ role }) {
                   {busy ? "MINTING…" : "Generate token"}
                 </button>
               </div>
-              <p className="mt-1 text-[10px] text-slate-600">
+              <p className="mt-1 text-[10px] text-violet-400">
                 Shown exactly once — the dashboard only stores a hash. The machine's first heartbeat binds it to this name in the fleet.
               </p>
             </div>
 
             {minted && (
-              <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-3 anim-fadeup">
-                <p className="mono text-[11px] font-semibold uppercase tracking-widest text-amber-300">
+              <div className="space-y-3 rounded-xl border border-purple-500/30 bg-purple-500/[0.07] p-3 anim-fadeup">
+                <p className="mono text-[11px] font-semibold uppercase tracking-widest text-purple-300">
                   Copy this token now — it won't be shown again
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="mono flex-1 overflow-x-auto rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-amber-100">
+                  <code className="mono flex-1 overflow-x-auto rounded-md border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-purple-100">
                     {minted.token}
                   </code>
                   <CopyButton text={minted.token} label="Copy" />
                 </div>
-                <div className="flex flex-wrap gap-2 text-[10px] text-slate-500">
+                <div className="flex flex-wrap gap-2 text-[10px] text-violet-300">
                   <span className="mono">token id: {minted.token_id}</span>
                   {minted.client_id && <span className="mono">client: {minted.client_id}</span>}
                 </div>
@@ -222,10 +222,10 @@ export default function OnboardingPage({ role }) {
         {/* ------------------------------------------------ active tokens */}
         <GlassCard
           title="2 · Active machine tokens"
-          right={<button onClick={load} className="text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-emerald-300">refresh</button>}
+          right={<button onClick={load} className="text-[10px] uppercase tracking-widest text-violet-300 transition hover:text-violet-300">refresh</button>}
         >
           {agents === null ? (
-            <p className="text-[13px] text-slate-500">Loading tokens…</p>
+            <p className="text-[13px] text-violet-300">Loading tokens…</p>
           ) : agents.length === 0 ? (
             <Empty
               title="No machine tokens yet"
@@ -240,25 +240,25 @@ export default function OnboardingPage({ role }) {
                     key={a.token_id}
                     className={`glass-row flex flex-wrap items-center gap-3 px-3 py-2.5 ${revoked ? "opacity-50" : ""}`}
                   >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${revoked ? "bg-red-400" : (a.client_id ? "bg-emerald-400" : "bg-slate-600")}`} />
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${revoked ? "bg-pink-500" : (a.client_id ? "bg-violet-500" : "bg-[#3b2a5c]")}`} />
                     <div className="min-w-0 flex-1">
-                      <p className={`mono truncate text-[12px] font-semibold ${revoked ? "text-slate-500 line-through" : "text-slate-200"}`}>
-                        {(a.label && `${a.label}`) || <span className="text-slate-500">(untitled)</span>}
+                      <p className={`mono truncate text-[12px] font-semibold ${revoked ? "text-violet-300 line-through" : "text-slate-200"}`}>
+                        {(a.label && `${a.label}`) || <span className="text-violet-300">(untitled)</span>}
                       </p>
-                      <p className="mono truncate text-[10px] text-slate-500">
+                      <p className="mono truncate text-[10px] text-violet-300">
                         {a.token_id} · {revoked
-                          ? <span className="text-red-400/80">revoked</span>
+                          ? <span className="text-pink-500/80">revoked</span>
                           : (a.client_id ? `bound to ${a.client_id}` : "unbound")}
                       </p>
                     </div>
-                    <span className="mono text-[10px] text-slate-600">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
+                    <span className="mono text-[10px] text-violet-400">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
                     {revoked ? (
-                      <PlainBadge cls="!text-red-300">revoked</PlainBadge>
+                      <PlainBadge cls="!text-pink-300">revoked</PlainBadge>
                     ) : (
                       !isPreview && isAdmin && (
                         <button
                           onClick={() => handleRevoke(a.token_id)}
-                          className="rounded-md border border-red-400/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-300 transition hover:bg-red-400/10"
+                          className="rounded-md border border-pink-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-pink-300 transition hover:bg-pink-500/10"
                         >
                           revoke
                         </button>
@@ -295,9 +295,9 @@ export default function OnboardingPage({ role }) {
               <p className="eyebrow mb-1.5">Install &amp; run</p>
               <CodeBlock>{INSTALL_CMDS[tab]}</CodeBlock>
             </div>
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-[11px] leading-relaxed text-violet-300">
               Replace the server URL and token in step 1's config below. The agent heartbeats to{" "}
-              <code className="mono text-slate-400">/api/agent/heartbeat</code> automatically — no extra config needed.
+              <code className="mono text-violet-200">/api/agent/heartbeat</code> automatically — no extra config needed.
               Network hiccups are buffered and retried with exponential backoff, so no logs are lost on a flaky link.
             </p>
           </div>
@@ -359,7 +359,7 @@ function CopyButton({ text, label = "Copy", float = false }) {
   return (
     <button
       onClick={copy}
-      className={`rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition hover:bg-emerald-500/20 ${
+      className={`rounded-md border border-violet-600/30 bg-violet-600/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-violet-300 transition hover:bg-violet-600/20 ${
         float ? "sticky top-1 z-10 float-right ml-2" : "shrink-0"
       }`}
     >

@@ -166,11 +166,11 @@ export default function ConsolePage() {
         title="Live console"
         sub={
           <span className="flex flex-wrap items-center gap-3">
-            <PlainBadge cls="!text-cyan-300">system-wide</PlainBadge>
-            <span className="mono text-[11px] text-slate-500">
+            <PlainBadge cls="!text-violet-300">system-wide</PlainBadge>
+            <span className="mono text-[11px] text-violet-300">
               {total.toLocaleString()} events in store
             </span>
-            <Link to="/events" className="mono text-[11px] text-emerald-300 hover:text-emerald-200">open triage →</Link>
+            <Link to="/events" className="mono text-[11px] text-violet-300 hover:text-violet-200">open triage →</Link>
           </span>
         }
         actions={
@@ -178,9 +178,9 @@ export default function ConsolePage() {
             <button
               onClick={() => setLive(!live)}
               className={`chip ${live ? "chip-on" : ""}`}
-              style={live ? { borderColor: "rgba(52,211,153,0.6)", color: "#6ee7b7" } : undefined}
+              style={live ? { borderColor: "rgba(167, 139, 196,0.6)", color: "#c4b5fd" } : undefined}
             >
-              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${live && !paused ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${live && !paused ? "bg-violet-500 pulse-dot-calm" : "bg-[#2e1f4a]"}`} />
               {live ? (paused ? "PAUSED" : `LIVE · ${liveCount}`) : "PAUSED"}
             </button>
             {live && (
@@ -219,12 +219,12 @@ export default function ConsolePage() {
         <button onClick={() => setShowRaw(!showRaw)} className={`chip ${showRaw ? "chip-on" : ""}`}>
           {showRaw ? "RAW" : "PARSED"}
         </button>
-        <span className="ml-auto mono text-[10px] text-slate-600">
+        <span className="ml-auto mono text-[10px] text-violet-400">
           {filtered.length} / {lines.length} lines
         </span>
       </div>
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       <div
         ref={scrollRef}
@@ -232,7 +232,7 @@ export default function ConsolePage() {
         className="flex-1 overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center text-slate-500">Loading console…</div>
+          <div className="flex h-full items-center justify-center text-violet-300">Loading console…</div>
         ) : filtered.length === 0 ? (
           <Empty title="No lines" hint="Waiting for events from your agents…" />
         ) : (
@@ -245,11 +245,11 @@ export default function ConsolePage() {
 
 function LogLine({ event: e, showRaw }) {
   const sevColor = {
-    critical: "text-red-400",
+    critical: "text-pink-500",
     error: "text-violet-400",
-    warning: "text-amber-400",
+    warning: "text-purple-400",
     info: "text-slate-300",
-    low: "text-slate-400",
+    low: "text-violet-200",
   }[e.severity] || "text-slate-300";
 
   const ts = e.timestamp ? new Date(e.timestamp) : null;
@@ -260,10 +260,10 @@ function LogLine({ event: e, showRaw }) {
 
   return (
     <div className="group flex gap-3 py-0.5 hover:bg-white/[0.02]">
-      <span className="shrink-0 text-slate-600">{time}</span>
+      <span className="shrink-0 text-violet-400">{time}</span>
       <SeverityDot severity={e.severity} />
       <span className={`min-w-0 flex-1 break-all ${sevColor}`}>{text}</span>
-      <span className="hidden shrink-0 text-[10px] text-slate-600 group-hover:inline">
+      <span className="hidden shrink-0 text-[10px] text-violet-400 group-hover:inline">
         {e.client_id}
         {e.source_type ? ` · ${e.source_type}` : ""}
       </span>

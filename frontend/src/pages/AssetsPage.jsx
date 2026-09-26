@@ -39,7 +39,7 @@ export default function AssetsPage() {
         actions={<LiveBadge text={`${assets.length} assets · ${threatenedCount} threatened`} />}
       />
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <GlassCard title="Internal assets — risk ranked">
@@ -54,12 +54,12 @@ export default function AssetsPage() {
                   className="glass-row group flex w-full items-center gap-3 p-3 text-left feed-in"
                   style={{ animationDelay: `${Math.min(i, 15) * 40}ms` }}
                 >
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.threatened ? "bg-red-400 pulse-dot-red" : "bg-emerald-400/70"}`} />
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.threatened ? "bg-pink-500 pulse-dot-red" : "bg-violet-500/70"}`} />
                   <div className="min-w-0 flex-1">
                     <p className="mono text-[13px] text-slate-100">{a.id}</p>
                     <div className="mt-1.5 flex items-center gap-2">
-                      <ProgressBar value={a.degree} max={maxDegree} color={a.threatened ? "from-[#f87171] to-[#fbbf24]" : "from-emerald-500 to-cyan-400"} className="w-40" />
-                      <span className="mono text-[10px] text-slate-500">degree {a.degree}</span>
+                      <ProgressBar value={a.degree} max={maxDegree} color={a.threatened ? "from-[#ec4899] to-[#c084fc]" : "from-violet-600 to-violet-500"} className="w-40" />
+                      <span className="mono text-[10px] text-violet-300">degree {a.degree}</span>
                     </div>
                   </div>
                   {a.threatened ? (
@@ -83,7 +83,7 @@ export default function AssetsPage() {
 
         <GlassCard
           title={relation ? `Relations — ${relation.ip}` : "Asset drill-down"}
-          right={relation && <button onClick={() => setRelation(null)} className="text-[11px] text-slate-500 hover:text-slate-200">close ×</button>}
+          right={relation && <button onClick={() => setRelation(null)} className="text-[11px] text-violet-300 hover:text-slate-200">close ×</button>}
         >
           {!relation ? (
             <Empty
@@ -93,7 +93,7 @@ export default function AssetsPage() {
           ) : (
             <div className="space-y-5">
               <div>
-                <SectionTitle right={<span className="mono text-[10px] text-slate-500">{relation.edges.length} edges</span>}>
+                <SectionTitle right={<span className="mono text-[10px] text-violet-300">{relation.edges.length} edges</span>}>
                   Communication edges
                 </SectionTitle>
                 <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
@@ -102,8 +102,8 @@ export default function AssetsPage() {
                       <span className="mono truncate text-slate-300">{e.source} → {e.target}</span>
                       <span className="flex items-center gap-2">
                         <PlainBadge>{e.kind}</PlainBadge>
-                        <span className="mono text-[10px] text-slate-500">{e.flows}f</span>
-                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" /> : null}
+                        <span className="mono text-[10px] text-violet-300">{e.flows}f</span>
+                        {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-pink-500 pulse-dot-red" /> : null}
                       </span>
                     </div>
                   ))}
@@ -113,7 +113,7 @@ export default function AssetsPage() {
               <div>
                 <SectionTitle>Linked findings</SectionTitle>
                 {relation.findings.length === 0 ? (
-                  <p className="text-[12px] text-slate-500">No findings on this asset.</p>
+                  <p className="text-[12px] text-violet-300">No findings on this asset.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {relation.findings.map((f, i) => (
@@ -129,13 +129,13 @@ export default function AssetsPage() {
               <div>
                 <SectionTitle>Mapped controls</SectionTitle>
                 {!relation.compliance?.controls?.length ? (
-                  <p className="text-[12px] text-slate-500">No controls mapped for this asset.</p>
+                  <p className="text-[12px] text-violet-300">No controls mapped for this asset.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {relation.compliance.controls.map((c, i) => (
                       <div key={i} className="glass-row px-3 py-2 text-[12px]">
                         <p className="mono text-slate-100">{c.threat_class}</p>
-                        <p className="mt-0.5 text-[11px] text-slate-400">
+                        <p className="mt-0.5 text-[11px] text-violet-200">
                           CIS {c.cis_controls?.join(", ") || "—"} · NIST {c.nist_csf}
                         </p>
                       </div>
@@ -144,7 +144,7 @@ export default function AssetsPage() {
                 )}
                 {relation.compliance?.summary_markdown && (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">analyst brief (markdown)</summary>
+                    <summary className="cursor-pointer text-[11px] text-violet-300 hover:text-slate-300">analyst brief (markdown)</summary>
                     <CodeBlock maxH="max-h-40" >{relation.compliance.summary_markdown}</CodeBlock>
                   </details>
                 )}

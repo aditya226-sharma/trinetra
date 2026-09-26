@@ -7,25 +7,31 @@ function useForceLayout(nodes, edges, width = 900, height = 540) {
   return useMemo(() => computeLayout(nodes, edges, width, height), [nodes, edges, width, height]);
 }
 
+// Node kinds share one hue family, so they are told apart by BRIGHTNESS as
+// well as hue. `threat` is the most saturated pink in the system and is the
+// only kind that also gets a halo ring, because in a one-hue-family palette a
+// threat node and a benign node would otherwise be told apart by label size
+// alone. `user` therefore sits on magenta rather than sharing threat's pink.
 const KIND_COLOR = {
-  ip: "#22d3ee",
-  user: "#34d399",
-  proc: "#fbbf24",
-  domain: "#818cf8",
-  threat: "#f87171",
+  ip: "#a855f7",
+  user: "#d946ef",
+  proc: "#7c3aed",
+  domain: "#f472b6",
+  threat: "#ec4899",
 };
 
 // Module C records six relationship kinds. The page used to keep only `comm`
 // and threatened edges, which silently discarded every dns/auth/exec/runs edge
 // and left all domain, user and process nodes unconnected. Each kind now gets
-// its own stroke so the picture says which relationship it is showing.
+// its own stroke so the picture says which relationship it is showing. Dash
+// patterns are the second channel here, since the palette is one hue family.
 const EDGE_STYLE = {
-  comm: { stroke: "#2a3a55", width: 1, dash: null, label: "comm" },
-  dns: { stroke: "#6366f1", width: 1, dash: "3 3", label: "dns" },
-  auth: { stroke: "#34d399", width: 1.5, dash: null, label: "auth" },
-  exec: { stroke: "#fbbf24", width: 1.5, dash: "5 3", label: "exec" },
-  runs: { stroke: "#a78bfa", width: 1.2, dash: null, label: "runs" },
-  flagged: { stroke: "#f87171", width: 1.8, dash: null, label: "flagged" },
+  comm: { stroke: "#3b2a5c", width: 1, dash: null, label: "comm" },
+  dns: { stroke: "#7c3aed", width: 1, dash: "3 3", label: "dns" },
+  auth: { stroke: "#c084fc", width: 1.5, dash: null, label: "auth" },
+  exec: { stroke: "#f472b6", width: 1.5, dash: "5 3", label: "exec" },
+  runs: { stroke: "#a855f7", width: 1.2, dash: null, label: "runs" },
+  flagged: { stroke: "#ec4899", width: 1.8, dash: null, label: "flagged" },
 };
 
 const NODE_KIND_UNIVERSE = Object.keys(KIND_COLOR);
@@ -174,8 +180,8 @@ export default function GraphPage() {
     return c;
   }, [allEdges]);
 
-  if (error) return <div className="text-sm text-red-400">Failed to load graph: {error}</div>;
-  if (!graph) return <div className="text-slate-500">Rendering entity graph…</div>;
+  if (error) return <div className="text-sm text-pink-500">Failed to load graph: {error}</div>;
+  if (!graph) return <div className="text-violet-300">Rendering entity graph…</div>;
 
   const chip = (label, active, onClick, color) => (
     <button
@@ -184,8 +190,8 @@ export default function GraphPage() {
       aria-pressed={active}
       className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
         active
-          ? "border-transparent bg-slate-100/90 font-medium text-slate-900"
-          : "border-white/10 bg-white/5 text-slate-400 hover:border-white/25 hover:text-slate-200"
+          ? "border-transparent bg-[#f5f0fb] font-medium text-violet-950"
+          : "border-white/10 bg-white/5 text-violet-200 hover:border-white/25 hover:text-slate-200"
       }`}
     >
       {color ? (
@@ -205,7 +211,7 @@ export default function GraphPage() {
       />
 
       <GlassCard title="Filters" right={anyFilter ? (
-        <button type="button" onClick={clearFilters} className="text-[12px] text-slate-500 hover:text-slate-200">
+        <button type="button" onClick={clearFilters} className="text-[12px] text-violet-300 hover:text-slate-200">
           clear all
         </button>
       ) : null}>
@@ -246,9 +252,9 @@ export default function GraphPage() {
                 className="field mono w-full px-3 py-1.5 text-[12px]"
               />
               {query.trim() ? (
-                <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-white/10 bg-slate-900/95 shadow-xl">
+                <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-white/10 bg-[#120a21] shadow-xl">
                   {matches.length === 0 && (
-                    <p className="px-3 py-2 text-[12px] text-slate-500">No node matches “{query.trim()}”.</p>
+                    <p className="px-3 py-2 text-[12px] text-violet-300">No node matches “{query.trim()}”.</p>
                   )}
                   {matches.map((n) => (
                     <button
@@ -264,17 +270,17 @@ export default function GraphPage() {
                     >
                       <span
                         className="h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{ background: KIND_COLOR[n.kind] || "#34d399" }}
+                        style={{ background: KIND_COLOR[n.kind] || "#a78bfa" }}
                       />
                       <span className="mono truncate text-slate-200">{n.label || n.id}</span>
-                      <span className="ml-auto shrink-0 text-[10px] text-slate-500">{n.kind}</span>
+                      <span className="ml-auto shrink-0 text-[10px] text-violet-300">{n.kind}</span>
                     </button>
                   ))}
                 </div>
               ) : null}
             </div>
             {kindFilterActive && (
-              <span className="mono text-[11px] text-slate-500">
+              <span className="mono text-[11px] text-violet-300">
                 matching {kindNodes.length.toLocaleString()} nodes · {kindEdges.length.toLocaleString()} edges
               </span>
             )}
@@ -283,7 +289,7 @@ export default function GraphPage() {
       </GlassCard>
 
       {hidden > 0 && (
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[12px] text-amber-300">
+        <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 px-3 py-2 text-[12px] text-purple-300">
           Laying out {nodes.length} of {kindNodes.length.toLocaleString()} nodes (
           {hidden.toLocaleString()} omitted) to keep the layout responsive. User, process and threat
           nodes are always included, so their relationships stay visible.
@@ -291,7 +297,7 @@ export default function GraphPage() {
       )}
 
       {nodes.length === 0 && (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-6 text-center text-[12px] text-slate-500">
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-6 text-center text-[12px] text-violet-300">
           {allNodes.length === 0
             ? "No entities recorded yet. The store is waiting for traffic."
             : "No nodes match these filters. Re-enable an entity or relationship kind."}
@@ -310,7 +316,7 @@ export default function GraphPage() {
           </div>
         }
       >
-        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-slate-500">
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-violet-300">
           <span className="eyebrow">Relationships</span>
           {Object.keys(EDGE_STYLE)
             .filter((k) => kindCounts[k])
@@ -337,7 +343,7 @@ export default function GraphPage() {
                       strokeLinecap="round"
                     />
                   </svg>
-                  <span className="mono text-slate-400">
+                  <span className="mono text-violet-200">
                     {k} {drawn.toLocaleString()}
                     {partial ? ` of ${total.toLocaleString()}` : ""}
                   </span>
@@ -389,7 +395,7 @@ export default function GraphPage() {
                     strokeLinecap="round"
                   />
                   {threatened && e.flows && (
-                    <text x={mx} y={my - 4} textAnchor="middle" fontSize="8.5" className="fill-slate-400 mono">
+                    <text x={mx} y={my - 4} textAnchor="middle" fontSize="8.5" className="fill-violet-200 mono">
                       {e.flows}f
                     </text>
                   )}
@@ -409,19 +415,33 @@ export default function GraphPage() {
                   style={{ cursor: "pointer", opacity: n.ctx && !isSel ? 0.45 : 1 }}
                 >
                   {isSel && (
-                    <circle cx={p.x} cy={p.y} r={19} fill="none" stroke={KIND_COLOR[n.kind] || "#34d399"} strokeWidth="1.4" opacity="0.65">
+                    <circle cx={p.x} cy={p.y} r={19} fill="none" stroke={KIND_COLOR[n.kind] || "#a78bfa"} strokeWidth="1.4" opacity="0.65">
                       <animate attributeName="r" values="16;24;16" dur="2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  )}
+                  {n.kind === "threat" && (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={r + 5}
+                      fill="none"
+                      stroke="#ec4899"
+                      strokeWidth="1.5"
+                      opacity="0.9"
+                    >
+                      <animate attributeName="r" values={`${r + 3};${r + 9};${r + 3}`} dur="2.4s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.9;0.25;0.9" dur="2.4s" repeatCount="indefinite" />
                     </circle>
                   )}
                   <circle
                     cx={p.x}
                     cy={p.y}
                     r={r}
-                    fill={KIND_COLOR[n.kind] ? `url(#nodeg-${n.kind})` : "#34d399"}
-                    stroke={isSel ? "#f8fafc" : "rgba(255,255,255,0.25)"}
+                    fill={KIND_COLOR[n.kind] ? `url(#nodeg-${n.kind})` : "#a78bfa"}
+                    stroke={isSel ? "#ffffff" : "rgba(255,255,255,0.25)"}
                     strokeWidth={isSel ? 1.6 : 0.6}
-                    style={{ filter: `drop-shadow(0 0 ${isSel ? 10 : 5}px ${KIND_COLOR[n.kind] || "#34d399"})` }}
+                    style={{ filter: `drop-shadow(0 0 ${isSel ? 10 : 5}px ${KIND_COLOR[n.kind] || "#a78bfa"})` }}
                   />
                   <text
                     x={p.x}
@@ -429,9 +449,9 @@ export default function GraphPage() {
                     textAnchor="middle"
                     fontSize={isSel ? 12.5 : n.kind === "threat" ? 11 : n.ctx ? 8.5 : 9.5}
                     fontWeight={isSel ? 700 : 400}
-                    fill={isSel ? "#f8fafc" : "#a7b6c9"}
+                    fill={isSel ? "#ffffff" : "#a78bc4"}
                     className="mono"
-                    style={{ paintOrder: "stroke", stroke: "#05080f", strokeWidth: 3 }}
+                    style={{ paintOrder: "stroke", stroke: "#0a0612", strokeWidth: 3 }}
                   >
                     {n.label && String(n.label).length > 18 ? String(n.label).slice(0, 17) + "…" : n.label}
                   </text>
@@ -440,8 +460,8 @@ export default function GraphPage() {
             })}
           </svg>
         </div>
-        <p className="mt-2 text-[11px] text-slate-500">
-          Rose curves carry module-threat flags · dashed lines are dns lookups · hover nothing,
+        <p className="mt-2 text-[11px] text-violet-300">
+          Pink curves carry module-threat flags · dashed lines are dns lookups · hover nothing,
           click everything.
           {ctxCount > 0 && ` · ${ctxCount} dimmed node${ctxCount === 1 ? "" : "s"} shown as context for the filtered entity`}
         </p>
@@ -452,8 +472,8 @@ export default function GraphPage() {
           title={`Node — ${selNode.label || selNode.id}`}
           right={
             <div className="flex items-center gap-3">
-              <LegendDot color={KIND_COLOR[selNode.kind] || "#34d399"} label={selNode.kind} />
-              <button onClick={() => setSelected(null)} className="text-[12px] text-slate-500 hover:text-slate-200">
+              <LegendDot color={KIND_COLOR[selNode.kind] || "#a78bfa"} label={selNode.kind} />
+              <button onClick={() => setSelected(null)} className="text-[12px] text-violet-300 hover:text-slate-200">
                 close ×
               </button>
             </div>
@@ -480,13 +500,13 @@ export default function GraphPage() {
                           <span className="mono truncate text-slate-300">{e.source} → {e.target}</span>
                           <span className="flex shrink-0 items-center gap-2">
                             <PlainBadge>{e.kind}</PlainBadge>
-                            {e.flows ? <span className="mono text-[10px] text-slate-500">{e.flows}f</span> : null}
-                            {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" /> : null}
+                            {e.flows ? <span className="mono text-[10px] text-violet-300">{e.flows}f</span> : null}
+                            {e.threat ? <span className="h-1.5 w-1.5 rounded-full bg-pink-500 pulse-dot-red" /> : null}
                           </span>
                         </div>
                       ))}
                       {linked.length === 0 && (
-                        <p className="px-3 py-2 text-[12px] text-slate-500">
+                        <p className="px-3 py-2 text-[12px] text-violet-300">
                           No relationships recorded for this node yet.
                         </p>
                       )}

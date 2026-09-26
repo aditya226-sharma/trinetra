@@ -335,8 +335,8 @@ export default function App() {
     return (
       <div className="grid h-full place-items-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
-          <p className="mono text-xs tracking-widest text-slate-500">VERIFYING SESSION…</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-600/30 border-t-emerald-400" />
+          <p className="mono text-xs tracking-widest text-violet-300">VERIFYING SESSION…</p>
         </div>
       </div>
     );
@@ -350,8 +350,8 @@ export default function App() {
     return (
       <div className="grid h-full place-items-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
-          <p className="mono text-xs tracking-widest text-slate-500">LINKING TO ULPP CORE…</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-600/30 border-t-emerald-400" />
+          <p className="mono text-xs tracking-widest text-violet-300">LINKING TO ULPP CORE…</p>
         </div>
       </div>
     );
@@ -366,13 +366,13 @@ export default function App() {
           target="_blank"
           rel="noreferrer"
           title={`Open the live TriNetra instance (${liveUrl})`}
-          className="sticky top-0 z-40 flex items-center justify-center gap-2 border-b border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-center backdrop-blur-xl"
+          className="sticky top-0 z-40 flex items-center justify-center gap-2 border-b border-violet-600/20 bg-violet-600/10 px-3 py-1.5 text-center backdrop-blur-xl"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
-          <span className="mono text-[10px] uppercase tracking-widest text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-violet-500 pulse-dot-calm" />
+          <span className="mono text-[10px] uppercase tracking-widest text-violet-300">
             live instance · {liveUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}
           </span>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-violet-500">
             <path d="M7 17L17 7M9 7h8v8" />
           </svg>
         </a>
@@ -381,18 +381,18 @@ export default function App() {
       {/* ambient core glow behind content */}
       <div
         className="pointer-events-none fixed left-1/2 top-28 z-0 h-96 w-[60rem] -translate-x-1/2 rounded-full opacity-25"
-        style={{ background: "radial-gradient(closest-side, rgba(52,211,153,0.18), transparent)" }}
+        style={{ background: "radial-gradient(closest-side, rgba(167, 139, 196,0.18), transparent)" }}
         aria-hidden
       />
 
       {/* ------------------------------------------------------- nav rail */}
       <aside className="sticky top-0 z-20 flex h-screen w-60 shrink-0 flex-col border-r border-white/5 bg-[#070b15]/80 backdrop-blur-xl">
         {/* glow seat */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-500/[0.07] to-transparent" aria-hidden />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-violet-600/[0.07] to-transparent" aria-hidden />
 
         <div className="relative px-5 pb-5 pt-6">
           <Link to="/" className="group flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_24px_-4px_rgba(52,211,153,0.7)]">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-violet-600/40 bg-[#120a21] shadow-[0_0_24px_-4px_rgba(167, 139, 196,0.7)]">
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="TriNetra" className="h-full w-full object-cover" />
             </div>
             <div>
@@ -424,7 +424,7 @@ export default function App() {
                       <span className="grid h-6 w-6 place-items-center opacity-80">{ICONS[item.label]}</span>
                       {item.label}
                       {item.label === "Alerts" && openCaseCount > 0 && (
-                        <span className={`ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-[#f87171] px-1 text-[9px] font-bold text-white ${openCaseCount > 0 ? "pulse-dot-red" : ""}`}>
+                        <span className={`ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-[#ec4899] px-1 text-[9px] font-bold text-[#0a0612] ${openCaseCount > 0 ? "pulse-dot-red" : ""}`}>
                           {openCaseCount > 99 ? "99+" : openCaseCount}
                         </span>
                       )}
@@ -440,26 +440,26 @@ export default function App() {
           <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
             {isPreview ? (
               <div className="flex items-center gap-2.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <span className="h-2 w-2 rounded-full bg-purple-400" />
                 <div>
-                  <p className="text-[11px] font-medium text-amber-300">PREVIEW DATA</p>
-                  <p className="text-[10px] text-slate-500">bundled demo dataset</p>
+                  <p className="text-[11px] font-medium text-purple-300">PREVIEW DATA</p>
+                  <p className="text-[10px] text-violet-300">bundled demo dataset</p>
                 </div>
               </div>
             ) : apiOffline ? (
               <div className="flex items-center gap-2.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <span className="h-2 w-2 rounded-full bg-purple-400" />
                 <div>
-                  <p className="text-[11px] font-medium text-amber-300">STATIC PREVIEW</p>
-                  <p className="text-[10px] text-slate-500">API not reachable from Pages</p>
+                  <p className="text-[11px] font-medium text-purple-300">STATIC PREVIEW</p>
+                  <p className="text-[10px] text-violet-300">API not reachable from Pages</p>
                 </div>
               </div>
             ) : ready ? (
               <div className="flex items-center gap-2.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 pulse-dot" />
+                <span className="h-2 w-2 rounded-full bg-violet-500 pulse-dot-calm" />
                 <div>
-                  <p className="text-[11px] font-medium text-emerald-300">DATA LINK ESTABLISHED</p>
-                  <p className="text-[10px] text-slate-500">demo corpus on-line</p>
+                  <p className="text-[11px] font-medium text-violet-300">DATA LINK ESTABLISHED</p>
+                  <p className="text-[10px] text-violet-300">demo corpus on-line</p>
                 </div>
               </div>
             ) : user?.role === "admin" ? (
@@ -472,12 +472,12 @@ export default function App() {
               </button>
             ) : (
               <div>
-                <p className="text-[11px] font-medium text-amber-300">AWAITING DATASET</p>
-                <p className="text-[10px] text-slate-500">ask an admin to run the demo dataset</p>
+                <p className="text-[11px] font-medium text-purple-300">AWAITING DATASET</p>
+                <p className="text-[10px] text-violet-300">ask an admin to run the demo dataset</p>
               </div>
             )}
           </div>
-          <div className="mono text-[10px] leading-relaxed tracking-wide text-slate-600">
+          <div className="mono text-[10px] leading-relaxed tracking-wide text-violet-400">
             PS26156 · PS26145<br />PS26160 · PS26189
           </div>
         </div>
@@ -498,14 +498,14 @@ export default function App() {
                 <button
                   onClick={(e) => { e.stopPropagation(); setBell((b) => ({ ...b, open: !b.open })); }}
                   title="Recent alerts"
-                  className="relative grid h-9 w-9 place-items-center rounded-full border border-white/5 bg-white/[0.03] transition hover:border-emerald-500/40"
+                  className="relative grid h-9 w-9 place-items-center rounded-full border border-white/5 bg-white/[0.03] transition hover:border-violet-600/40"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
                     <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.7 21a2 2 0 01-3.4 0" />
                   </svg>
                   {bell.alerts.length > 0 && (
-                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-400 px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-pink-500 px-1 text-[9px] font-bold text-white">
                       {bell.alerts.length}
                     </span>
                   )}
@@ -514,7 +514,7 @@ export default function App() {
                   <div className="glass absolute right-0 top-11 z-50 w-80 p-2 anim-fadeup">
                     <p className="eyebrow px-2 pb-2">Latest alerts</p>
                     {bell.alerts.length === 0 ? (
-                      <p className="px-2 py-3 text-[12px] text-slate-500">No alerts yet.</p>
+                      <p className="px-2 py-3 text-[12px] text-violet-300">No alerts yet.</p>
                     ) : (
                       <div className="max-h-80 space-y-1 overflow-y-auto">
                         {bell.alerts.map((a, i) => (
@@ -525,7 +525,7 @@ export default function App() {
                           >
                             <SeverityDot severity={a.severity} />
                             <span className="mono min-w-0 flex-1 truncate text-[11px] text-slate-200">{a.threat_class}</span>
-                            <span className="mono text-[10px] text-slate-500">{fmtClock(a.timestamp)}</span>
+                            <span className="mono text-[10px] text-violet-300">{fmtClock(a.timestamp)}</span>
                           </button>
                         ))}
                       </div>
@@ -542,20 +542,20 @@ export default function App() {
               {!isPreview && (
                 <>
                   <div className="hidden items-center gap-2.5 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-violet-600/20 text-[10px] font-bold text-violet-300">
                       {(user?.username || "?")[0]?.toUpperCase()}
                     </span>
-                    <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
+                    <span className="mono text-[10px] uppercase tracking-widest text-violet-200">
                       {user?.username} · {user?.role}
                     </span>
                     {user?.client_scope && (
-                      <span className="mono rounded border border-cyan-400/30 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-cyan-300">
+                      <span className="mono rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-violet-300">
                         {user.client_scope}
                       </span>
                     )}
                     <button
                       onClick={signOut}
-                      className="mono text-[10px] uppercase tracking-widest text-slate-500 transition hover:text-red-300"
+                      className="mono text-[10px] uppercase tracking-widest text-violet-300 transition hover:text-pink-300"
                     >
                       sign out
                     </button>
@@ -563,23 +563,23 @@ export default function App() {
                 </>
               )}
               <div className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 lg:flex">
-                <span className={`h-2 w-2 rounded-full ${health?.analyzer?.backend?.healthy ? "bg-emerald-400 pulse-dot" : "bg-amber-400 pulse-dot-red"}`} />
-                <span className="mono text-[10px] uppercase tracking-widest text-slate-400">
+                <span className={`h-2 w-2 rounded-full ${health?.analyzer?.backend?.healthy ? "bg-violet-500 pulse-dot-calm" : "bg-purple-400 pulse-dot-red"}`} />
+                <span className="mono text-[10px] uppercase tracking-widest text-violet-200">
                   {health ? `analyzer · ${health?.analyzer?.configured_backend || "…"}` : "api · offline"}
                 </span>
               </div>
               <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-                  className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 transition hover:border-emerald-500/40 lg:flex"
+                  className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 transition hover:border-violet-600/40 lg:flex"
                 >
                   {theme === "dark" ? (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-amber-300">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-purple-300">
                       <circle cx="12" cy="12" r="4.5" />
                       <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8" />
                     </svg>
                   ) : (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-violet-300">
                       <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
                     </svg>
                   )}
@@ -588,7 +588,7 @@ export default function App() {
                 <p className="text-sm font-semibold tabular-nums tracking-widest text-slate-200">
                   {clock.toLocaleTimeString("en-GB", { hour12: false })}
                 </p>
-                <p className="text-[10px] uppercase tracking-widest text-slate-600">
+                <p className="text-[10px] uppercase tracking-widest text-violet-400">
                   {clock.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                 </p>
               </div>
@@ -598,10 +598,10 @@ export default function App() {
 
         <main className="mx-auto w-full max-w-[1500px] flex-1 px-7 pb-14 pt-7">
           {apiOffline && (
-            <div className="mb-5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-4 py-3 text-[11px] leading-relaxed text-amber-200/90">
-              <span className="mono font-semibold tracking-widest text-amber-300">STATIC PREVIEW</span>
+            <div className="mb-5 rounded-xl border border-purple-500/25 bg-purple-500/[0.07] px-4 py-3 text-[11px] leading-relaxed text-purple-200/90">
+              <span className="mono font-semibold tracking-widest text-purple-300">STATIC PREVIEW</span>
               {" — the Python API lives in the container, so this page shows the UI shell. Run it live: "}
-              <code className="mono text-amber-100">docker run -p 8000:8000 ghcr.io/aditya226-sharma/trinetra:latest</code>
+              <code className="mono text-purple-100">docker run -p 8000:8000 ghcr.io/aditya226-sharma/trinetra:latest</code>
             </div>
           )}
           <Routes>
@@ -628,9 +628,9 @@ export default function App() {
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />
             <Route path="*" element={
               <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-6 text-center">
-                <p className="mono text-3xl font-bold tracking-widest text-slate-700">404</p>
-                <p className="mono text-[13px] uppercase tracking-widest text-slate-400">no such sector — this sector is off the map</p>
-                <p className="max-w-md text-[12px] leading-relaxed text-slate-500">
+                <p className="mono text-3xl font-bold tracking-widest text-violet-500">404</p>
+                <p className="mono text-[13px] uppercase tracking-widest text-violet-200">no such sector — this sector is off the map</p>
+                <p className="max-w-md text-[12px] leading-relaxed text-violet-300">
                   The address you reached doesn't match any page in this console. Navigate back to the dashboard to keep scanning.
                 </p>
                 <Link to="/" className="btn-primary mono mt-2 !px-4 !py-2 text-[11px]">BACK TO DASHBOARD</Link>
@@ -640,7 +640,7 @@ export default function App() {
         </main>
 
         <footer className="border-t border-white/5 px-7 py-3">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-600">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-violet-400">
             <span>TriNetra · Universal Log Pre-processing</span>
             <span className="mono">normalize → dedup → modules → analyze</span>
           </div>

@@ -15,10 +15,10 @@ describe("Donut", () => {
     const { container } = render(
       <Donut
         segments={[
-          { value: 100, color: "#34d399" },
-          { value: 0, color: "#f87171" },
-          { value: 0, color: "#60a5fa" },
-          { value: 50, color: "#818cf8" },
+          { value: 100, color: "#a78bfa" },
+          { value: 0, color: "#ec4899" },
+          { value: 0, color: "#c4b5fd" },
+          { value: 50, color: "#7c3aed" },
         ]}
       />
     );
@@ -34,7 +34,7 @@ describe("Donut", () => {
 
   it("drops zero-value segments instead of painting a full ring", () => {
     const { container } = render(
-      <Donut segments={[{ value: 0, color: "#34d399" }, { value: 0, color: "#f87171" }]} />
+      <Donut segments={[{ value: 0, color: "#a78bfa" }, { value: 0, color: "#ec4899" }]} />
     );
     expect(container.querySelectorAll("circle[stroke-dasharray]").length).toBe(0);
   });
@@ -44,8 +44,8 @@ describe("Donut", () => {
     const { container } = render(
       <Donut
         segments={[
-          { value: 10_000_000, color: "#34d399" },
-          { value: 1, color: "#f87171" },
+          { value: 10_000_000, color: "#a78bfa" },
+          { value: 1, color: "#ec4899" },
         ]}
       />
     );
@@ -58,9 +58,9 @@ describe("Donut", () => {
 
   it("segments still sum to the full circumference", () => {
     const segs = [
-      { value: 40, color: "#34d399" },
-      { value: 35, color: "#22d3ee" },
-      { value: 25, color: "#818cf8" },
+      { value: 40, color: "#a78bfa" },
+      { value: 35, color: "#a855f7" },
+      { value: 25, color: "#7c3aed" },
     ];
     const { container } = render(<Donut segments={segs} />);
     const circles = [...container.querySelectorAll("circle[stroke-dasharray]")];
@@ -78,7 +78,7 @@ describe("Donut", () => {
 
   it("renders the centre value it is given", () => {
     const { container } = render(
-      <Donut segments={[{ value: 7, color: "#34d399" }]} centerValue={7} centerLabel="events" />
+      <Donut segments={[{ value: 7, color: "#a78bfa" }]} centerValue={7} centerLabel="events" />
     );
     const texts = [...container.querySelectorAll("text")].map((t) => t.textContent);
     expect(texts).toContain("7");

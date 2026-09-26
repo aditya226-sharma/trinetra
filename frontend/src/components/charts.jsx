@@ -2,7 +2,7 @@ import React from "react";
 
 /* Pure-SVG micro-charts — no external deps. */
 
-export function Sparkline({ data = [], color = "#22d3ee", width = 120, height = 36, fill = true }) {
+export function Sparkline({ data = [], color = "#a855f7", width = 120, height = 36, fill = true }) {
   if (data.length < 2) {
     return <svg width={width} height={height} className="opacity-30" />;
   }
@@ -44,7 +44,7 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
           ))}
         </linearGradient>
       </defs>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,0.1)" strokeWidth={thickness} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(167, 139, 196,0.1)" strokeWidth={thickness} />
       {segments.map((s, i) => {
         const raw = (s.value / total) * c;
         // 2px inset between neighbouring arcs. A zero (or sub-inset) share
@@ -73,12 +73,12 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
         );
       })}
       {centerValue !== undefined && (
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-slate-100 mono" fontSize="26" fontWeight="700">
+        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-white mono" fontSize="26" fontWeight="700">
           {centerValue}
         </text>
       )}
       {centerLabel && (
-        <text x="50%" y="62%" textAnchor="middle" textRendering="geometricPrecision" className="fill-slate-500" fontSize="9" letterSpacing="2">
+        <text x="50%" y="62%" textAnchor="middle" textRendering="geometricPrecision" className="fill-[#a78bc4]" fontSize="9" letterSpacing="2">
           {centerLabel.toUpperCase()}
         </text>
       )}
@@ -86,7 +86,7 @@ export function Donut({ segments = [], size = 160, thickness = 16, centerValue, 
   );
 }
 
-export function ScoreRing({ score = 0, size = 96, tone = "#22d3ee", label }) {
+export function ScoreRing({ score = 0, size = 96, tone = "#a855f7", label }) {
   const thickness = 8;
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
@@ -97,10 +97,10 @@ export function ScoreRing({ score = 0, size = 96, tone = "#22d3ee", label }) {
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={tone} />
-          <stop offset="100%" stopColor="#22d3ee" />
+          <stop offset="100%" stopColor="#a855f7" />
         </linearGradient>
       </defs>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth={thickness} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(167, 139, 196,0.12)" strokeWidth={thickness} />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -113,11 +113,11 @@ export function ScoreRing({ score = 0, size = 96, tone = "#22d3ee", label }) {
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ filter: `drop-shadow(0 0 8px ${tone}77)`, transition: "stroke-dasharray 0.6s ease" }}
       />
-      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-slate-100 mono" fontSize="20" fontWeight="700">
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="fill-white mono" fontSize="20" fontWeight="700">
         {Math.round(score)}
       </text>
       {label && (
-        <text x="50%" y="66%" textAnchor="middle" className="fill-slate-500" fontSize="7.5" letterSpacing="1.6">
+        <text x="50%" y="66%" textAnchor="middle" className="fill-[#a78bc4]" fontSize="7.5" letterSpacing="1.6">
           {label.toUpperCase()}
         </text>
       )}
@@ -125,7 +125,7 @@ export function ScoreRing({ score = 0, size = 96, tone = "#22d3ee", label }) {
   );
 }
 
-export function MiniBars({ data = [], color = "#22d3ee", height = 44, barWidth = 8 }) {
+export function MiniBars({ data = [], color = "#a855f7", height = 44, barWidth = 8 }) {
   const max = Math.max(...data, 1);
   return (
     <div className="flex items-end gap-1" style={{ height }}>

@@ -20,25 +20,25 @@ export function usePagedList(items, step = 100) {
 export function ShowMoreBar({ remaining, total, shownCount, onMore, onAll, noun = "items" }) {
   if (remaining <= 0) {
     return (
-      <p className="mono mt-3 text-[11px] text-slate-500">
+      <p className="mono mt-3 text-[11px] text-violet-300">
         Showing all {total} {noun}
       </p>
     );
   }
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/5 pt-3">
-      <p className="mono text-[11px] text-slate-500">
+      <p className="mono text-[11px] text-violet-300">
         Showing {shownCount} of {total} {noun} · {remaining} more not rendered
       </p>
       <button
         onClick={onMore}
-        className="rounded-lg border border-cyan-400/30 px-3 py-1.5 text-[12px] text-cyan-300 hover:border-cyan-400/60"
+        className="rounded-lg border border-violet-500/30 px-3 py-1.5 text-[12px] text-violet-300 hover:border-violet-500/60"
       >
         Show more
       </button>
       <button
         onClick={onAll}
-        className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-slate-400 hover:border-white/25 hover:text-slate-200"
+        className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-violet-200 hover:border-white/25 hover:text-slate-200"
       >
         Show all {total}
       </button>

@@ -20,17 +20,17 @@ function Dim({ title, obj = {} }) {
   return (
     <div className="space-y-2">
       <p className="eyebrow">{title}</p>
-      {entries.length === 0 && <p className="text-[11px] text-slate-500">None</p>}
+      {entries.length === 0 && <p className="text-[11px] text-violet-300">None</p>}
       {entries.map(([k, v]) => (
         <div key={k} className="flex items-center gap-3 text-[11.5px]">
           <span className="mono w-24 truncate text-slate-300">{k || "—"}</span>
           <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/5">
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-emerald-500/70"
+              className="absolute inset-y-0 left-0 rounded-full bg-violet-600/70"
               style={{ width: `${Math.max(4, (v / max) * 100)}%` }}
             />
           </div>
-          <span className="mono w-14 text-right text-slate-400">{v.toLocaleString()}</span>
+          <span className="mono w-14 text-right text-violet-200">{v.toLocaleString()}</span>
         </div>
       ))}
     </div>
@@ -45,12 +45,12 @@ function MiniChart({ series = [] }) {
         <div
           key={i}
           title={`${b.bucket}\n${b.events} events`}
-          className="flex-1 bg-emerald-500/80 rounded-t"
+          className="flex-1 bg-violet-600/80 rounded-t"
           style={{ height: `${Math.max(2, (b.events / max) * 100)}%` }}
         />
       ))}
       {series.length === 0 && (
-        <span className="text-[11px] text-slate-500">No series data</span>
+        <span className="text-[11px] text-violet-300">No series data</span>
       )}
     </div>
   );
@@ -100,8 +100,8 @@ export default function AnalyticsPage() {
                 onClick={() => setHours(h)}
                 className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
                   hours === h
-                    ? "border-emerald-500/60 bg-emerald-500/20 text-emerald-300"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20"
+                    ? "border-violet-600/60 bg-violet-600/20 text-violet-300"
+                    : "border-white/10 bg-white/[0.03] text-violet-200 hover:border-white/20"
                 }`}
               >
                 {lbl}
@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
             <button
               onClick={download}
               disabled={exporting}
-              className="ml-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:border-emerald-500/30 hover:text-emerald-300 disabled:opacity-50"
+              className="ml-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300 hover:border-violet-600/30 hover:text-violet-300 disabled:opacity-50"
             >
               {exporting ? "exporting…" : "CSV"}
             </button>
@@ -118,10 +118,10 @@ export default function AnalyticsPage() {
         }
       />
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
       {!data && !error && (
         <GlassCard title="Loading analytics…">
-          <p className="mono text-[11px] text-slate-500">Fetching roll-ups…</p>
+          <p className="mono text-[11px] text-violet-300">Fetching roll-ups…</p>
         </GlassCard>
       )}
       {data && (
@@ -132,13 +132,13 @@ export default function AnalyticsPage() {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Stat k="Events total" v={data.totals?.events_total ?? 0} />
                 <Stat k="Events window" v={data.totals?.events_in_window ?? 0} />
-                <Stat k="Findings" v={data.totals?.findings_total ?? 0} accent="rose" />
-                <Stat k="Dedup rate" v={`${((data.totals?.dedup_rate ?? 0) * 100).toFixed(2)}%`} accent="amber" />
+                <Stat k="Findings" v={data.totals?.findings_total ?? 0} accent="danger" />
+                <Stat k="Dedup rate" v={`${((data.totals?.dedup_rate ?? 0) * 100).toFixed(2)}%`} accent="warning" />
               </div>
 
               <GlassCard title={`Hourly event volume (last ${hours}h)`} right={<PlainBadge>{series.length} buckets</PlainBadge>}>
                 <MiniChart series={series} />
-                <p className="mt-2 text-[10.5px] text-slate-500">Hover bars for exact counts; chart auto-scales to peak.</p>
+                <p className="mt-2 text-[10.5px] text-violet-300">Hover bars for exact counts; chart auto-scales to peak.</p>
               </GlassCard>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -160,7 +160,7 @@ export default function AnalyticsPage() {
                 <Dim obj={data.detections} title="threat_class" />
               </GlassCard>
 
-              <p className="text-right text-[10px] text-slate-500">Generated {data.generated_at?.replace("T", " ").replace("Z", " UTC")}</p>
+              <p className="text-right text-[10px] text-violet-300">Generated {data.generated_at?.replace("T", " ").replace("Z", " UTC")}</p>
             </>
           );
         })()
@@ -169,13 +169,13 @@ export default function AnalyticsPage() {
   );
 }
 
-function Stat({ k, v, accent = "emerald" }) {
+function Stat({ k, v, accent = "calm" }) {
   const color =
-    accent === "rose"
-      ? "text-red-400"
-      : accent === "amber"
-      ? "text-amber-400"
-      : "text-emerald-400";
+    accent === "danger"
+      ? "text-pink-500"
+      : accent === "warning"
+      ? "text-purple-400"
+      : "text-violet-500";
   return (
     <div className="glass-row p-4">
       <p className="eyebrow">{k}</p>

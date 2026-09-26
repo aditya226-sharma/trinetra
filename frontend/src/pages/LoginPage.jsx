@@ -26,7 +26,7 @@ export default function LoginPage({ onSuccess }) {
       <div className="bg-grid" aria-hidden />
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="mx-auto h-14 w-14 overflow-hidden rounded-2xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_32px_-6px_rgba(52,211,153,0.7)]">
+          <div className="mx-auto h-14 w-14 overflow-hidden rounded-2xl border border-violet-600/40 bg-[#120a21] shadow-[0_0_32px_-6px_rgba(167, 139, 196,0.7)]">
             <img src={`${import.meta.env.BASE_URL}logo.png`} alt="TriNetra" className="h-full w-full object-cover" />
           </div>
           <h1 className="mt-5 text-2xl font-bold tracking-tight">
@@ -60,14 +60,14 @@ export default function LoginPage({ onSuccess }) {
             />
           </label>
 
-          {error && <p className="text-[12px] text-red-400">{error}</p>}
+          {error && <p className="text-[12px] text-pink-500">{error}</p>}
 
           <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? "AUTHENTICATING…" : "SIGN IN"}
           </button>
         </form>
 
-        <p className="text-center text-[10px] uppercase tracking-widest text-slate-600">
+        <p className="text-center text-[10px] uppercase tracking-widest text-violet-400">
           protected console · sessions expire
         </p>
       </div>

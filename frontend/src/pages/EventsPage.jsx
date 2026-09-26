@@ -253,9 +253,9 @@ export default function EventsPage() {
             <button
               onClick={toggleLive}
               className={`chip ${live ? "chip-on" : ""}`}
-              style={live ? { borderColor: "rgba(52,211,153,0.6)", color: "#6ee7b7" } : undefined}
+              style={live ? { borderColor: "rgba(167, 139, 196,0.6)", color: "#c4b5fd" } : undefined}
             >
-              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${liveActive ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${liveActive ? "bg-violet-500 pulse-dot-calm" : "bg-[#2e1f4a]"}`} />
               {liveActive ? `LIVE · ${liveCount} new` : "LIVE TAIL"}
             </button>
           </div>
@@ -274,9 +274,9 @@ export default function EventsPage() {
                 className={`chip ${client === c.client_id ? "chip-on" : ""}`}
                 title={`${c.source_type} · ${c.events} events`}
               >
-                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-violet-500" />
                 <span className="mono">{c.client_id}</span>
-                <span className="ml-1.5 text-[10px] text-slate-500">
+                <span className="ml-1.5 text-[10px] text-violet-300">
                   {c.last_seen ? fmtAgo(c.last_seen) : `${c.events} evt`}
                 </span>
               </button>
@@ -289,7 +289,7 @@ export default function EventsPage() {
       <div className="glass p-4 anim-fadeup">
         <div className="flex flex-wrap items-center gap-3">
           <label className="relative min-w-[260px] flex-1">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-violet-300">
               <SearchGlyph />
             </span>
             <input
@@ -340,7 +340,7 @@ export default function EventsPage() {
           <span className="eyebrow mx-1">TIME</span>
           <input type="datetime-local" value={fromTs} onChange={(e) => setFromTs(e.target.value)}
             className="field mono px-3 py-1.5 text-[11px]" title="From (UTC)" />
-          <span className="text-[10px] text-slate-600">→</span>
+          <span className="text-[10px] text-violet-400">→</span>
           <input type="datetime-local" value={toTs} onChange={(e) => setToTs(e.target.value)}
             className="field mono px-3 py-1.5 text-[11px]" title="To (UTC)" />
           <button onClick={saveSearch} className="btn-ghost !px-3 !py-1.5 text-[11px]" title="Save this filter for later">
@@ -349,7 +349,7 @@ export default function EventsPage() {
           {filtersActive && (
             <button
               onClick={() => { setQuery(""); setSrc(""); setSev(""); setCat(""); setClient(""); setThreat(""); setFromTs(""); setToTs(""); }}
-              className="ml-auto text-[11px] text-slate-500 hover:text-emerald-300"
+              className="ml-auto text-[11px] text-violet-300 hover:text-violet-300"
             >
               reset filters ×
             </button>
@@ -362,18 +362,18 @@ export default function EventsPage() {
           <p className="eyebrow px-1 pb-2">Saved searches</p>
           <div className="flex flex-wrap items-center gap-2">
             {saved.map((s) => (
-              <span key={s.name} className="flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-1">
-                <button onClick={() => applySaved(s.f)} className="mono text-[11px] text-emerald-300 hover:text-emerald-200">
+              <span key={s.name} className="flex items-center gap-1.5 rounded-full border border-violet-600/25 bg-violet-600/[0.07] px-2.5 py-1">
+                <button onClick={() => applySaved(s.f)} className="mono text-[11px] text-violet-300 hover:text-violet-200">
                   {s.name}
                 </button>
-                <button onClick={() => dropSaved(s.name)} className="text-[11px] text-slate-500 hover:text-red-300" title="Delete saved search">×</button>
+                <button onClick={() => dropSaved(s.name)} className="text-[11px] text-violet-300 hover:text-pink-300" title="Delete saved search">×</button>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       {/* feed + detail */}
       <div className="flex gap-6">
@@ -392,25 +392,25 @@ export default function EventsPage() {
                 style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
               >
                 <span className={`sev-strip ${stripCls(e.severity)}`} />
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/5 bg-white/5 text-slate-400 transition group-hover:text-emerald-300">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/5 bg-white/5 text-violet-200 transition group-hover:text-violet-300">
                   {CAT_GLYPH[e.category] || <EventGlyph />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-[12.5px] text-slate-100">
                     <span className="mono">{e.message}</span>
                   </p>
-                  <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
+                  <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-violet-300">
                     {e.client_id} · {e.source_type} · {e.category}
                   </p>
                   {e.fields?.src_ip && (
-                    <p className="mono mt-1 text-[11px] text-cyan-300/80">
+                    <p className="mono mt-1 text-[11px] text-violet-300/80">
                       {e.fields.src_ip} → {e.fields.dst_ip || "?"}
                       {e.fields.dport ? `:${e.fields.dport}` : ""}
                     </p>
                   )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="mono text-[11px] text-slate-500">{e.timestamp}</p>
+                  <p className="mono text-[11px] text-violet-300">{e.timestamp}</p>
                   <SeverityBadge severity={e.severity} />
                 </div>
               </button>
@@ -418,11 +418,11 @@ export default function EventsPage() {
           )}
           {events.length > 0 && (
             <div className="flex items-center justify-between pt-2">
-              <p className="mono text-[10px] uppercase tracking-widest text-slate-600">
+              <p className="mono text-[10px] uppercase tracking-widest text-violet-400">
                 showing {events.length.toLocaleString()} of {total.toLocaleString()}
               </p>
               {hasMore && (
-                <span ref={sentinelRef} className="mono text-[10px] uppercase tracking-widest text-emerald-300/70">
+                <span ref={sentinelRef} className="mono text-[10px] uppercase tracking-widest text-violet-300/70">
                   {loading ? "LOADING…" : "SCROLL FOR MORE…"}
                 </span>
               )}
@@ -441,7 +441,7 @@ export default function EventsPage() {
                     <SeverityBadge severity={detail.severity} />
                   </div>
                 </div>
-                <button onClick={() => { setDetail(null); setDetailMeta(null); }} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-slate-400 hover:text-slate-100">
+                <button onClick={() => { setDetail(null); setDetailMeta(null); }} className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 text-violet-200 hover:text-slate-100">
                   ×
                 </button>
               </div>
@@ -491,7 +491,7 @@ export default function EventsPage() {
 
               {detail.raw && (
                 <details className="mt-3">
-                  <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
+                  <summary className="cursor-pointer text-[11px] text-violet-300 hover:text-slate-300">
                     raw log ({detail.raw.length} bytes)
                   </summary>
                   <CodeBlock maxH="max-h-40">{detail.raw}</CodeBlock>
@@ -521,7 +521,7 @@ export default function EventsPage() {
 function Row({ k, v, mono }) {
   return (
     <div className="grid grid-cols-[96px_1fr] gap-2">
-      <dt className="text-slate-500">{k}</dt>
+      <dt className="text-violet-300">{k}</dt>
       <dd className={`break-all text-slate-300 ${mono ? "mono text-[11px]" : ""}`}>{v || "—"}</dd>
     </div>
   );
@@ -641,10 +641,10 @@ function RiskMeter({ detail }) {
   }[detail?.severity] ?? 25;
   const conf = firstFinding(detail)?.confidence;
   const score = Math.round(conf != null ? sevRank * 0.6 + Number(conf) * 100 * 0.4 : sevRank);
-  const color = score >= 80 ? "from-[#f87171] to-[#fbbf24]" : score >= 50 ? "from-amber-500 to-orange-400" : "from-emerald-500 to-cyan-500";
+  const color = score >= 80 ? "from-[#ec4899] to-[#c084fc]" : score >= 50 ? "from-purple-500 to-pink-400" : "from-violet-600 to-violet-600";
   return (
     <div className="flex items-center gap-2">
-      <span className={`mono text-[11px] ${score >= 80 ? "text-red-300" : score >= 50 ? "text-amber-300" : "text-emerald-300"}`}>{score}/100</span>
+      <span className={`mono text-[11px] ${score >= 80 ? "text-pink-300" : score >= 50 ? "text-purple-300" : "text-violet-300"}`}>{score}/100</span>
       <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/5">
         <span className={`bar-grow block h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${score}%` }} />
       </span>
@@ -656,7 +656,7 @@ function geoChip(meta, ip) {
   if (!ip || !meta?.geo?.[ip]) return null;
   const g = meta.geo[ip];
   return (
-    <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9.5px] text-cyan-300/80" title={ip}>
+    <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9.5px] text-violet-300/80" title={ip}>
       {[g.country, g.city].filter(Boolean).join(" · ") || (g.asn ? `AS${g.asn}` : "geo")}
     </span>
   );
@@ -680,14 +680,14 @@ function RelatedEvents({ detail, onOpen }) {
   }
   ids.delete(detail?.event_id);
   const related = [...ids].slice(0, 40);
-  if (related.length === 0) return <p className="text-[11px] text-slate-600">no correlated events</p>;
+  if (related.length === 0) return <p className="text-[11px] text-violet-400">no correlated events</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {related.map((id) => (
         <button
           key={id}
           onClick={() => onOpen(id)}
-          className="mono max-w-[180px] truncate rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-slate-400 transition hover:border-cyan-500/40 hover:text-cyan-300"
+          className="mono max-w-[180px] truncate rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-violet-200 transition hover:border-violet-600/40 hover:text-violet-300"
           title="open related event"
         >
           {id}
@@ -701,34 +701,34 @@ function InvestigationPanel({ detail, meta }) {
   const cases = meta?.relatedCases || [];
   if (cases.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-white/10 p-3 text-[11px] text-slate-600">
+      <div className="rounded-lg border border-dashed border-white/10 p-3 text-[11px] text-violet-400">
         not linked to any SOC case · {meta?.loading ? "correlating…" : "no alert created for this event"}
       </div>
     );
   }
   const statusMap = {
-    open: "border-red-400/30 bg-red-400/10 text-red-300",
-    investigation: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    acknowledged: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-    resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    open: "border-pink-500/30 bg-pink-500/10 text-pink-300",
+    investigation: "border-purple-500/30 bg-purple-500/10 text-purple-300",
+    acknowledged: "border-purple-500/30 bg-purple-500/10 text-purple-300",
+    closed: "border-violet-600/30 bg-violet-600/10 text-violet-300",
+    resolved: "border-violet-600/30 bg-violet-600/10 text-violet-300",
   };
   return (
     <div className="space-y-2">
       {cases.map((c) => (
         <div key={c.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${statusMap[c.status] || "border-white/10 text-slate-400"}`}>{c.status || "open"}</span>
-            <span className="mono text-[10.5px] text-slate-400">{c.threat_class}</span>
-            {c.assignee && <span className="mono text-[10px] text-emerald-300">@{c.assignee}</span>}
+            <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${statusMap[c.status] || "border-white/10 text-violet-200"}`}>{c.status || "open"}</span>
+            <span className="mono text-[10.5px] text-violet-200">{c.threat_class}</span>
+            {c.assignee && <span className="mono text-[10px] text-violet-300">@{c.assignee}</span>}
           </div>
-          <p className="mono mt-1.5 break-all text-[10px] text-slate-500">case {c.id}</p>
+          <p className="mono mt-1.5 break-all text-[10px] text-violet-300">case {c.id}</p>
           <p className="mt-1 text-[11px] text-slate-300">{c.message || "—"}</p>
           {(c.notes || []).length > 0 && (
             <div className="mt-2 space-y-1">
               {(c.notes || []).map((n, ni) => (
-                <p key={ni} className="mono rounded bg-black/30 px-2 py-1 text-[10px] text-amber-200/80">
-                  <span className="text-slate-600">[{n.ts || ""}] {n.actor || ""}</span> — {n.note || ""}
+                <p key={ni} className="mono rounded bg-black/30 px-2 py-1 text-[10px] text-purple-200/80">
+                  <span className="text-violet-400">[{n.ts || ""}] {n.actor || ""}</span> — {n.note || ""}
                 </p>
               ))}
             </div>
@@ -776,7 +776,7 @@ function TraceTimeline({ events, current }) {
   return (
     <div className="mt-5">
       <details open>
-        <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-300">
+        <summary className="cursor-pointer text-[11px] text-violet-300 hover:text-slate-300">
           trace timeline · {sorted.length} events
         </summary>
         <ol className="mt-3 space-y-0 border-l border-white/10 pl-4">
@@ -786,20 +786,20 @@ function TraceTimeline({ events, current }) {
               <li key={ev.event_id} className="relative pb-3">
                 <span
                   className={`absolute -left-[19px] top-1 h-2 w-2 rounded-full ${
-                    isCurrent ? "bg-emerald-400 pulse-dot-green" : "bg-slate-600"
+                    isCurrent ? "bg-violet-500 pulse-dot-calm-green" : "bg-[#3b2a5c]"
                   }`}
                 />
-                <div className={`flex items-center gap-2 text-[10.5px] ${isCurrent ? "text-emerald-300" : "text-slate-400"}`}>
+                <div className={`flex items-center gap-2 text-[10.5px] ${isCurrent ? "text-violet-300" : "text-violet-200"}`}>
                   <span className={`mono ${isCurrent ? "sev-critical" : "sev-info"}`}>
                     {ev.category || "system"}
                   </span>
                   <span className="ml-auto">{(ev.timestamp || "").slice(11, 19)}Z</span>
                 </div>
-                <p className={`mt-0.5 truncate text-[11px] ${isCurrent ? "text-slate-100" : "text-slate-500"}`}>
+                <p className={`mt-0.5 truncate text-[11px] ${isCurrent ? "text-slate-100" : "text-violet-300"}`}>
                   {ev.message || "—"}
                 </p>
                 {ev.fields && ev.fields.threat_class && (
-                  <p className="text-[9.5px] uppercase tracking-wider text-amber-400/80">
+                  <p className="text-[9.5px] uppercase tracking-wider text-purple-400/80">
                     ⚠ {ev.fields.threat_class}
                   </p>
                 )}

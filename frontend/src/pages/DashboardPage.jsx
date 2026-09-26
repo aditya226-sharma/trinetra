@@ -4,7 +4,7 @@ import { getDashboard, getClients, getTasks, createTask, patchTask, streamEvents
 import { SeverityBadge, SeverityDot, LiveBadge, PulseDot, SectionTitle, Empty, severityRank, severityHex } from "../components/ui";
 import { Donut, Sparkline, ScoreRing } from "../components/charts";
 
-const DONUT_COLORS = ["#22d3ee", "#34d399", "#818cf8", "#fbbf24", "#f472b6", "#f87171", "#60a5fa"];
+const DONUT_COLORS = ["#a855f7", "#ec4899", "#c084fc", "#f472b6", "#7c3aed", "#d8b4fe", "#a78bfa"];
 
 const REVIEW_LIMIT = 6;
 
@@ -120,9 +120,9 @@ const PIPELINE = [
 ];
 
 const STATUS_LANES = [
-  { key: "open", label: "open", tone: "text-red-400 border-red-400/30" },
-  { key: "investigation", label: "investigation", tone: "text-amber-400 border-amber-500/30" },
-  { key: "closed", label: "closed", tone: "text-emerald-400 border-emerald-500/30" },
+  { key: "open", label: "open", tone: "text-pink-500 border-pink-500/30" },
+  { key: "investigation", label: "investigation", tone: "text-purple-400 border-purple-500/30" },
+  { key: "closed", label: "closed", tone: "text-violet-500 border-violet-600/30" },
 ];
 
 export default function DashboardPage({ role = "", clientScope = "" }) {
@@ -155,8 +155,8 @@ export default function DashboardPage({ role = "", clientScope = "" }) {
     };
   }, [adminOnly]);
 
-  if (error) return <div className="text-sm text-red-400">Failed to load dashboard: {error}</div>;
-  if (!data) return <div className="text-slate-500">Loading dashboard…</div>;
+  if (error) return <div className="text-sm text-pink-500">Failed to load dashboard: {error}</div>;
+  if (!data) return <div className="text-violet-300">Loading dashboard…</div>;
 
   if (scoped || data.scope) {
     return (
@@ -186,37 +186,37 @@ function ScopedDashboard({ data, scope }) {
       <LiveToast toast={toast} onDismiss={dismiss} />
       {/* scoped portal banner — unmistakably different from the admin command center */}
       <div className="anim-fadeup">
-        <div className="flex items-center gap-3 rounded-xl border border-cyan-400/25 bg-gradient-to-r from-cyan-500/10 via-sky-500/5 to-transparent px-5 py-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-xl text-[#67e8f9]">
+        <div className="flex items-center gap-3 rounded-xl border border-violet-500/25 bg-gradient-to-r from-violet-600/10 via-purple-500/5 to-transparent px-5 py-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-violet-500/30 bg-violet-500/10 text-xl text-[#ddd6fe]">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 01-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 011-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 011.52 0C14.51 3.81 17 5 19 5a1 1 0 011 1z" />
             </svg>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="mono text-[10px] uppercase tracking-[0.22em] text-cyan-300">Client portal · scoped workspace</p>
+            <p className="mono text-[10px] uppercase tracking-[0.22em] text-violet-300">Client portal · scoped workspace</p>
             <h1 className="mt-0.5 text-[22px] font-bold leading-tight tracking-tight text-slate-50">
-              <span className="text-[#67e8f9]">{scope}</span>
-              <span className="text-slate-400"> · this workspace</span>
+              <span className="text-[#ddd6fe]">{scope}</span>
+              <span className="text-violet-200"> · this workspace</span>
             </h1>
-            <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-slate-400">
-              You are signed in as a <b className="mono text-cyan-200">viewer</b> scoped to{" "}
-              <b className="mono text-cyan-200">{scope}</b> — you only see this client's telemetry,
-              incidents and SOC tasks. <span className="text-slate-500">Read-only view · managed by the SOC team.</span>
+            <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-violet-200">
+              You are signed in as a <b className="mono text-violet-200">viewer</b> scoped to{" "}
+              <b className="mono text-violet-200">{scope}</b> — you only see this client's telemetry,
+              incidents and SOC tasks. <span className="text-violet-300">Read-only view · managed by the SOC team.</span>
             </p>
           </div>
-          <span className="mono shrink-0 rounded-md border border-cyan-400/30 bg-black/30 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-cyan-200">
+          <span className="mono shrink-0 rounded-md border border-violet-500/30 bg-black/30 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-violet-200">
             scope: {scope}
           </span>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-slate-500">
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-violet-300">
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" /> <b className="mono text-cyan-300">{s.events ?? 0}</b> normalized events
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> <b className="mono text-violet-300">{s.events ?? 0}</b> normalized events
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> <b className="mono text-amber-300">{s.findings ?? 0}</b> findings
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-400" /> <b className="mono text-purple-300">{s.findings ?? 0}</b> findings
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-400" /> <b className="mono text-red-300">{totalIncidents}</b> incidents
+            <span className="h-1.5 w-1.5 rounded-full bg-pink-500" /> <b className="mono text-pink-300">{totalIncidents}</b> incidents
           </span>
           <span className="ml-auto"><LiveBadge text="Live · 10s" /></span>
         </div>
@@ -224,18 +224,18 @@ function ScopedDashboard({ data, scope }) {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Events this client" value={s.events ?? 0} sub={`dedup ${Math.round((data.dedup_rate || 0) * 100)}%`} tone="emerald" icon={<ChartIcon />} delay={0} />
+        <KpiCard label="Events this client" value={s.events ?? 0} sub={`dedup ${Math.round((data.dedup_rate || 0) * 100)}%`} tone="calm" icon={<ChartIcon />} delay={0} />
         <KpiCard label="Findings" value={s.findings ?? 0} sub="on this workspace" tone="danger" icon={<ThreatIcon />} delay={60} />
         <KpiCard label="Open incidents" value={incidents.open?.length ?? 0} sub="awaiting SOC triage" tone="danger" icon={<GraphIcon />} delay={120} />
-        <KpiCard label="Investigation" value={incidents.investigation?.length ?? 0} sub="actively worked" tone="violet" icon={<DedupIcon />} delay={180} />
+        <KpiCard label="Investigation" value={incidents.investigation?.length ?? 0} sub="actively worked" tone="brand" icon={<DedupIcon />} delay={180} />
       </div>
 
       <NeedsReview rows={buildReviewQueue({ findings: data.findings || [], incidents: incidents.open || [] })} />
 
       {/* tasks assigned by the SOC team */}
-      <section className="glass p-5 anim-fadeup !border-cyan-400/20 !bg-cyan-950/10">
+      <section className="glass p-5 anim-fadeup !border-violet-500/20 !bg-violet-950/10">
         <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-cyan-300/70">from the SOC team → you</span>}
+          right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300/70">from the SOC team → you</span>}
         >
           Tasks assigned to {scope}
         </SectionTitle>
@@ -245,7 +245,7 @@ function ScopedDashboard({ data, scope }) {
       {/* incident board */}
       <section className="glass p-5 anim-fadeup">
         <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">{scope} only</span>}
+          right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">{scope} only</span>}
         >
           Incidents on this workspace
         </SectionTitle>
@@ -255,7 +255,7 @@ function ScopedDashboard({ data, scope }) {
       {/* threat radar + findings */}
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="glass p-5 anim-fadeup">
-          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">this workspace</span>}>
+          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">this workspace</span>}>
             Threat radar
           </SectionTitle>
           {Object.keys(threats).length === 0 ? (
@@ -268,10 +268,10 @@ function ScopedDashboard({ data, scope }) {
                   <div key={threat} className="feed-in" style={{ animationDelay: `${i * 60}ms` }}>
                     <div className="mb-1 flex items-center justify-between text-[12px]">
                       <span className="mono text-slate-200">{threat}</span>
-                      <span className="mono text-[11px] text-red-300">{count} hits</span>
+                      <span className="mono text-[11px] text-pink-300">{count} hits</span>
                     </div>
                     <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(34,211,238,0.4)" }} />
+                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(168, 85, 247,0.4)" }} />
                     </div>
                   </div>
                 );
@@ -281,7 +281,7 @@ function ScopedDashboard({ data, scope }) {
         </section>
 
         <section className="glass p-5 anim-fadeup">
-          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">analyzer verdict feed</span>}>
+          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">analyzer verdict feed</span>}>
             Latest findings
           </SectionTitle>
           {findings.length === 0 ? (
@@ -297,7 +297,7 @@ function ScopedDashboard({ data, scope }) {
       </div>
 
       {/* read-only footer note */}
-      <p className="mono text-center text-[9.5px] uppercase tracking-[0.2em] text-slate-600">
+      <p className="mono text-center text-[9.5px] uppercase tracking-[0.2em] text-violet-400">
         TriNetra client portal · restricted to {scope} · questions? contact your SOC team
       </p>
     </div>
@@ -320,9 +320,9 @@ function FindingRow({ f, i, sevStrip }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="mono text-[12.5px] text-slate-100">{alert.threat_class}</span>
-          <span className="mono text-[10px] text-slate-500">conf {alert.confidence}</span>
+          <span className="mono text-[10px] text-violet-300">conf {alert.confidence}</span>
         </div>
-        <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
+        <p className="mono mt-0.5 text-[10px] uppercase tracking-widest text-violet-300">
           {verdict ? `${verdict} · ${storeDecision}` : "awaiting analyzer verdict"}
         </p>
       </div>
@@ -339,7 +339,7 @@ function NeedsReview({ rows }) {
     <section className="glass p-5 anim-fadeup">
       <SectionTitle
         right={
-          <span className="mono text-[10px] uppercase tracking-widest text-[#94a3b8]">
+          <span className="mono text-[10px] uppercase tracking-widest text-[#a78bc4]">
             {critical > 0 ? `${critical} high priority` : `${rows.length} queued`}
           </span>
         }
@@ -368,12 +368,12 @@ function NeedsReview({ rows }) {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <SeverityDot severity={r.severity} />
-                      <span className="truncate text-[13px] font-medium text-[#e2e8f0]">{r.title}</span>
+                      <span className="truncate text-[13px] font-medium text-[#f5f0fb]">{r.title}</span>
                     </span>
                     {(r.subject || r.ago) && (
-                      <span className="mono mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#94a3b8]">
+                      <span className="mono mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#a78bc4]">
                         {r.subject && <span className="truncate">{r.subject}</span>}
-                        {r.subject && r.ago && <span aria-hidden="true" className="text-slate-600">·</span>}
+                        {r.subject && r.ago && <span aria-hidden="true" className="text-violet-400">·</span>}
                         {r.ago && (
                           <time className="shrink-0" dateTime={new Date(r.when).toISOString()}>
                             {r.ago}
@@ -391,7 +391,7 @@ function NeedsReview({ rows }) {
                     height="14"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#94a3b8"
+                    stroke="#a78bc4"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -429,7 +429,7 @@ function AdminOverview({ data, clients }) {
   const feedTotal = feedSegments.reduce((acc, x) => acc + x.value, 0);
   const feedColor = (c) => {
     const i = active.findIndex((x) => x.client_id === c.client_id);
-    return i < 0 ? "rgba(148,163,184,0.25)" : DONUT_COLORS[i % DONUT_COLORS.length];
+    return i < 0 ? "rgba(167, 139, 196,0.25)" : DONUT_COLORS[i % DONUT_COLORS.length];
   };
   const eventsSpark = top.map((c) => c.events);
   const threatVals = Object.values(threats).map(Number);
@@ -446,11 +446,11 @@ function AdminOverview({ data, clients }) {
             <h1 className="text-3xl font-bold tracking-tight text-slate-50">
               Security <span className="text-grad-emerald">overview</span>
             </h1>
-            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-400">
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-violet-200">
               Multi-domain intelligence over{" "}
-              <b className="mono text-emerald-300">{s.events ?? 0}</b> normalized events with{" "}
-              <b className="mono text-amber-300">{s.findings ?? 0}</b> module findings and{" "}
-              <b className="mono text-red-300">{s.alerts_sent ?? 0}</b> alerts fanned out.
+              <b className="mono text-violet-300">{s.events ?? 0}</b> normalized events with{" "}
+              <b className="mono text-purple-300">{s.findings ?? 0}</b> module findings and{" "}
+              <b className="mono text-pink-300">{s.alerts_sent ?? 0}</b> alerts fanned out.
             </p>
           </div>
           <LiveBadge text="Live · 10s" />
@@ -461,24 +461,24 @@ function AdminOverview({ data, clients }) {
       <div className="glass flex flex-wrap items-center gap-x-2 gap-y-3 px-5 py-4 anim-fadeup">
         {PIPELINE.map((p, i) => (
           <React.Fragment key={p.id}>
-            {i > 0 && <span className="text-slate-600">›</span>}
+            {i > 0 && <span className="text-violet-400">›</span>}
             <span className="flex items-center gap-2">
               <PulseDot />
-              <span className="mono text-[11px] uppercase tracking-widest text-emerald-300">{p.label}</span>
+              <span className="mono text-[11px] uppercase tracking-widest text-violet-300">{p.label}</span>
             </span>
           </React.Fragment>
         ))}
-        <span className="ml-auto mono text-[11px] text-slate-500">
+        <span className="ml-auto mono text-[11px] text-violet-300">
           {top.length} feeds reporting · graph {g.nodes}N/{g.edges}E
         </span>
       </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard label="Events ingested" value={s.events ?? 0} sub={`${s.raw_lines ?? 0} raw lines · ${Math.round((data.dedup_rate || 0) * 100)}% dedup`} tone="emerald" icon={<ChartIcon />} spark={{ values: eventsSpark, color: "#22d3ee" }} delay={0} />
-        <KpiCard label="Deduplication rate" value={`${Math.round((data.dedup_rate || 0) * 100)}%`} sub="fingerprint-based corpus" tone="cyan" icon={<DedupIcon />} delay={60} />
-        <KpiCard label="Module findings" value={s.findings ?? 0} sub={`${s.alerts_sent ?? 0} alerts sent to analyst queue`} tone="danger" icon={<ThreatIcon />} spark={{ values: threatVals.length ? threatVals : [1], color: "#f87171" }} delay={120} />
-        <KpiCard label="Entity graph" value={`${g.nodes ?? 0}N / ${g.edges ?? 0}E`} sub={`${g.threatened?.length || 0} assets impacted`} tone="violet" icon={<GraphIcon />} spark={{ values: top.map((c) => c.events), color: "#22d3ee" }} delay={180} />
+        <KpiCard label="Events ingested" value={s.events ?? 0} sub={`${s.raw_lines ?? 0} raw lines · ${Math.round((data.dedup_rate || 0) * 100)}% dedup`} tone="calm" icon={<ChartIcon />} spark={{ values: eventsSpark, color: "#a855f7" }} delay={0} />
+        <KpiCard label="Deduplication rate" value={`${Math.round((data.dedup_rate || 0) * 100)}%`} sub="fingerprint-based corpus" tone="brand" icon={<DedupIcon />} delay={60} />
+        <KpiCard label="Module findings" value={s.findings ?? 0} sub={`${s.alerts_sent ?? 0} alerts sent to analyst queue`} tone="danger" icon={<ThreatIcon />} spark={{ values: threatVals.length ? threatVals : [1], color: "#ec4899" }} delay={120} />
+        <KpiCard label="Entity graph" value={`${g.nodes ?? 0}N / ${g.edges ?? 0}E`} sub={`${g.threatened?.length || 0} assets impacted`} tone="info" icon={<GraphIcon />} spark={{ values: top.map((c) => c.events), color: "#a855f7" }} delay={180} />
       </div>
 
       <NeedsReview rows={buildReviewQueue({ findings: data.findings || [], incidents: incidents.open || [] })} />
@@ -486,7 +486,7 @@ function AdminOverview({ data, clients }) {
       {/* incident board */}
       <section className="glass p-5 anim-fadeup">
         <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">admin · every client's incidents</span>}
+          right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">admin · every client's incidents</span>}
         >
           Incident board
         </SectionTitle>
@@ -496,7 +496,7 @@ function AdminOverview({ data, clients }) {
       {/* assign tasks to clients */}
       <section className="glass p-5 anim-fadeup">
         <SectionTitle
-          right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">appears on the client's own dashboard</span>}
+          right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">appears on the client's own dashboard</span>}
         >
           Assign a task to a client
         </SectionTitle>
@@ -507,7 +507,7 @@ function AdminOverview({ data, clients }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <section className="glass p-5 anim-fadeup">
-            <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">Module A · flow heuristics</span>}>
+            <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">Module A · flow heuristics</span>}>
               Threat radar
             </SectionTitle>
             {Object.keys(threats).length === 0 ? (
@@ -520,10 +520,10 @@ function AdminOverview({ data, clients }) {
                     <div key={threat} className="feed-in" style={{ animationDelay: `${i * 60}ms` }}>
                       <div className="mb-1 flex items-center justify-between text-[12px]">
                         <span className="mono text-slate-200">{threat}</span>
-                        <span className="mono text-[11px] text-red-300">{count} hits</span>
+                        <span className="mono text-[11px] text-pink-300">{count} hits</span>
                       </div>
                       <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#22d3ee,#f87171)", boxShadow: "0 0 12px rgba(248,113,113,0.5)" }} />
+                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(236, 72, 153,0.5)" }} />
                       </div>
                     </div>
                   );
@@ -534,7 +534,7 @@ function AdminOverview({ data, clients }) {
 
           {/* latest findings */}
           <section className="glass p-5 anim-fadeup">
-            <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">analyzer verdict feed</span>}>
+            <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">analyzer verdict feed</span>}>
               Latest findings
             </SectionTitle>
             {findings.length === 0 ? (
@@ -551,7 +551,7 @@ function AdminOverview({ data, clients }) {
 
         {/* clients + donut */}
         <section className="glass p-5 anim-fadeup lg:row-span-1">
-          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">GET /api/clients</span>}>
+          <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">GET /api/clients</span>}>
             Feed share
           </SectionTitle>
           {top.length === 0 ? (
@@ -574,17 +574,17 @@ function AdminOverview({ data, clients }) {
                     <div key={c.client_id} className="flex items-center gap-2 text-[12px]">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
                       <span className="mono truncate text-slate-300">{c.client_id}</span>
-                      <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
+                      <span className="text-[10px] text-violet-400">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
                       {!activeIds.has(c.client_id) && (
-                        <span className="text-[9.5px] uppercase tracking-wider text-slate-600">silent</span>
+                        <span className="text-[9.5px] uppercase tracking-wider text-violet-400">silent</span>
                       )}
-                      <span className="ml-auto mono tabular-nums text-slate-500">{c.events ?? 0}</span>
+                      <span className="ml-auto mono tabular-nums text-violet-300">{c.events ?? 0}</span>
                     </div>
                   );
                 })}
               </div>
               {active.length < top.length && (
-                <p className="mt-2 text-[10.5px] text-slate-600">
+                <p className="mt-2 text-[10.5px] text-violet-400">
                   {top.length - active.length} registered sensor{top.length - active.length === 1 ? "" : "s"} reported no events and {top.length - active.length === 1 ? "is" : "are"} excluded from the ring.
                 </p>
               )}
@@ -595,7 +595,7 @@ function AdminOverview({ data, clients }) {
 
       {/* VPN assessment */}
       <section className="glass p-5 anim-fadeup">
-        <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">Module B · IPsec posture</span>}>
+        <SectionTitle right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">Module B · IPsec posture</span>}>
           VPN / IPsec gateway assessment
         </SectionTitle>
         {vpn.length === 0 ? (
@@ -603,14 +603,14 @@ function AdminOverview({ data, clients }) {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {vpn.map((p, i) => {
-              const tone = p.risk_level === "critical" ? "#f87171" : p.risk_level === "high" ? "#fca5a5" : p.risk_level === "medium" ? "#fbbf24" : "#38bdf8";
+              const tone = p.risk_level === "critical" ? "#ec4899" : p.risk_level === "high" ? "#f472b6" : p.risk_level === "medium" ? "#c084fc" : "#d8b4fe";
               return (
                 <div key={p.interface || p.file || i} className="glass-row flex items-center gap-4 p-4 feed-in" style={{ animationDelay: `${i * 70}ms` }}>
                   <ScoreRing score={p.security_score ?? p.score ?? 0} tone={tone} label="score" />
                   <div className="min-w-0 flex-1">
                     <p className="mono truncate text-[13px] text-slate-100">{p.file}</p>
                     <SeverityBadge severity={p.risk_level} />
-                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10.5px] text-slate-400">
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10.5px] text-violet-200">
                       <span>IKEv{p.ike_version}</span>
                       <span>{p.encryption}/{p.key_length}</span>
                       <span>DH {p.dh_group}</span>
@@ -651,23 +651,23 @@ function IncidentBoard({ incidents }) {
             </div>
             <div className="space-y-2">
               {l.items.length === 0 ? (
-                <p className="mono text-[10px] text-slate-600">—</p>
+                <p className="mono text-[10px] text-violet-400">—</p>
               ) : (
                 l.items.slice(0, 6).map((c) => (
                   <Link
                     key={c.id}
                     to={`/incidents/${c.id}`}
-                    className="block w-full rounded-lg border border-white/5 bg-white/[0.03] p-2 text-left transition hover:border-emerald-500/30"
+                    className="block w-full rounded-lg border border-white/5 bg-white/[0.03] p-2 text-left transition hover:border-violet-600/30"
                   >
                     <div className="flex items-center gap-1.5">
                       <SeverityBadge severity={c.severity} />
                       <span className="mono truncate text-[11px] text-slate-200">{c.threat_class}</span>
                     </div>
-                    <p className="mono mt-1 truncate text-[9.5px] uppercase tracking-widest text-slate-500">
+                    <p className="mono mt-1 truncate text-[9.5px] uppercase tracking-widest text-violet-300">
                       {c.client_id || "—"} · {c.source_kind || "flow"}
-                      {c.assignee && <span className="text-emerald-300"> @{c.assignee}</span>}
+                      {c.assignee && <span className="text-violet-300"> @{c.assignee}</span>}
                     </p>
-                    <span className="mono mt-1 block text-[9px] uppercase tracking-widest text-cyan-300/70 hover:text-cyan-200">open incident →</span>
+                    <span className="mono mt-1 block text-[9px] uppercase tracking-widest text-violet-300/70 hover:text-violet-200">open incident →</span>
                   </Link>
                 ))
               )}
@@ -706,28 +706,28 @@ function useLiveChannel(clientScope) {
 
 function LiveToast({ toast, onDismiss }) {
   if (!toast) return null;
-  const tone = toast.icon === "task" ? "border-cyan-500/40" : "border-red-400/40";
+  const tone = toast.icon === "task" ? "border-violet-600/40" : "border-pink-500/40";
   return (
     <div className={`fixed right-4 top-20 z-50 flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border bg-black/85 p-3 shadow-2xl backdrop-blur anim-fadeup ${tone}`}>
-      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[13px] ${toast.icon === "task" ? "bg-cyan-500/15 text-cyan-300" : "bg-red-400/15 text-red-300"}`}>
+      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[13px] ${toast.icon === "task" ? "bg-violet-600/15 text-violet-300" : "bg-pink-500/15 text-pink-300"}`}>
         {toast.icon === "task" ? "⚑" : "◉"}
       </span>
       <div className="min-w-0 flex-1">
         <p className="mono text-[11.5px] font-semibold text-slate-100">{toast.title}</p>
-        <p className="mono mt-0.5 truncate text-[10px] text-slate-400">{toast.detail}</p>
-        <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-600">{toast.ts}</p>
+        <p className="mono mt-0.5 truncate text-[10px] text-violet-200">{toast.detail}</p>
+        <p className="mono mt-1 text-[9px] uppercase tracking-widest text-violet-400">{toast.ts}</p>
       </div>
-      <button onClick={onDismiss} className="text-slate-600 transition hover:text-slate-300">✕</button>
+      <button onClick={onDismiss} className="text-violet-400 transition hover:text-slate-300">✕</button>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ tasks */
 const PRIORITY_TONES = {
-  P1: "text-red-300 border-red-400/40 bg-red-400/10",
-  P2: "text-amber-300 border-amber-500/40 bg-amber-500/10",
-  P3: "text-cyan-300 border-cyan-500/40 bg-cyan-500/10",
-  P4: "text-slate-400 border-slate-500/40 bg-slate-500/10",
+  P1: "text-pink-300 border-pink-500/40 bg-pink-500/10",
+  P2: "text-purple-300 border-purple-500/40 bg-purple-500/10",
+  P3: "text-violet-300 border-violet-600/40 bg-violet-600/10",
+  P4: "text-violet-200 border-violet-300/40 bg-[#2e1f4a]",
 };
 
 function TaskPriority({ priority }) {
@@ -741,12 +741,12 @@ export function TaskRow({ task, onPatch, canPatch }) {
   const overdue = task.due_at && task.status !== "done" && task.due_at.slice(0, 10) < new Date().toISOString().slice(0, 10);
   const nextStatus = task.status === "todo" ? "in_progress" : task.status === "in_progress" ? "done" : "todo";
   return (
-    <div className={`glass-row p-3 ${overdue ? "border-red-400/30" : ""}`}>
+    <div className={`glass-row p-3 ${overdue ? "border-pink-500/30" : ""}`}>
       <div className="flex items-start gap-2">
         {canPatch && (
           <button
             onClick={() => onPatch(task.id, { status: nextStatus })}
-            className="mt-0.5 grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full border border-slate-600 text-slate-500 transition hover:border-emerald-400 hover:text-emerald-300"
+            className="mt-0.5 grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full border border-violet-400 text-violet-300 transition hover:border-violet-500 hover:text-violet-300"
             title={`Mark ${nextStatus}`}
           >
             {task.status === "done" && <span className="text-[9px]">✓</span>}
@@ -756,16 +756,16 @@ export function TaskRow({ task, onPatch, canPatch }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="mono text-[12.5px] text-slate-100">{task.title}</span>
             <TaskPriority priority={task.priority} />
-            <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-slate-400">{task.status}</span>
-            {overdue && <span className="mono rounded border border-red-400/40 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-red-300">overdue</span>}
+            <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-violet-200">{task.status}</span>
+            {overdue && <span className="mono rounded border border-pink-500/40 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-pink-300">overdue</span>}
           </div>
-          {task.description && <p className="mono mt-1 truncate text-[10.5px] text-slate-500">{task.description}</p>}
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
+          {task.description && <p className="mono mt-1 truncate text-[10.5px] text-violet-300">{task.description}</p>}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px] text-violet-300">
             {task.due_at && <span className="mono">{task.due_at.slice(0, 10)} due</span>}
             {task.linked_case_id && (
-              <Link to={`/incidents/${task.linked_case_id}`} className="mono text-cyan-300 underline-offset-2 hover:underline">incident {task.linked_case_id.slice(0, 8)}</Link>
+              <Link to={`/incidents/${task.linked_case_id}`} className="mono text-violet-300 underline-offset-2 hover:underline">incident {task.linked_case_id.slice(0, 8)}</Link>
             )}
-            {task.created_by && <span className="mono text-slate-600">by {task.created_by}</span>}
+            {task.created_by && <span className="mono text-violet-400">by {task.created_by}</span>}
           </div>
           {canPatch && (
             <div className="mt-2 flex items-center gap-2">
@@ -774,7 +774,7 @@ export function TaskRow({ task, onPatch, canPatch }) {
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { onPatch(task.id, { note: note.trim() }); setNote(""); } }}
                 placeholder="add a note (enter to post)"
-                className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200 outline-none placeholder:text-slate-600"
+                className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200 outline-none placeholder:text-violet-400"
               />
             </div>
           )}
@@ -810,7 +810,7 @@ export function ClientTasks({ clientId, initial }) {
           {tasks.map((t) => <TaskRow key={t.id} task={t} onPatch={patch} canPatch />)}
           {done.length > 0 && (
             <details className="mt-2">
-              <summary className="mono cursor-pointer text-[10px] uppercase tracking-widest text-slate-500">completed · {done.length}</summary>
+              <summary className="mono cursor-pointer text-[10px] uppercase tracking-widest text-violet-300">completed · {done.length}</summary>
               <div className="mt-2 space-y-2">
                 {done.map((t) => <TaskRow key={t.id} task={t} onPatch={patch} canPatch />)}
               </div>
@@ -853,26 +853,26 @@ export function AdminTaskManage({ clients, initial }) {
   return (
     <div className="mt-2 grid gap-6 lg:grid-cols-2">
       <div className="rounded-xl border border-white/5 bg-black/30 p-4">
-        {flash && <p className="mono mb-3 text-[11px] text-emerald-300">✓ {flash}</p>}
+        {flash && <p className="mono mb-3 text-[11px] text-violet-300">✓ {flash}</p>}
         <form onSubmit={submit} className="space-y-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} required
             placeholder="Task title · what needs to be done"
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12.5px] text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12.5px] text-slate-100 outline-none placeholder:text-violet-400 focus:border-violet-600/50" />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
             placeholder="Instructions / context for the client"
-            className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+            className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-slate-200 outline-none placeholder:text-violet-400 focus:border-violet-600/50" />
           <div className="grid gap-3 sm:grid-cols-3">
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} required
-              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50">
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-violet-600/50">
               <option value="">assign to…</option>
               {clients.map((c) => <option key={c.client_id} value={c.client_id}>{c.client_id}</option>)}
             </select>
             <select value={priority} onChange={(e) => setPriority(e.target.value)}
-              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50">
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-violet-600/50">
               {["P1", "P2", "P3", "P4"].map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)}
-              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50" />
+              className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-violet-600/50" />
           </div>
           <button disabled={busy} className="btn-primary mono w-full !py-2 text-[11px]">
             {busy ? "assigning…" : "assign task →"}
@@ -898,20 +898,22 @@ export function AdminTaskManage({ clients, initial }) {
 /* ------------------------------------------------------------------ local pieces */
 function KpiCard({ label, value, sub, tone, icon, spark, delay }) {
   // Glow + icon tint derive from the same tone so a card reads as one object.
+  // The palette is one hue family, so the four cards are separated by tint
+  // rather than hue: three calm purple steps and one urgent pink.
   const tones = {
-    emerald: { glow: "glow-cyan", icon: "text-[#22d3ee]" },
-    cyan: { glow: "glow-cyan", icon: "text-[#22d3ee]" },
-    danger: { glow: "glow-red", icon: "text-[#f87171]" },
-    violet: { glow: "glow-cyan", icon: "text-[#818cf8]" },
+    calm: { glow: "glow-cyan", icon: "text-[#a78bfa]" },
+    brand: { glow: "glow-cyan", icon: "text-[#a855f7]" },
+    info: { glow: "glow-cyan", icon: "text-[#c084fc]" },
+    danger: { glow: "glow-red", icon: "text-[#ec4899]" },
   };
-  const t = tones[tone] || tones.cyan;
+  const t = tones[tone] || tones.brand;
   return (
     <div className={`glass p-4 anim-fadeup ${t.glow}`} style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow truncate">{label}</p>
-          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-[#e2e8f0]">{value}</p>
-          <p className="mt-2 text-[11px] leading-snug text-[#94a3b8]">{sub}</p>
+          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-[#f5f0fb]">{value}</p>
+          <p className="mt-2 text-[11px] leading-snug text-[#a78bc4]">{sub}</p>
         </div>
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 ${t.icon}`}>{icon}</span>
       </div>

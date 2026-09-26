@@ -231,19 +231,19 @@ export default function LogConsolePage() {
         eyebrow={`Client · ${clientId}`}
         title={
           <span className="flex items-center gap-3">
-            <span className={`inline-block h-2.5 w-2.5 rounded-full ${isOnline ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+            <span className={`inline-block h-2.5 w-2.5 rounded-full ${isOnline ? "bg-violet-500 pulse-dot-calm" : "bg-[#2e1f4a]"}`} />
             {clientMeta?.hostname || clientId}
           </span>
         }
         sub={
           <span className="flex flex-wrap items-center gap-3">
-            {clientMeta?.platform && <PlainBadge cls="!text-cyan-300">{clientMeta.platform}</PlainBadge>}
+            {clientMeta?.platform && <PlainBadge cls="!text-violet-300">{clientMeta.platform}</PlainBadge>}
             {clientMeta?.agent_version && <PlainBadge>v{clientMeta.agent_version}</PlainBadge>}
             {clientMeta?.ip && <PlainBadge>{clientMeta.ip}</PlainBadge>}
             {clientMeta?.source_types?.map((st) => (
               <PlainBadge key={st}>{st}</PlainBadge>
             ))}
-            <span className="mono text-[11px] text-slate-500">
+            <span className="mono text-[11px] text-violet-300">
               {total.toLocaleString()} events · {isOnline ? "online" : `last seen ${fmtAgo(clientMeta?.last_seen)}`}
             </span>
           </span>
@@ -253,9 +253,9 @@ export default function LogConsolePage() {
             <button
               onClick={() => setLive(!live)}
               className={`chip ${live ? "chip-on" : ""}`}
-              style={live ? { borderColor: "rgba(52,211,153,0.6)", color: "#6ee7b7" } : undefined}
+              style={live ? { borderColor: "rgba(167, 139, 196,0.6)", color: "#c4b5fd" } : undefined}
             >
-              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${live && !paused ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+              <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${live && !paused ? "bg-violet-500 pulse-dot-calm" : "bg-[#2e1f4a]"}`} />
               {live ? (paused ? "PAUSED" : `LIVE · ${liveCount}`) : "PAUSED"}
             </button>
             {live && (
@@ -277,7 +277,7 @@ export default function LogConsolePage() {
       <section className="glass p-4 anim-fadeup">
         <SectionTitle
           right={
-            <span className="mono text-[10px] uppercase tracking-widest text-slate-500">
+            <span className="mono text-[10px] uppercase tracking-widest text-violet-300">
               {filtered.length} / {lines.length} lines
             </span>
           }
@@ -296,7 +296,7 @@ export default function LogConsolePage() {
             {filter && (
               <button
                 onClick={() => setFilter("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-violet-300 transition hover:text-slate-200"
                 title="clear search"
               >
                 ✕
@@ -320,7 +320,7 @@ export default function LogConsolePage() {
 
         {sevOptions.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">severity</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-violet-400">severity</span>
             <button
               onClick={() => setSevFilter("")}
               className={`chip text-[10px] ${sevFilter === "" ? "chip-on" : ""}`}
@@ -341,7 +341,7 @@ export default function LogConsolePage() {
 
         {catOptions.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">category</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-violet-400">category</span>
             <button
               onClick={() => setCatFilter("")}
               className={`chip text-[10px] ${catFilter === "" ? "chip-on" : ""}`}
@@ -362,7 +362,7 @@ export default function LogConsolePage() {
 
         {srcOptions.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">source</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-violet-400">source</span>
             <button
               onClick={() => setSrcFilter("")}
               className={`chip text-[10px] ${srcFilter === "" ? "chip-on" : ""}`}
@@ -382,7 +382,7 @@ export default function LogConsolePage() {
         )}
       </section>
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       {/* Selected log detail */}
       {selected && <EventDetail event={selected} onClose={() => setSelected(null)} />}
@@ -394,7 +394,7 @@ export default function LogConsolePage() {
         className="h-[min(60vh,640px)] min-h-[320px] overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center text-slate-500">Loading logs…</div>
+          <div className="flex h-full items-center justify-center text-violet-300">Loading logs…</div>
         ) : filtered.length === 0 ? (
           <Empty title="No log lines" hint="Waiting for events from this client…" />
         ) : (
@@ -409,7 +409,7 @@ export default function LogConsolePage() {
           ))
         )}
         {!loading && filtered.length > 0 && filtered.length < lines.length && (
-          <p className="sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-slate-600">
+          <p className="sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-violet-400">
             showing {filtered.length} of {lines.length} lines — clear filters to see the rest
           </p>
         )}
@@ -422,7 +422,7 @@ function ClientInfo({ meta, total, isOnline }) {
   return (
     <section className="glass p-4 anim-fadeup">
       <SectionTitle
-        right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">fleet registry · GET /api/clients</span>}
+        right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">fleet registry · GET /api/clients</span>}
       >
         Client information
       </SectionTitle>
@@ -442,9 +442,9 @@ function ClientInfo({ meta, total, isOnline }) {
       </div>
       {meta?.source_types?.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
-          <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">source_types</span>
+          <span className="mono mr-1 text-[9px] uppercase tracking-widest text-violet-400">source_types</span>
           {meta.source_types.map((st) => (
-            <span key={st} className="mono rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
+            <span key={st} className="mono rounded border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-300">
               {st}
             </span>
           ))}
@@ -457,7 +457,7 @@ function ClientInfo({ meta, total, isOnline }) {
 function InfoTile({ k, v, mono }) {
   return (
     <div className="min-w-0">
-      <p className="text-[9px] uppercase tracking-widest text-slate-600">{k}</p>
+      <p className="text-[9px] uppercase tracking-widest text-violet-400">{k}</p>
       <p className={`mt-0.5 truncate text-[13px] text-slate-200 ${mono ? "mono" : ""}`}>{v}</p>
     </div>
   );
@@ -474,25 +474,25 @@ function EventDetail({ event: e, onClose }) {
     <section className="glass overflow-hidden anim-fadeup">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="mono text-[11px] tracking-widest text-slate-500">event detail</span>
+          <span className="mono text-[11px] tracking-widest text-violet-300">event detail</span>
           <SeverityBadge severity={e.severity} />
-          {e.category && <PlainBadge cls="!text-cyan-300">{e.category}</PlainBadge>}
+          {e.category && <PlainBadge cls="!text-violet-300">{e.category}</PlainBadge>}
           {e.source_type && <PlainBadge>{e.source_type}</PlainBadge>}
-          {e.client_ip && <PlainBadge cls="!text-slate-400">{e.client_ip}</PlainBadge>}
+          {e.client_ip && <PlainBadge cls="!text-violet-200">{e.client_ip}</PlainBadge>}
         </div>
         <button onClick={onClose} className="chip">✕ close</button>
       </div>
 
       <div className="space-y-4 p-4">
-        <div className="mono flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-slate-500">
+        <div className="mono flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-violet-300">
           <span>ts <b className="text-slate-300">{time}</b></span>
           {e.client_id && <span>client <b className="text-slate-300">{e.client_id}</b></span>}
           {fields.host && <span>host <b className="text-slate-300">{fields.host}</b></span>}
           {fields.src && fields.dst && (
             <span>
-              flow <b className="text-cyan-300">{fields.src}</b>
+              flow <b className="text-violet-300">{fields.src}</b>
               {fields.sport ? `:${fields.sport}` : ""} →{" "}
-              <b className="text-cyan-300">{fields.dst}</b>
+              <b className="text-violet-300">{fields.dst}</b>
               {fields.dport ? `:${fields.dport}` : ""} · {fields.proto}
             </span>
           )}
@@ -518,9 +518,9 @@ function EventDetail({ event: e, onClose }) {
           )}
         </div>
 
-        <div className="mono flex flex-wrap gap-x-6 gap-y-1 border-t border-white/5 pt-3 text-[10px] text-slate-600">
-          <span>event_id <b className="text-slate-400">{e.event_id || "—"}</b></span>
-          <span>trace_id <b className="text-slate-400">{e.trace_id || "—"}</b></span>
+        <div className="mono flex flex-wrap gap-x-6 gap-y-1 border-t border-white/5 pt-3 text-[10px] text-violet-400">
+          <span>event_id <b className="text-violet-200">{e.event_id || "—"}</b></span>
+          <span>trace_id <b className="text-violet-200">{e.trace_id || "—"}</b></span>
         </div>
       </div>
     </section>
@@ -538,7 +538,7 @@ function FieldTable({ fields }) {
             <tbody>
               {entries.map(([k, v]) => (
                 <tr key={k} className="border-b border-white/5 last:border-0">
-                  <td className="mono w-44 px-2.5 py-1.5 align-top text-slate-500">{k}</td>
+                  <td className="mono w-44 px-2.5 py-1.5 align-top text-violet-300">{k}</td>
                   <td className="break-all px-2.5 py-1.5 text-slate-300">
                     {typeof v === "object" && v !== null ? JSON.stringify(v) : String(v)}
                   </td>
@@ -554,11 +554,11 @@ function FieldTable({ fields }) {
 
 function LogLine({ event: e, showRaw, active, onSelect }) {
   const sevColor = {
-    critical: "text-red-400",
+    critical: "text-pink-500",
     error: "text-violet-400",
-    warning: "text-amber-400",
+    warning: "text-purple-400",
     info: "text-slate-300",
-    low: "text-slate-400",
+    low: "text-violet-200",
   }[e.severity] || "text-slate-300";
 
   const ts = e.timestamp ? new Date(e.timestamp) : null;
@@ -572,18 +572,18 @@ function LogLine({ event: e, showRaw, active, onSelect }) {
       type="button"
       onClick={() => onSelect(e)}
       title="view event detail"
-      className={`group flex w-full cursor-pointer gap-3 px-1 py-0.5 text-left transition hover:bg-white/[0.04] ${active ? "bg-emerald-500/10" : ""}`}
+      className={`group flex w-full cursor-pointer gap-3 px-1 py-0.5 text-left transition hover:bg-white/[0.04] ${active ? "bg-violet-600/10" : ""}`}
     >
-      <span className="shrink-0 text-slate-600">{time}</span>
+      <span className="shrink-0 text-violet-400">{time}</span>
       <SeverityDot severity={e.severity} />
-      <span className={`min-w-0 flex-1 break-all ${showRaw ? "text-slate-400" : sevColor}`}>
+      <span className={`min-w-0 flex-1 break-all ${showRaw ? "text-violet-200" : sevColor}`}>
         {text}
       </span>
-      <span className="hidden shrink-0 text-[10px] text-slate-600 group-hover:inline">
+      <span className="hidden shrink-0 text-[10px] text-violet-400 group-hover:inline">
         {e.source_type}
         {e.fields?.channel ? ` · ${e.fields.channel}` : ""}
       </span>
-      <span className={`shrink-0 text-[12px] ${active ? "text-emerald-300" : "text-slate-700 group-hover:text-emerald-300"}`}>›</span>
+      <span className={`shrink-0 text-[12px] ${active ? "text-violet-300" : "text-violet-500 group-hover:text-violet-300"}`}>›</span>
     </button>
   );
 }

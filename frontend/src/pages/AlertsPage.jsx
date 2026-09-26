@@ -141,7 +141,7 @@ export default function AlertsPage({ role }) {
         actions={
           <div className="flex items-center gap-2">
             <LiveBadge text={`Poll 5s · ${stats?.total ?? 0} cases`} />
-            {!canTriage && <PlainBadge cls="!text-slate-400">read-only</PlainBadge>}
+            {!canTriage && <PlainBadge cls="!text-violet-200">read-only</PlainBadge>}
           </div>
         }
       />
@@ -155,7 +155,7 @@ export default function AlertsPage({ role }) {
         <Tile label="critical open" value={statsSev.critical ?? 0} tone="tone-danger" />
       </div>
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2 anim-fadeup">
@@ -191,7 +191,7 @@ export default function AlertsPage({ role }) {
               <button onClick={() => actAll("investigate")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px]">
                 {bulkBusy ? "…" : `investigate ${selectedIds.length}`}
               </button>
-              <button onClick={() => actAll("close")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-red-400/90 hover:!bg-red-400">
+              <button onClick={() => actAll("close")} disabled={bulkBusy} className="btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-pink-500/90 hover:!bg-pink-500">
                 {bulkBusy ? "…" : `close ${selectedIds.length}`}
               </button>
             </>
@@ -204,13 +204,13 @@ export default function AlertsPage({ role }) {
         <Empty title="Queue is clear" hint="Verdicts and policy hits land here as cases; nothing matches your filters right now." />
       ) : (
         <div className="relative space-y-3 pl-6 anim-fadeup">
-          <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-emerald-500/40 via-white/10 to-transparent" aria-hidden />
+          <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gradient-to-b from-violet-600/40 via-white/10 to-transparent" aria-hidden />
           {queuePage.shown.map((c, i) => {
             const open = expandedId === c.id;
             return (
               <div key={c.id} className="relative feed-in" style={{ animationDelay: `${i * 35}ms` }}>
                 <span className={`absolute -left-6 top-4 h-3 w-3 rounded-full border-2 border-[#05080f] ${dotCls(c.severity)} ${c.severity === "critical" ? "pulse-dot-red" : ""}`} />
-                <div className={`glass-row overflow-hidden ${open ? "border-emerald-500/30" : ""}`}>
+                <div className={`glass-row overflow-hidden ${open ? "border-violet-600/30" : ""}`}>
                   <button onClick={() => openIncident(open ? null : c.id)} className="flex w-full items-center gap-3 p-4 text-left">
                     {canTriage && (
                       <span
@@ -220,7 +220,7 @@ export default function AlertsPage({ role }) {
                         onClick={(e) => { e.stopPropagation(); setSel((s) => ({ ...s, [c.id]: !s[c.id] })); }}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setSel((s) => ({ ...s, [c.id]: !s[c.id] })); } }}
                         onMouseDown={(e) => e.stopPropagation()}
-                        className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[9px] ${sel[c.id] ? "border-emerald-400 bg-emerald-500 text-white" : "border-white/20"}`}
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded border text-[9px] ${sel[c.id] ? "border-violet-500 bg-violet-600 text-white" : "border-white/20"}`}
                       >
                         {sel[c.id] ? "✓" : ""}
                       </span>
@@ -231,22 +231,22 @@ export default function AlertsPage({ role }) {
                         <span className="mono text-[13.5px] font-semibold text-slate-100">{c.threat_class}</span>
                         <SeverityBadge severity={c.severity} />
                         <StatusBadge status={c.status} />
-                        <PlainBadge cls="!text-cyan-300">{c.source_kind}</PlainBadge>
+                        <PlainBadge cls="!text-violet-300">{c.source_kind}</PlainBadge>
                         {c.hits > 1 && <PlainBadge cls="!text-slate-300">hits {c.hits}</PlainBadge>}
                       </div>
-                      <p className="mono mt-1 text-[11px] uppercase tracking-widest text-slate-500">
+                      <p className="mono mt-1 text-[11px] uppercase tracking-widest text-violet-300">
                         {c.message || c.threat_class} · {c.source_value || "—"} {c.timestamp && ` · ${c.timestamp}`}
-                        {c.assignee && <span className="text-emerald-300"> · @{c.assignee}</span>}
+                        {c.assignee && <span className="text-violet-300"> · @{c.assignee}</span>}
                       </p>
                     </div>
-                    <span className="text-slate-600 transition group-hover:text-emerald-300">{open ? "−" : "+"}</span>
+                    <span className="text-violet-400 transition group-hover:text-violet-300">{open ? "−" : "+"}</span>
                   </button>
 
                   {open && (
                     <div className="border-t border-white/5 bg-black/30 p-4">
                       <div className="mb-3 flex flex-wrap items-center gap-2">
                         {!canTriage ? (
-                          <span className="mono text-[10.5px] uppercase tracking-widest text-slate-500">read-only queue — an admin or analyst owns this case</span>
+                          <span className="mono text-[10.5px] uppercase tracking-widest text-violet-300">read-only queue — an admin or analyst owns this case</span>
                         ) : (
                           <>
                             {c.status === "open" && <ActionBtn onClick={() => act(c.id, "investigate")} busy={busy[c.id]} label="Investigate" />}
@@ -284,12 +284,12 @@ export default function AlertsPage({ role }) {
                           <p className="eyebrow mb-2 mt-4">Activity timeline · who did what</p>
                           <div className="space-y-1">
                             {c.timeline.map((t, ti) => (
-                              <p key={ti} className="mono text-[10.5px] text-slate-500">
-                                <span className="text-slate-600">{t.ts}</span>{"  "}
-                                <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
-                                {" by "}<span className="text-slate-400">{t.actor}</span>
-                                {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
-                                {t.note && <span className="text-amber-300/80"> (“{t.note}”)</span>}
+                              <p key={ti} className="mono text-[10.5px] text-violet-300">
+                                <span className="text-violet-400">{t.ts}</span>{"  "}
+                                <span className={t.action === "created" ? "text-violet-200" : "text-violet-300"}>{t.action}</span>
+                                {" by "}<span className="text-violet-200">{t.actor}</span>
+                                {t.detail && <span className="text-violet-300"> — {t.detail}</span>}
+                                {t.note && <span className="text-purple-300/80"> (“{t.note}”)</span>}
                               </p>
                             ))}
                           </div>
@@ -323,23 +323,23 @@ function IncidentPanel({ data, loading }) {
   const { case: incident, involved = [], graph = { nodes: [], edges: [] } } = data;
   return (
     <div className="mt-4">
-      <Link to={`/incidents/${incident?.id || ""}`} className="mono text-[10.5px] text-cyan-300 underline-offset-2 hover:underline">
+      <Link to={`/incidents/${incident?.id || ""}`} className="mono text-[10.5px] text-violet-300 underline-offset-2 hover:underline">
         open dedicated incident view →
       </Link>
       <div className="mt-3 grid gap-4 lg:grid-cols-2">
       <div>
         <p className="eyebrow mb-2">Involved parties · who is implicated</p>
         {involved.length === 0 ? (
-          <p className="text-[11.5px] text-slate-500">No entity attribution recorded for this incident.</p>
+          <p className="text-[11.5px] text-violet-300">No entity attribution recorded for this incident.</p>
         ) : (
           <div className="space-y-1.5">
             {involved.map((e, i) => (
               <div key={`${e.kind}-${e.value}-${i}`} className="glass-row flex items-center gap-2 p-2.5">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${kindDot(e.kind)}`} />
-                <span className="mono text-[10px] uppercase tracking-widest text-slate-500">{e.kind}</span>
+                <span className="mono text-[10px] uppercase tracking-widest text-violet-300">{e.kind}</span>
                 <span className="mono truncate text-[12px] text-slate-200">{e.label || e.value}</span>
                 {typeof e.events === "number" && (
-                  <span className="ml-auto mono text-[10.5px] text-slate-500">{e.events} events</span>
+                  <span className="ml-auto mono text-[10.5px] text-violet-300">{e.events} events</span>
                 )}
               </div>
             ))}
@@ -354,11 +354,11 @@ function IncidentPanel({ data, loading }) {
             <p className="eyebrow mb-2 mt-4">Investigators · activity trail</p>
             <div className="space-y-1">
               {incident.timeline.map((t, ti) => (
-                <p key={ti} className="mono text-[10.5px] text-slate-500">
-                  <span className="text-slate-600">{t.ts}</span>{" "}
-                  <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
-                  {" by "}<span className="text-slate-400">{t.actor}</span>
-                  {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
+                <p key={ti} className="mono text-[10.5px] text-violet-300">
+                  <span className="text-violet-400">{t.ts}</span>{" "}
+                  <span className={t.action === "created" ? "text-violet-200" : "text-violet-300"}>{t.action}</span>
+                  {" by "}<span className="text-violet-200">{t.actor}</span>
+                  {t.detail && <span className="text-violet-300"> — {t.detail}</span>}
                 </p>
               ))}
             </div>
@@ -374,7 +374,7 @@ function IncidentGraph({ graph }) {
   const nodes = graph.nodes || [];
   const edges = graph.edges || [];
   if (nodes.length === 0) {
-    return <div className="glass-row border border-white/5 p-3 text-[11px] text-slate-500">No graph data for this incident yet.</div>;
+    return <div className="glass-row border border-white/5 p-3 text-[11px] text-violet-300">No graph data for this incident yet.</div>;
   }
   const rows = nodes.map((n, i) => ({
     node: n,
@@ -390,29 +390,30 @@ function IncidentGraph({ graph }) {
           const a = rows.find((r) => r.node.id === e.source);
           const b = rows.find((r) => r.node.id === e.target);
           if (!a || !b) return null;
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#f87171" : "#334155"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
+          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.threat ? "#ec4899" : "#432c68"} strokeWidth={e.threat ? 1.6 : 1} strokeDasharray={e.threat ? "2 2" : undefined} />;
         })}
         {rows.map(({ node, x, y }) => (
           <g key={node.id}>
-            <circle cx={x} cy={y} r={node.threatened || node.kind === "threat" ? 7 : 5} fill={node.color || "#6366f1"} opacity="0.9" />
-            <text x={x + 9} y={y + 3} fontSize="7.5" fill="#cbd5e1" className="mono">{node.label}</text>
+            <circle cx={x} cy={y} r={node.threatened || node.kind === "threat" ? 7 : 5} fill={node.color || "#7c3aed"} opacity="0.9" />
+            <text x={x + 9} y={y + 3} fontSize="7.5" fill="#ddd6fe" className="mono">{node.label}</text>
           </g>
         ))}
       </svg>
-      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-600">{nodes.length} nodes · {edges.length} edges</p>
+      <p className="mono text-[9.5px] uppercase tracking-widest text-violet-400">{nodes.length} nodes · {edges.length} edges</p>
     </div>
   );
 }
 
 const kindDot = (kind) => {
-  const m = { ip: "bg-indigo-500", user: "bg-emerald-500", domain: "bg-cyan-500", client: "bg-violet-500", proc: "bg-amber-500" };
-  return m[kind] || "bg-slate-500";
+  // Same hexes as GraphPage KIND_COLOR so chips and the graph legend agree.
+  const m = { ip: "bg-[#a855f7]", user: "bg-[#ec4899]", domain: "bg-[#f472b6]", client: "bg-[#d946ef]", proc: "bg-[#7c3aed]" };
+  return m[kind] || "bg-[#2e1f4a]";
 };
 
 function ActionBtn({ onClick, busy, label, variant = "primary" }) {
   const cls = {
     primary: "btn-primary mono !px-3 !py-1.5 text-[10.5px]",
-    danger: "btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-red-400/90 hover:!bg-red-400",
+    danger: "btn-primary mono !px-3 !py-1.5 text-[10.5px] !bg-pink-500/90 hover:!bg-pink-500",
     ghost: "btn-ghost mono !px-3 !py-1.5 text-[10.5px]",
   }[variant];
   return (
@@ -424,9 +425,9 @@ function ActionBtn({ onClick, busy, label, variant = "primary" }) {
 
 function StatusBadge({ status }) {
   const map = {
-    open: "text-red-300 border-red-400/30 bg-red-400/10",
-    investigation: "text-amber-300 border-amber-500/30 bg-amber-500/10",
-    closed: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
+    open: "text-pink-300 border-pink-500/30 bg-pink-500/10",
+    investigation: "text-purple-300 border-purple-500/30 bg-purple-500/10",
+    closed: "text-violet-300 border-violet-600/30 bg-violet-600/10",
   };
   return (
     <span className={`mono rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${map[status] || ""}`}>
@@ -438,8 +439,8 @@ function StatusBadge({ status }) {
 function Tile({ label, value, tone }) {
   const tones = {
     "tone-danger": "text-grad-danger glow-red text-[24px] mono font-bold",
-    "tone-warn": "text-[24px] mono font-bold text-amber-300",
-    "tone-info": "text-[24px] mono font-bold text-sky-300",
+    "tone-warn": "text-[24px] mono font-bold text-purple-300",
+    "tone-info": "text-[24px] mono font-bold text-purple-300",
     "tone-slate": "text-[24px] mono font-bold text-slate-200",
   };
   return (
@@ -455,6 +456,6 @@ const stripCls = (sev) => {
   return m[sev] || "sev-info";
 };
 const dotCls = (sev) => {
-  const m = { critical: "bg-red-400", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
-  return m[sev] || "bg-sky-500";
+  const m = { critical: "bg-pink-500", high: "bg-pink-500", warning: "bg-purple-400", error: "bg-violet-500", info: "bg-purple-500", low: "bg-purple-500" };
+  return m[sev] || "bg-purple-500";
 };

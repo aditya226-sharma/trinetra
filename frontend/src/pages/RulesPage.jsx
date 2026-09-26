@@ -62,11 +62,11 @@ export default function RulesPage({ role }) {
         eyebrow="soc · detection rules"
         title="Rules editor"
         sub="Write signature conditions over the normalized UES event — every match becomes an alert case tagged custom::<rule>."
-        actions={<PlainBadge cls="!text-emerald-300">{rules.length} rules</PlainBadge>}
+        actions={<PlainBadge cls="!text-violet-300">{rules.length} rules</PlainBadge>}
       />
 
       {!isAdmin && (
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-[12px] text-slate-400 anim-fadeup">
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-[12px] text-violet-200 anim-fadeup">
           Read-only view — <span className="mono text-slate-200">admins</span> enable, edit, and delete rules.
         </div>
       )}
@@ -76,17 +76,17 @@ export default function RulesPage({ role }) {
       <form onSubmit={save} className="glass space-y-4 p-5 anim-fadeup">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block min-w-[220px] flex-1">
-            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">rule name</span>
+            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">rule name</span>
             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. repeated failed logins" className="field mono w-full px-3 py-2" />
           </label>
           <label className="block">
-            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">min severity</span>
+            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">min severity</span>
             <select value={form.min_severity} onChange={(e) => setForm((f) => ({ ...f, min_severity: e.target.value }))} className="field mono px-3 py-2">
               {SEV_FLORS.map((s) => <option key={s}>{s}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">action</span>
+            <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">action</span>
             <select value={form.action} onChange={(e) => setForm((f) => ({ ...f, action: e.target.value }))} className="field mono px-3 py-2">
               <option value="alert">alert (+ deliver)</option>
               <option value="notify">case only</option>
@@ -94,7 +94,7 @@ export default function RulesPage({ role }) {
           </label>
         </div>
         <label className="block">
-          <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">description</span>
+          <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">description</span>
           <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="field w-full px-3 py-2" />
         </label>
 
@@ -110,7 +110,7 @@ export default function RulesPage({ role }) {
                   {OPS.map((o) => <option key={o}>{o}</option>)}
                 </select>
                 <input value={c.value} onChange={(e) => setCond(idx, { value: e.target.value })} placeholder="value" className="field mono w-44 px-3 py-2" />
-                <button type="button" onClick={() => setForm((f) => ({ ...f, match: f.match.filter((_, i) => i !== idx) }))} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
+                <button type="button" onClick={() => setForm((f) => ({ ...f, match: f.match.filter((_, i) => i !== idx) }))} className="mono text-[11px] text-pink-500 hover:text-pink-300">✕</button>
               </div>
             ))}
           </div>
@@ -128,7 +128,7 @@ export default function RulesPage({ role }) {
               cancel edit
             </button>
           )}
-          {err && <span className="mono text-[11px] text-red-400">✗ {err}</span>}
+          {err && <span className="mono text-[11px] text-pink-500">✗ {err}</span>}
         </div>
       </form>
       )}
@@ -139,17 +139,17 @@ export default function RulesPage({ role }) {
       ) : (
         <div className="glass overflow-hidden anim-fadeup">
           <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <p className="mono text-[11px] tracking-widest text-slate-500">rules :: {rules.length} configured</p>
+            <p className="mono text-[11px] tracking-widest text-violet-300">rules :: {rules.length} configured</p>
           </div>
           <div className="divide-y divide-white/[0.04]">
             {rules.map((r) => (
               <div key={r.id} className={`flex flex-col gap-2 px-4 py-3 ${r.enabled ? "" : "opacity-60"}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mono text-[13px] font-semibold text-slate-100">{r.name}</span>
-                  <PlainBadge cls="!text-amber-300">custom::{r.id}</PlainBadge>
+                  <PlainBadge cls="!text-purple-300">custom::{r.id}</PlainBadge>
                   <PlainBadge>min {r.min_severity}</PlainBadge>
-                  <PlainBadge cls="!text-slate-400">{r.action}</PlainBadge>
-                  {r.categories?.length > 0 && <PlainBadge cls="!text-cyan-300">{r.categories.join("/")}</PlainBadge>}
+                  <PlainBadge cls="!text-violet-200">{r.action}</PlainBadge>
+                  {r.categories?.length > 0 && <PlainBadge cls="!text-violet-300">{r.categories.join("/")}</PlainBadge>}
                   <div className="ml-auto flex items-center gap-2">
                     {isAdmin && (
                       <>
@@ -160,13 +160,13 @@ export default function RulesPage({ role }) {
                           {r.enabled ? "ENABLED" : "DISABLED"}
                         </button>
                         <button onClick={() => startEdit(r)} className="btn-ghost mono !px-3 !py-1.5 text-[10.5px]">edit</button>
-                        <button onClick={() => remove(r.id)} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
+                        <button onClick={() => remove(r.id)} className="mono text-[11px] text-pink-500 hover:text-pink-300">✕</button>
                       </>
                     )}
                   </div>
                 </div>
-                {r.description && <p className="text-[11px] text-slate-500">{r.description}</p>}
-                <details className="text-[11px] text-slate-500">
+                {r.description && <p className="text-[11px] text-violet-300">{r.description}</p>}
+                <details className="text-[11px] text-violet-300">
                   <summary className="eyebrow cursor-pointer">match conditions</summary>
                   <CodeBlock maxH="max-h-40">{JSON.stringify(r.match || [], null, 2)}</CodeBlock>
                 </details>

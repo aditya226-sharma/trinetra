@@ -220,27 +220,27 @@ export default function SettingsPage() {
         eyebrow="admin · storage · audit"
         title="Settings & admin"
         sub="Retention policy, your sign-in credentials, and the trail of privileged actions — all recorded in the audit store."
-        actions={<PlainBadge cls="!text-cyan-300">admin console</PlainBadge>}
+        actions={<PlainBadge cls="!text-violet-300">admin console</PlainBadge>}
       />
 
       {/* users & roles (RBAC) */}
       <section className="glass overflow-hidden anim-fadeup">
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-          <p className="mono text-[11px] tracking-widest text-slate-500">users &amp; roles :: rbac</p>
-          <PlainBadge cls="!text-emerald-300">{roster ? `${roster.length} accounts` : "…"}</PlainBadge>
+          <p className="mono text-[11px] tracking-widest text-violet-300">users &amp; roles :: rbac</p>
+          <PlainBadge cls="!text-violet-300">{roster ? `${roster.length} accounts` : "…"}</PlainBadge>
         </div>
         <div className="p-5">
           <form onSubmit={createUser} className="flex flex-wrap items-end gap-3">
             <label className="block min-w-[160px] flex-1">
-              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">username</span>
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">username</span>
               <input value={uName} onChange={(e) => setUName(e.target.value)} placeholder="soc-analyst" className="field mono w-full px-3 py-2" />
             </label>
             <label className="block min-w-[160px] flex-1">
-              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">password</span>
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">password</span>
               <input value={uPass} onChange={(e) => setUPass(e.target.value)} type="password" placeholder="min 6 chars" className="field mono w-full px-3 py-2" />
             </label>
             <label className="block">
-              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">role</span>
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">role</span>
               <select value={uRole} onChange={(e) => setURole(e.target.value)} className="field mono px-3 py-2">
                 <option value="analyst">analyst</option>
                 <option value="admin">admin</option>
@@ -250,23 +250,23 @@ export default function SettingsPage() {
             <button type="submit" disabled={uBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
               {uBusy ? "CREATING…" : "CREATE USER"}
             </button>
-            {uMsg && <span className="mono text-[11px] text-emerald-400">✓ {uMsg}</span>}
-            {uErr && <span className="mono text-[11px] text-red-400">✗ {uErr}</span>}
+            {uMsg && <span className="mono text-[11px] text-violet-500">✓ {uMsg}</span>}
+            {uErr && <span className="mono text-[11px] text-pink-500">✗ {uErr}</span>}
           </form>
 
           <div className="mt-4 divide-y divide-white/[0.04]">
             {(roster || []).map((u) => (
               <div key={u.username} className="flex items-center gap-3 py-2.5">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-500/20 text-[11px] font-bold text-emerald-300">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-600/20 text-[11px] font-bold text-violet-300">
                   {(u.username || "?")[0]?.toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="mono text-[13px] text-slate-100">{u.username}{u.username === session?.username && <span className="text-slate-500"> (you)</span>}</p>
-                  <p className="mono text-[10px] text-slate-600">{u.created_at}</p>
+                  <p className="mono text-[13px] text-slate-100">{u.username}{u.username === session?.username && <span className="text-violet-300"> (you)</span>}</p>
+                  <p className="mono text-[10px] text-violet-400">{u.created_at}</p>
                 </div>
-                <PlainBadge cls={u.role === "admin" ? "!text-emerald-300" : u.role === "analyst" ? "!text-cyan-300" : "!text-slate-400"}>{u.role}</PlainBadge>
+                <PlainBadge cls={u.role === "admin" ? "!text-violet-300" : u.role === "analyst" ? "!text-violet-300" : "!text-violet-200"}>{u.role}</PlainBadge>
                 {u.username !== session?.username && (
-                  <button onClick={() => handleDeleteUser(u.username)} className="mono text-[11px] text-red-400 hover:text-red-300">✕</button>
+                  <button onClick={() => handleDeleteUser(u.username)} className="mono text-[11px] text-pink-500 hover:text-pink-300">✕</button>
                 )}
               </div>
             ))}
@@ -278,7 +278,7 @@ export default function SettingsPage() {
         {/* -------------------------------------------- storage & retention */}
         <section className="glass overflow-hidden anim-fadeup">
           <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <p className="mono text-[11px] tracking-widest text-slate-500">storage :: event store</p>
+            <p className="mono text-[11px] tracking-widest text-violet-300">storage :: event store</p>
             <PlainBadge>retention {storage ? `${storage.retention_days}d` : "…"}</PlainBadge>
           </div>
           <div className="p-5">
@@ -289,7 +289,7 @@ export default function SettingsPage() {
               <Stat value={storage ? fmtBytes(storage.raw_store_bytes) : "…"} label="raw store" />
             </div>
             {storage?.cutoff && (
-              <p className="mono mt-3 text-[10px] text-slate-600">
+              <p className="mono mt-3 text-[10px] text-violet-400">
                 prune cutoff: keeping events newer than {storage.cutoff}
               </p>
             )}
@@ -306,7 +306,7 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-            <label className="mt-3 flex items-center gap-2 text-[12px] text-slate-400">
+            <label className="mt-3 flex items-center gap-2 text-[12px] text-violet-200">
               <input type="checkbox" checked={pruneNow} onChange={(e) => setPruneNow(e.target.checked)} className="accent-emerald-400" />
               apply immediately (prune now)
             </label>
@@ -314,8 +314,8 @@ export default function SettingsPage() {
               <button onClick={applyRetention} disabled={busy || !storage} className="btn-primary mono !px-4 !py-2 text-[11px]">
                 {busy ? "APPLYING…" : "APPLY RETENTION"}
               </button>
-              {retentMsg && <span className="mono text-[11px] text-emerald-400">{retentMsg}</span>}
-              {retentErr && <span className="mono text-[11px] text-red-400">✗ {retentErr}</span>}
+              {retentMsg && <span className="mono text-[11px] text-violet-500">{retentMsg}</span>}
+              {retentErr && <span className="mono text-[11px] text-pink-500">✗ {retentErr}</span>}
             </div>
           </div>
         </section>
@@ -323,7 +323,7 @@ export default function SettingsPage() {
         {/* -------------------------------------------- password change */}
         <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "60ms" }}>
           <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <p className="mono text-[11px] tracking-widest text-slate-500">identity :: credentials</p>
+            <p className="mono text-[11px] tracking-widest text-violet-300">identity :: credentials</p>
             <PlainBadge>{session.role || "…"}</PlainBadge>
           </div>
           <form onSubmit={submitPassword} className="space-y-4 p-5">
@@ -336,20 +336,20 @@ export default function SettingsPage() {
             <Field label="confirm new password">
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="field mono w-full px-3 py-2" autoComplete="new-password" />
             </Field>
-            {pwMsg && <p className="mono text-[11px] text-emerald-400">✓ {pwMsg}</p>}
-            {pwErr && <p className="mono text-[11px] text-red-400">✗ {pwErr}</p>}
+            {pwMsg && <p className="mono text-[11px] text-violet-500">✓ {pwMsg}</p>}
+            {pwErr && <p className="mono text-[11px] text-pink-500">✗ {pwErr}</p>}
             <button type="submit" disabled={pwBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
               {pwBusy ? "ROTATING…" : "CHANGE PASSWORD"}
             </button>
           </form>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/5 px-5 py-3 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/5 px-5 py-3 text-[11px] text-violet-300">
             <span>signed in as <span className="mono text-slate-300">{session.username}</span></span>
             {session.remaining ? (
               <span className="mono">session expires in {session.remaining}</span>
             ) : (
               <span className="mono">session expiry from token</span>
             )}
-            <span className="text-slate-600">JWT-secured · rotations recorded to audit</span>
+            <span className="text-violet-400">JWT-secured · rotations recorded to audit</span>
           </div>
         </section>
       </div>
@@ -357,11 +357,11 @@ export default function SettingsPage() {
       {/* ------------------------------------------------ collectors */}
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "90ms" }}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-          <p className="mono text-[11px] tracking-widest text-slate-500">collectors :: live sources</p>
+          <p className="mono text-[11px] tracking-widest text-violet-300">collectors :: live sources</p>
           <div className="flex items-center gap-2">
-            {collectors?.syslog_active && <PlainBadge cls="!text-emerald-300">syslog :{collectors.syslog_port}</PlainBadge>}
-            {collectors?.tailer_active && <PlainBadge cls="!text-cyan-300">tail -f</PlainBadge>}
-            {collectors?.demo_active && <PlainBadge cls="!text-amber-300">demo replay</PlainBadge>}
+            {collectors?.syslog_active && <PlainBadge cls="!text-violet-300">syslog :{collectors.syslog_port}</PlainBadge>}
+            {collectors?.tailer_active && <PlainBadge cls="!text-violet-300">tail -f</PlainBadge>}
+            {collectors?.demo_active && <PlainBadge cls="!text-purple-300">demo replay</PlainBadge>}
             {!collectors && <PlainBadge>…</PlainBadge>}
           </div>
         </div>
@@ -379,7 +379,7 @@ export default function SettingsPage() {
               listener enabled
             </label>
             <label className="block">
-              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">port</span>
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">port</span>
               <input
                 value={syslogPort}
                 disabled={!syslogEnabled}
@@ -387,7 +387,7 @@ export default function SettingsPage() {
                 className="field mono w-full px-3 py-2 disabled:opacity-40"
               />
             </label>
-            <p className="text-[10.5px] leading-relaxed text-slate-500">
+            <p className="text-[10.5px] leading-relaxed text-violet-300">
               RFC 3164/5424 datagrams over UDP, normalized then deduped like any other source.
             </p>
           </div>
@@ -417,14 +417,14 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               {tailingPaths.length === 0 && (
-                <p className="text-[10.5px] text-slate-600">No files being followed.</p>
+                <p className="text-[10.5px] text-violet-400">No files being followed.</p>
               )}
               {tailingPaths.map((p) => (
                 <div key={p} className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
                   <span className="mono min-w-0 flex-1 truncate text-[11px] text-slate-300">{p}</span>
                   <button
                     onClick={() => setTailingPaths((xs) => xs.filter((x) => x !== p))}
-                    className="text-[11px] text-red-400 hover:text-red-300"
+                    className="text-[11px] text-pink-500 hover:text-pink-300"
                   >
                     ✕
                   </button>
@@ -446,14 +446,14 @@ export default function SettingsPage() {
               replay demo corpus to the live pipeline
             </label>
             <label className="block">
-              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">pause between passes (s)</span>
+              <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">pause between passes (s)</span>
               <input
                 value={demoDelay}
                 onChange={(e) => setDemoDelay(e.target.value)}
                 className="field mono w-full px-3 py-2"
               />
             </label>
-            <p className="text-[10.5px] leading-relaxed text-slate-500">
+            <p className="text-[10.5px] leading-relaxed text-violet-300">
               Cycles the bundled incident story with a quiet gap so dedup keeps the store healthy.
             </p>
           </div>
@@ -462,20 +462,20 @@ export default function SettingsPage() {
           <button onClick={applyCollectors} disabled={colBusy} className="btn-primary mono !px-4 !py-2 text-[11px]">
             {colBusy ? "RESTARTING…" : "APPLY COLLECTORS"}
           </button>
-          {colMsg && <span className="mono text-[11px] text-emerald-400">✓ {colMsg}</span>}
-          {colErr && <span className="mono text-[11px] text-red-400">✗ {colErr}</span>}
+          {colMsg && <span className="mono text-[11px] text-violet-500">✓ {colMsg}</span>}
+          {colErr && <span className="mono text-[11px] text-pink-500">✗ {colErr}</span>}
         </div>
       </section>
 
       {/* ------------------------------------------------ notifications */}
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "110ms" }}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-          <p className="mono text-[11px] tracking-widest text-slate-500">delivery :: alert fan-out · digest</p>
+          <p className="mono text-[11px] tracking-widest text-violet-300">delivery :: alert fan-out · digest</p>
           <div className="flex items-center gap-2">
-            {notif && <PlainBadge cls={notif.enabled ? "!text-emerald-300" : "!text-slate-400"}>{notif.enabled ? "enabled" : "muted"}</PlainBadge>}
-            {notif?.webhook?.url && <PlainBadge cls="!text-cyan-300">webhook</PlainBadge>}
-            {notif?.email?.host && <PlainBadge cls="!text-cyan-300">smtp</PlainBadge>}
-            {notif?.digest?.enabled && <PlainBadge cls="!text-amber-300">digest {notif.digest.hour_utc}:00z</PlainBadge>}
+            {notif && <PlainBadge cls={notif.enabled ? "!text-violet-300" : "!text-violet-200"}>{notif.enabled ? "enabled" : "muted"}</PlainBadge>}
+            {notif?.webhook?.url && <PlainBadge cls="!text-violet-300">webhook</PlainBadge>}
+            {notif?.email?.host && <PlainBadge cls="!text-violet-300">smtp</PlainBadge>}
+            {notif?.digest?.enabled && <PlainBadge cls="!text-purple-300">digest {notif.digest.hour_utc}:00z</PlainBadge>}
           </div>
         </div>
         {notif ? (
@@ -514,7 +514,7 @@ export default function SettingsPage() {
                 <p className="eyebrow">Webhook</p>
                 <Field label="endpoint URL"><input value={notif.webhook.url} onChange={(e) => setNotif((n) => ({ ...n, webhook: { ...n.webhook, url: e.target.value } }))} placeholder="https://alertflow.example.com/hook" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
                 <Field label="shared secret"><input value={notif.webhook.secret} onChange={(e) => setNotif((n) => ({ ...n, webhook: { ...n.webhook, secret: e.target.value } }))} type="password" placeholder="X-Trinetra-Secret" className="field mono w-full px-3 py-1.5 text-[11px]" /></Field>
-                <p className="text-[10.5px] leading-relaxed text-slate-500">
+                <p className="text-[10.5px] leading-relaxed text-violet-300">
                   POSTs a JSON envelope {"{type,severity,title,body}"} to the endpoint. Console logging is always on.
                 </p>
               </div>
@@ -528,34 +528,34 @@ export default function SettingsPage() {
                 <button onClick={sendDigest} disabled={digestBusy} className="btn-ghost mono !px-4 !py-2 text-[11px]">
                   {digestBusy ? "SENDING…" : "RUN DIGEST NOW"}
                 </button>
-                {notifMsg && <span className="mono text-[11px] text-emerald-400">✓ {notifMsg}</span>}
-                {notifErr && <span className="mono text-[11px] text-red-400">✗ {notifErr}</span>}
+                {notifMsg && <span className="mono text-[11px] text-violet-500">✓ {notifMsg}</span>}
+                {notifErr && <span className="mono text-[11px] text-pink-500">✗ {notifErr}</span>}
               </div>
             </div>
           </div>
         ) : (
-          <p className="px-5 py-6 text-center text-[12px] text-slate-500">Loading delivery config…</p>
+          <p className="px-5 py-6 text-center text-[12px] text-violet-300">Loading delivery config…</p>
         )}
       </section>
 
       {/* ------------------------------------------------ audit trail */}
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "120ms" }}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-          <p className="mono text-[11px] tracking-widest text-slate-500">audit trail :: newest first</p>
+          <p className="mono text-[11px] tracking-widest text-violet-300">audit trail :: newest first</p>
           <PlainBadge>{audit.length} entries</PlainBadge>
         </div>
         {audit.length === 0 ? (
-          <p className="px-5 py-6 text-center text-[12px] text-slate-500">
+          <p className="px-5 py-6 text-center text-[12px] text-violet-300">
             No privileged actions recorded yet — logins, ingests, token changes and retention edits will appear here.
           </p>
         ) : (
           <div className="terminal max-h-[18rem] overflow-y-auto p-3">
             {audit.map((a, i) => (
               <div key={i} className="flex gap-3 border-b border-white/[0.04] px-2 py-1.5 text-[11px]">
-                <span className="mono shrink-0 text-slate-600">{(a.ts || "").replace("T", " ").slice(0, 19)}</span>
-                <span className="mono w-32 shrink-0 truncate text-slate-400">{a.actor}</span>
-                <span className="mono shrink-0 text-emerald-300/90">{a.action}</span>
-                <span className="min-w-0 flex-1 truncate text-slate-500" title={a.detail}>{a.detail}</span>
+                <span className="mono shrink-0 text-violet-400">{(a.ts || "").replace("T", " ").slice(0, 19)}</span>
+                <span className="mono w-32 shrink-0 truncate text-violet-200">{a.actor}</span>
+                <span className="mono shrink-0 text-violet-300/90">{a.action}</span>
+                <span className="min-w-0 flex-1 truncate text-violet-300" title={a.detail}>{a.detail}</span>
               </div>
             ))}
           </div>
@@ -569,7 +569,7 @@ function Stat({ value, label }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
       <p className="text-grad-emerald text-xl font-bold leading-none mono">{value}</p>
-      <p className="mono mt-1.5 text-[9px] uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="mono mt-1.5 text-[9px] uppercase tracking-widest text-violet-300">{label}</p>
     </div>
   );
 }
@@ -577,7 +577,7 @@ function Stat({ value, label }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">{label}</span>
       {children}
     </label>
   );

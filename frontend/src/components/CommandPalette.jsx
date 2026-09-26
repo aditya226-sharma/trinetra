@@ -90,7 +90,7 @@ export default function CommandPalette({ theme, setTheme, role }) {
         aria-modal="true"
       >
         <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-          <code className="mono text-[11px] text-emerald-300">⌘K</code>
+          <code className="mono text-[11px] text-violet-300">⌘K</code>
           <input
             ref={inputRef}
             value={q}
@@ -102,7 +102,7 @@ export default function CommandPalette({ theme, setTheme, role }) {
         </div>
         <div className="max-h-[46vh] overflow-y-auto p-2">
           {results.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[12px] text-slate-500">no matches — try “events”, “alerts” or “theme”</p>
+            <p className="px-3 py-6 text-center text-[12px] text-violet-300">no matches — try “events”, “alerts” or “theme”</p>
           ) : (
             results.map((a, i) => (
               <button
@@ -110,16 +110,16 @@ export default function CommandPalette({ theme, setTheme, role }) {
                 onClick={() => run(a)}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] transition ${
-                  i === activeIndex ? "bg-emerald-500/15 text-emerald-200" : "text-slate-300 hover:bg-white/[0.04]"
+                  i === activeIndex ? "bg-violet-600/15 text-violet-200" : "text-slate-300 hover:bg-white/[0.04]"
                 }`}
               >
                 <span>{a.label}</span>
-                <span className="mono text-[10px] uppercase tracking-widest text-slate-600">{a.hint}</span>
+                <span className="mono text-[10px] uppercase tracking-widest text-violet-400">{a.hint}</span>
               </button>
             ))
           )}
         </div>
-        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-slate-600">
+        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-violet-400">
           <span>↑↓ navigate</span><span>↵ run</span><span>esc close</span>
         </div>
       </div>

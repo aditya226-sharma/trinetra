@@ -38,7 +38,7 @@ export default function CompliancePage() {
         actions={<LiveBadge text={`${assets.length} assets require action`} />}
       />
 
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-pink-500">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         {/* asset rail */}
@@ -52,14 +52,14 @@ export default function CompliancePage() {
                   key={a.id}
                   onClick={() => pick(a.id)}
                   className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition feed-in ${selected === a.id
-                      ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_20px_-4px_rgba(52,211,153,0.4)]"
-                      : "border-white/5 bg-white/[0.03] hover:border-emerald-500/30"
+                      ? "border-violet-600/60 bg-violet-600/10 shadow-[0_0_20px_-4px_rgba(167, 139, 196,0.4)]"
+                      : "border-white/5 bg-white/[0.03] hover:border-violet-600/30"
                     }`}
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <p className="mono text-[12.5px] text-slate-100">{a.id}</p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-red-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-400 pulse-dot-red" />
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-pink-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-pink-500 pulse-dot-red" />
                     {a.degree} edges · escalated
                   </p>
                 </button>
@@ -79,7 +79,7 @@ export default function CompliancePage() {
         {/* mapping panel */}
         <GlassCard
           title={compliance ? `Controls — ${compliance.asset_id}` : "Control mapping"}
-          right={selected && !compliance && <span className="mono text-[10px] text-slate-500">loading…</span>}
+          right={selected && !compliance && <span className="mono text-[10px] text-violet-300">loading…</span>}
         >
           {!compliance ? (
             <Empty
@@ -91,7 +91,7 @@ export default function CompliancePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityBadge severity="critical" />
                 <PlainBadge cls="uppercase">action required</PlainBadge>
-                <span className="mono ml-auto text-[11px] text-slate-500">
+                <span className="mono ml-auto text-[11px] text-violet-300">
                   {compliance.controls.length} threat → control chains
                 </span>
               </div>
@@ -100,17 +100,17 @@ export default function CompliancePage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => window.open(complianceReportUrl(compliance.asset_id), "_blank")}
-                    className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/25"
+                    className="rounded-xl border border-violet-600/40 bg-violet-600/15 px-3.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-violet-300 hover:bg-violet-600/25"
                   >
                     PDF report
                   </button>
-                  <span className="text-[10px] text-slate-500">print-friendly brief · Save as PDF</span>
+                  <span className="text-[10px] text-violet-300">print-friendly brief · Save as PDF</span>
                 </div>
               )}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {compliance.controls.length === 0 && (
-                  <p className="text-[12px] text-slate-500">No mapped controls for this asset.</p>
+                  <p className="text-[12px] text-violet-300">No mapped controls for this asset.</p>
                 )}
                 {compliance.controls.map((c, i) => (
                   <div key={i} className="glass-row feed-in p-4" style={{ animationDelay: `${i * 70}ms` }}>
@@ -124,7 +124,7 @@ export default function CompliancePage() {
                       <Frameworks label="MITRE ATT&CK" value={c.mitre_attack?.join(", ") || "—"} />
                       <div className="flex items-center gap-2 pt-1">
                         <span className="eyebrow">STATUS</span>
-                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+                        <span className="rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-300">
                           {c.status || "pending"}
                         </span>
                       </div>
@@ -135,7 +135,7 @@ export default function CompliancePage() {
 
               {compliance.summary_markdown && (
                 <div>
-                  <SectionTitle right={<span className="mono text-[10px] text-slate-500">analyst-ready</span>}>
+                  <SectionTitle right={<span className="mono text-[10px] text-violet-300">analyst-ready</span>}>
                     Generated brief
                   </SectionTitle>
                   <CodeBlock maxH="max-h-64">{compliance.summary_markdown}</CodeBlock>

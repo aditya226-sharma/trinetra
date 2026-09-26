@@ -70,10 +70,10 @@ describe("GraphPage", () => {
 
     // dns is dashed, auth/exec/runs use their own colours, flagged is critical red.
     expect(dashes).toContain("3 3");
-    expect(strokes).toContain("#34d399"); // auth
-    expect(strokes).toContain("#fbbf24"); // exec
-    expect(strokes).toContain("#a78bfa"); // runs
-    expect(strokes).toContain("#f87171"); // flagged
+    expect(strokes).toContain("#c084fc"); // auth
+    expect(strokes).toContain("#f472b6"); // exec
+    expect(strokes).toContain("#a855f7"); // runs
+    expect(strokes).toContain("#ec4899"); // flagged
   });
 
   it("counts and labels each relationship kind in the legend", async () => {
@@ -174,7 +174,7 @@ describe("GraphPage filters", () => {
       p.getAttribute("d")?.startsWith("M ")
     );
     expect(paths.length).toBe(1);
-    expect(paths[0].getAttribute("stroke")).toBe("#34d399"); // auth
+    expect(paths[0].getAttribute("stroke")).toBe("#c084fc"); // auth
     expect(card.getByText(/^auth 1$/)).toBeTruthy();
   });
 
@@ -290,7 +290,7 @@ describe("GraphPage filters", () => {
       p.getAttribute("d")?.startsWith("M ")
     );
     expect(paths.length).toBe(1);
-    expect(paths[0].getAttribute("stroke")).toBe("#34d399");
+    expect(paths[0].getAttribute("stroke")).toBe("#c084fc");
   });
 
   it("shows an empty state instead of a blank canvas when nothing is recorded", async () => {

@@ -132,7 +132,7 @@ export default function IngestPage() {
         sub="Feed raw log lines straight into the pipeline — normalize → dedup → modules → analyzer in one shot. Everything lands in the store and graph immediately."
         actions={
           <>
-            <span className="mono text-[11px] text-slate-500">{stored} events in store</span>
+            <span className="mono text-[11px] text-violet-300">{stored} events in store</span>
             <LiveBadge text="Port /api/ingest" />
           </>
         }
@@ -143,10 +143,10 @@ export default function IngestPage() {
         <section className="glass overflow-hidden anim-fadeup">
           {/* terminal chrome */}
           <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
-            <p className="mono ml-3 text-[11px] tracking-widest text-slate-500">
+            <span className="h-2.5 w-2.5 rounded-full bg-pink-500/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-purple-400/80" />
+            <span className="h-2.5 w-2.5 rounded-full bg-violet-500/80" />
+            <p className="mono ml-3 text-[11px] tracking-widest text-violet-300">
               trinetra@{source} — ingest console
             </p>
           </div>
@@ -160,8 +160,8 @@ export default function IngestPage() {
                   onClick={() => setSource(s)}
                   className={`mono rounded-md border px-2.5 py-1 text-[11px] transition ${
                     source === s
-                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
-                      : "border-white/10 bg-white/[0.03] text-slate-500 hover:text-slate-200"
+                      ? "border-violet-600/60 bg-violet-600/10 text-violet-300"
+                      : "border-white/10 bg-white/[0.03] text-violet-300 hover:text-slate-200"
                   }`}
                 >
                   $ {s}
@@ -172,7 +172,7 @@ export default function IngestPage() {
             {/* meta fields */}
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">
+                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">
                   client_id
                 </span>
                 <input
@@ -189,7 +189,7 @@ export default function IngestPage() {
                 </datalist>
               </label>
               <label className="block">
-                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-slate-500">
+                <span className="mono mb-1 block text-[10px] uppercase tracking-widest text-violet-300">
                   host_hint
                 </span>
                 <input
@@ -207,7 +207,7 @@ export default function IngestPage() {
               onChange={(e) => setLines(e.target.value)}
               rows={11}
               placeholder={'$ paste raw log lines…\n<134>Sep 10 09:00:01 web01 sshd: Failed password for invalid user root from 203.0.113.9 port 51122 ssh2'}
-              className="mono w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3.5 py-3 text-[12px] leading-relaxed text-emerald-100/90 caret-emerald-400 outline-none placeholder:text-slate-600 focus:border-emerald-500/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.08)]"
+              className="mono w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3.5 py-3 text-[12px] leading-relaxed text-violet-200/90 caret-emerald-400 outline-none placeholder:text-violet-400 focus:border-violet-600/50 focus:shadow-[0_0_0_3px_rgba(167, 139, 196,0.08)]"
             />
 
             {/* artist bar */}
@@ -218,7 +218,7 @@ export default function IngestPage() {
               <button onClick={sample} className="btn-ghost mono text-[11px]">
                 INSERT SAMPLE ×3
               </button>
-              <span className="mono ml-auto text-[10px] text-slate-600">
+              <span className="mono ml-auto text-[10px] text-violet-400">
                 buffer: {lineCount} line{lineCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -227,14 +227,14 @@ export default function IngestPage() {
             <div className="mt-4 flex items-center gap-2">
               {PIPELINE_STAGES.map((p, i) => (
                 <React.Fragment key={p}>
-                  {i > 0 && <span className="text-slate-700">›</span>}
+                  {i > 0 && <span className="text-violet-500">›</span>}
                   <span
                     className={`mono rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-widest transition ${
                       sending && stage >= i
-                        ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                        ? "border-violet-600/60 bg-violet-600/10 text-violet-300"
                         : result && stage >= PIPELINE_STAGES.length
-                          ? "border-emerald-500/40 text-emerald-400/80"
-                          : "border-white/5 text-slate-600"
+                          ? "border-violet-600/40 text-violet-500/80"
+                          : "border-white/5 text-violet-400"
                     }`}
                   >
                     {sending && stage === i && <Blink />} {p}
@@ -242,12 +242,12 @@ export default function IngestPage() {
                 </React.Fragment>
               ))}
               {!sending && result && (
-                <span className="ml-auto mono text-[10px] text-emerald-400">✓ batch complete</span>
+                <span className="ml-auto mono text-[10px] text-violet-500">✓ batch complete</span>
               )}
             </div>
 
             {error && (
-              <p className="mono mt-3 text-[12px] text-red-400">✗ {error}</p>
+              <p className="mono mt-3 text-[12px] text-pink-500">✗ {error}</p>
             )}
           </div>
         </section>
@@ -255,8 +255,8 @@ export default function IngestPage() {
         {/* ------------------------------------------------ pipeline result */}
         <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "80ms" }}>
           <div className="flex items-center gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
-            <p className="mono text-[11px] tracking-widest text-slate-500">output :: last batch</p>
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 pulse-dot-calm" />
+            <p className="mono text-[11px] tracking-widest text-violet-300">output :: last batch</p>
           </div>
           <div className="terminal p-5">
             {!result ? (
@@ -267,34 +267,34 @@ export default function IngestPage() {
             ) : (
               <div className="space-y-5">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+                  <div className="rounded-xl border border-violet-600/20 bg-violet-600/5 p-3 text-center">
                     <p className="text-grad-emerald text-3xl font-bold leading-none mono">{result.accepted}</p>
-                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">accepted</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-violet-300">accepted</p>
                   </div>
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+                  <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 text-center">
                     <p className="text-grad-warn text-3xl font-bold leading-none mono">{result.duplicates ?? 0}</p>
-                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">duplicates</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-violet-300">duplicates</p>
                   </div>
-                  <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-center">
+                  <div className="rounded-xl border border-pink-500/20 bg-pink-500/5 p-3 text-center">
                     <p className="text-grad-danger text-3xl font-bold leading-none mono">{result.failed}</p>
-                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-slate-500">failed</p>
+                    <p className="mono mt-1.5 text-[10px] uppercase tracking-widest text-violet-300">failed</p>
                   </div>
                 </div>
 
-                <div className="mono text-[11px] leading-relaxed text-slate-500">
-                  <p>$ store.total <span className="text-emerald-300">→ {result.total}</span></p>
-                  <p>$ alerts.batch <span className="text-amber-300">→ {result.alerts.length}</span></p>
+                <div className="mono text-[11px] leading-relaxed text-violet-300">
+                  <p>$ store.total <span className="text-violet-300">→ {result.total}</span></p>
+                  <p>$ alerts.batch <span className="text-purple-300">→ {result.alerts.length}</span></p>
                   {result.accepted > 0 && (
-                    <p className="text-emerald-400">✓ {result.accepted} lines accepted{failedNote(result)}</p>
+                    <p className="text-violet-500">✓ {result.accepted} lines accepted{failedNote(result)}</p>
                   )}
                   {(result.duplicates ?? 0) > 0 && (
-                    <p className="text-amber-300">↺ {result.duplicates} lines deduplicated — identical event already in store</p>
+                    <p className="text-purple-300">↺ {result.duplicates} lines deduplicated — identical event already in store</p>
                   )}
                   {(result.ignored ?? 0) > 0 && (
-                    <p className="text-slate-400">· {result.ignored} lines consumed as format scaffolding (e.g. CSV header) — raw preserved</p>
+                    <p className="text-violet-200">· {result.ignored} lines consumed as format scaffolding (e.g. CSV header) — raw preserved</p>
                   )}
                   {result.failed > 0 && (
-                    <p className="text-red-400">✗ {result.failed} lines rejected — blank or malformed input</p>
+                    <p className="text-pink-500">✗ {result.failed} lines rejected — blank or malformed input</p>
                   )}
                 </div>
 
@@ -308,10 +308,10 @@ export default function IngestPage() {
                             <span className="mono text-slate-300">{a}</span>
                           ) : (
                             <>
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === "critical" ? "bg-red-400 pulse-dot-red" : "bg-amber-400"}`} />
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === "critical" ? "bg-pink-500 pulse-dot-red" : "bg-purple-400"}`} />
                               <SeverityBadge severity={a.severity} />
                               <span className="mono text-slate-200">{a.threat_class}</span>
-                              <span className="ml-auto text-[10px] text-slate-500">conf {a.confidence}</span>
+                              <span className="ml-auto text-[10px] text-violet-300">conf {a.confidence}</span>
                             </>
                           )}
                         </div>
@@ -329,7 +329,7 @@ export default function IngestPage() {
       <section className="grid gap-6 xl:grid-cols-2 anim-fadeup" style={{ animationDelay: "120ms" }}>
         <div className="glass p-5">
           <SectionTitle
-            right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">GET /api/analytics</span>}
+            right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">GET /api/analytics</span>}
           >
             Share by source
           </SectionTitle>
@@ -342,7 +342,7 @@ export default function IngestPage() {
 
         <div className="glass p-5">
           <SectionTitle
-            right={<span className="mono text-[10px] uppercase tracking-widest text-slate-500">last {analytics?.window_hours || 48}h · every ingest</span>}
+            right={<span className="mono text-[10px] uppercase tracking-widest text-violet-300">last {analytics?.window_hours || 48}h · every ingest</span>}
           >
             Ingest volume
           </SectionTitle>
@@ -358,8 +358,8 @@ export default function IngestPage() {
       <section className="glass overflow-hidden anim-fadeup" style={{ animationDelay: "140ms" }}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 pulse-dot" />
-            <p className="mono text-[11px] tracking-widest text-slate-500">bulk :: file upload</p>
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-400 pulse-dot" />
+            <p className="mono text-[11px] tracking-widest text-violet-300">bulk :: file upload</p>
           </div>
           <PlainBadge>csv · json · jsonl</PlainBadge>
         </div>
@@ -387,30 +387,30 @@ export default function IngestPage() {
             <button onClick={uploadBulk} disabled={bulkBusy || !bulkFile} className="btn-primary mono">
               {bulkBusy ? "UPLOADING…" : "↑ UPLOAD"}
             </button>
-            <span className="mono text-[10px] text-slate-600">
+            <span className="mono text-[10px] text-violet-400">
               client_id from the field above · rows go through the full pipeline
             </span>
           </div>
 
-          {bulkError && <p className="mono mt-3 text-[12px] text-red-400">✗ {bulkError}</p>}
+          {bulkError && <p className="mono mt-3 text-[12px] text-pink-500">✗ {bulkError}</p>}
 
           {bulkResult && (
             <div className="mt-4 grid gap-3 sm:grid-cols-4">
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+              <div className="rounded-xl border border-violet-600/20 bg-violet-600/5 p-3 text-center">
                 <p className="text-grad-emerald text-2xl font-bold leading-none mono">{bulkResult.accepted}</p>
-                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">accepted</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-violet-300">accepted</p>
               </div>
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 text-center">
                 <p className="text-grad-warn text-2xl font-bold leading-none mono">{bulkResult.duplicates ?? 0}</p>
-                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">duplicates</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-violet-300">duplicates</p>
               </div>
-              <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-3 text-center">
+              <div className="rounded-xl border border-pink-500/20 bg-pink-500/5 p-3 text-center">
                 <p className="text-grad-danger text-2xl font-bold leading-none mono">{bulkResult.failed}</p>
-                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">failed</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-violet-300">failed</p>
               </div>
-              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-center">
+              <div className="rounded-xl border border-violet-600/20 bg-violet-600/5 p-3 text-center">
                 <p className="text-grad-emerald text-2xl font-bold leading-none mono">{bulkResult.total.toLocaleString()}</p>
-                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">total in store</p>
+                <p className="mono mt-1 text-[9px] uppercase tracking-widest text-violet-300">total in store</p>
               </div>
             </div>
           )}
@@ -426,11 +426,11 @@ function failedNote(r) {
 }
 
 function Blink() {
-  return <span className="inline-block h-3 w-1.5 animate-pulse bg-emerald-400 align-middle" style={{ verticalAlign: "-2px" }} />;
+  return <span className="inline-block h-3 w-1.5 animate-pulse bg-violet-500 align-middle" style={{ verticalAlign: "-2px" }} />;
 }
 
 /* --------------------------------------------------------------- ingest graphs */
-const SRC_COLORS = ["#34d399", "#22d3ee", "#818cf8", "#fbbf24", "#f472b6", "#60a5fa"];
+const SRC_COLORS = ["#a855f7", "#ec4899", "#c084fc", "#7c3aed", "#f472b6", "#a78bfa"];
 
 function SourceDonut({ obj = {}, total }) {
   const entries = Object.entries(obj).sort((a, b) => b[1] - a[1]);
@@ -444,7 +444,7 @@ function SourceDonut({ obj = {}, total }) {
     value,
     color: SRC_COLORS[i % SRC_COLORS.length],
   }));
-  if (rest > 0) segments.push({ label: "other", value: rest, color: "#64748b" });
+  if (rest > 0) segments.push({ label: "other", value: rest, color: "#6b5b8a" });
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
       <Donut size={168} thickness={18} centerValue={(total ?? 0).toLocaleString()} centerLabel="events" segments={segments} />
@@ -453,7 +453,7 @@ function SourceDonut({ obj = {}, total }) {
           <div key={s.label} className="flex items-center gap-2 text-[12px]">
             <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
             <span className="mono truncate text-slate-300">{s.label}</span>
-            <span className="ml-auto mono tabular-nums text-slate-500">{s.value.toLocaleString()}</span>
+            <span className="ml-auto mono tabular-nums text-violet-300">{s.value.toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -471,11 +471,11 @@ function VolumeChart({ series = [], total }) {
   const mean = Math.round(data.reduce((s, v) => s + v, 0) / data.length);
   return (
     <div>
-      <Sparkline data={data} color="#22d3ee" width={620} height={92} />
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-slate-500">
-        <span className="mono">peak <b className="text-cyan-300">{peak.toLocaleString()}</b> events/bucket</span>
+      <Sparkline data={data} color="#a855f7" width={620} height={92} />
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10.5px] text-violet-300">
+        <span className="mono">peak <b className="text-violet-300">{peak.toLocaleString()}</b> events/bucket</span>
         <span className="mono">mean <b className="text-slate-300">{mean.toLocaleString()}</b>/bucket</span>
-        <span className="mono">window total <b className="text-emerald-300">{(total ?? 0).toLocaleString()}</b></span>
+        <span className="mono">window total <b className="text-violet-300">{(total ?? 0).toLocaleString()}</b></span>
       </div>
     </div>
   );

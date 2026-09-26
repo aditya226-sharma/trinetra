@@ -47,8 +47,8 @@ export default function ClientsPage() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  if (error) return <div className="text-sm text-red-400">Failed to load fleet: {error}</div>;
-  if (!data) return <div className="text-slate-500">Loading fleet…</div>;
+  if (error) return <div className="text-sm text-pink-500">Failed to load fleet: {error}</div>;
+  if (!data) return <div className="text-violet-300">Loading fleet…</div>;
 
   const totals = data?.totals ?? {};
   const clients = Array.isArray(data?.clients) ? data.clients : [];
@@ -81,7 +81,7 @@ export default function ClientsPage() {
           <div className="flex items-center gap-2">
             <Link
               to="/clients/onboard"
-              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition hover:bg-emerald-500/20"
+              className="rounded-lg border border-violet-600/30 bg-violet-600/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-violet-300 transition hover:bg-violet-600/20"
             >
               + Onboard agent
             </Link>
@@ -92,10 +92,10 @@ export default function ClientsPage() {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MiniKpi label="Clients" value={totals.clients ?? 0} tone="emerald" />
-        <MiniKpi label="Online" value={totals.online ?? 0} tone="cyan" />
-        <MiniKpi label="Total events" value={totals.events ?? 0} tone="violet" />
-        <MiniKpi label="Recent (5m)" value={totals.events_recent ?? 0} tone="amber" sub={fmtRate(totals.events_recent, 300)} />
+        <MiniKpi label="Clients" value={totals.clients ?? 0} tone="calm" />
+        <MiniKpi label="Online" value={totals.online ?? 0} tone="info" />
+        <MiniKpi label="Total events" value={totals.events ?? 0} tone="brand" />
+        <MiniKpi label="Recent (5m)" value={totals.events_recent ?? 0} tone="alert" sub={fmtRate(totals.events_recent, 300)} />
       </div>
 
       {/* filters */}
@@ -112,12 +112,12 @@ export default function ClientsPage() {
             onClick={() => setFilter(f)}
             className={`chip ${filter === f ? "chip-on" : ""}`}
           >
-            {f === "online" && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-            {f === "offline" && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-slate-500" />}
+            {f === "online" && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-violet-500" />}
+            {f === "offline" && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#2e1f4a]" />}
             {f}
           </button>
         ))}
-        <span className="ml-auto mono text-[10px] text-slate-600">
+        <span className="ml-auto mono text-[10px] text-violet-400">
           {filtered.length} shown
         </span>
       </div>
@@ -156,13 +156,13 @@ function ClientCard({ c, delay, onOpen }) {
       role="button"
       tabIndex={0}
       aria-label={`Open details for ${c.client_id}`}
-      className="glass-row group relative cursor-pointer overflow-hidden p-4 anim-fadeup transition hover:border-emerald-500/40"
+      className="glass-row group relative cursor-pointer overflow-hidden p-4 anim-fadeup transition hover:border-violet-600/40"
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* status stripe */}
       <span
-        className={`absolute left-0 top-0 h-full w-1 ${isOnline ? "bg-emerald-400" : "bg-slate-600/50"}`}
-        style={isOnline ? { boxShadow: "0 0 12px rgba(52,211,153,0.6)" } : undefined}
+        className={`absolute left-0 top-0 h-full w-1 ${isOnline ? "bg-violet-500" : "bg-[#3b2a5c]"}`}
+        style={isOnline ? { boxShadow: "0 0 12px rgba(167, 139, 196,0.6)" } : undefined}
       />
 
       <div className="pl-3">
@@ -170,14 +170,14 @@ function ClientCard({ c, delay, onOpen }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`inline-block h-2 w-2 rounded-full ${isOnline ? "bg-emerald-400 pulse-dot" : "bg-slate-500"}`} />
+              <span className={`inline-block h-2 w-2 rounded-full ${isOnline ? "bg-violet-500 pulse-dot-calm" : "bg-[#2e1f4a]"}`} />
               <span className="mono text-[14px] font-semibold text-slate-100 truncate">{c.client_id}</span>
             </div>
-            <p className="mt-0.5 mono text-[11px] text-slate-500 truncate">
+            <p className="mt-0.5 mono text-[11px] text-violet-300 truncate">
               {c.hostname || c.client_id}
             </p>
           </div>
-          <span className="shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300 transition group-hover:bg-emerald-500/20">
+          <span className="shrink-0 rounded-lg border border-violet-600/30 bg-violet-600/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-violet-300 transition group-hover:bg-violet-600/20">
             Open Logs
           </span>
         </div>
@@ -185,7 +185,7 @@ function ClientCard({ c, delay, onOpen }) {
         {/* metadata row */}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
           {c.platform && (
-            <PlainBadge cls="!text-cyan-300">
+            <PlainBadge cls="!text-violet-300">
               {PLATFORM_ICON[c.platform] || c.platform}
             </PlainBadge>
           )}
@@ -193,7 +193,7 @@ function ClientCard({ c, delay, onOpen }) {
             <PlainBadge>v{c.agent_version}</PlainBadge>
           )}
           {c.ip && (
-            <PlainBadge cls="!text-slate-400">{c.ip}</PlainBadge>
+            <PlainBadge cls="!text-violet-200">{c.ip}</PlainBadge>
           )}
         </div>
 
@@ -201,7 +201,7 @@ function ClientCard({ c, delay, onOpen }) {
         {c.source_types?.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {c.source_types.map((st) => (
-              <span key={st} className="mono rounded bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">
+              <span key={st} className="mono rounded bg-white/5 px-2 py-0.5 text-[10px] text-violet-200">
                 {st}
               </span>
             ))}
@@ -212,20 +212,20 @@ function ClientCard({ c, delay, onOpen }) {
         <div className="mt-3 grid grid-cols-3 gap-3 border-t border-white/5 pt-3">
           <div>
             <p className="mono text-[18px] font-bold text-slate-100">{(c.events ?? 0).toLocaleString()}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">total</p>
+            <p className="text-[10px] uppercase tracking-widest text-violet-400">total</p>
           </div>
           <div>
-            <p className="mono text-[18px] font-bold text-cyan-300">{c.events_recent ?? 0}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">recent</p>
+            <p className="mono text-[18px] font-bold text-violet-300">{c.events_recent ?? 0}</p>
+            <p className="text-[10px] uppercase tracking-widest text-violet-400">recent</p>
           </div>
           <div>
-            <p className="mono text-[11px] text-slate-400">{fmtAgo(c.last_seen)}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">last seen</p>
+            <p className="mono text-[11px] text-violet-200">{fmtAgo(c.last_seen)}</p>
+            <p className="text-[10px] uppercase tracking-widest text-violet-400">last seen</p>
           </div>
         </div>
 
         {/* first seen + heartbeat */}
-        <div className="mt-2 flex items-center gap-4 text-[10px] text-slate-600">
+        <div className="mt-2 flex items-center gap-4 text-[10px] text-violet-400">
           {c.first_seen && <span>first {fmtAgo(c.first_seen)}</span>}
           {c.heartbeat_at && <span>heartbeat {fmtAgo(c.heartbeat_at)}</span>}
         </div>
@@ -235,25 +235,26 @@ function ClientCard({ c, delay, onOpen }) {
 }
 
 function MiniKpi({ label, value, tone, sub }) {
+  // One hue family, so the four tiles are separated by tint rather than hue.
   const tones = {
-    emerald: "text-emerald-300",
-    cyan: "text-cyan-300",
-    violet: "text-violet-300",
-    amber: "text-amber-300",
+    calm: "text-violet-300",
+    info: "text-purple-300",
+    brand: "text-fuchsia-400",
+    alert: "text-pink-400",
   };
   return (
     <div className="glass px-4 py-3">
       <p className="eyebrow">{label}</p>
       <p className={`mono mt-1 text-[22px] font-bold ${tones[tone] || "text-slate-100"}`}>{value.toLocaleString()}</p>
-      {sub && <p className="mono mt-1 text-[11px] text-slate-500">{sub}</p>}
+      {sub && <p className="mono mt-1 text-[11px] text-violet-300">{sub}</p>}
     </div>
   );
 }
 
 function LiveBadgeInline({ online, total }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-300">
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
+    <span className="inline-flex items-center gap-2 rounded-full border border-violet-600/30 bg-violet-600/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-violet-300">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-500 pulse-dot-calm" />
       {online}/{total} online
     </span>
   );
