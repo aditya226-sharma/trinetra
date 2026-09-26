@@ -271,7 +271,7 @@ function ScopedDashboard({ data, scope }) {
                       <span className="mono text-[11px] text-pink-300">{count} hits</span>
                     </div>
                     <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(168, 85, 247,0.4)" }} />
+                      <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#7c3aed,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(168, 85, 247,0.4)" }} />
                     </div>
                   </div>
                 );
@@ -523,7 +523,7 @@ function AdminOverview({ data, clients }) {
                         <span className="mono text-[11px] text-pink-300">{count} hits</span>
                       </div>
                       <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#0e7490,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(236, 72, 153,0.5)" }} />
+                        <div className="bar-grow h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: "linear-gradient(90deg,#7c3aed,#a855f7,#ec4899)", boxShadow: "0 0 12px rgba(236, 72, 153,0.5)" }} />
                       </div>
                     </div>
                   );
