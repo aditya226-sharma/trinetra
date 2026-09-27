@@ -462,7 +462,8 @@ select.field option {
      these darker "ink" variants wherever severity is set as text. */
   --sev-critical-ink: #b91c1c;
   --sev-high-ink: #c2410c;
-  --sev-warning-ink: #a16207;
+  --sev-warning-ink: #92400e;   /* a16207 is 4.49:1 on the #f1f5f9 tint, just
+                                  under AA for 11px text */
   --sev-info-ink: #0369a1;
   --sev-success-ink: #047857;
   color-scheme: light;
