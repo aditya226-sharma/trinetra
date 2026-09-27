@@ -477,7 +477,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <div className="mono text-[10px] leading-relaxed tracking-wide text-slate-600">
+          <div className="mono text-[10px] leading-relaxed tracking-wide text-slate-500">
             PS26156 · PS26145<br />PS26160 · PS26189
           </div>
         </div>
@@ -505,7 +505,7 @@ export default function App() {
                     <path d="M13.7 21a2 2 0 01-3.4 0" />
                   </svg>
                   {bell.alerts.length > 0 && (
-                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-400 px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#f87171] px-1 text-[9px] font-bold text-[#041016]">
                       {bell.alerts.length}
                     </span>
                   )}
@@ -588,7 +588,7 @@ export default function App() {
                 <p className="text-sm font-semibold tabular-nums tracking-widest text-slate-200">
                   {clock.toLocaleTimeString("en-GB", { hour12: false })}
                 </p>
-                <p className="text-[10px] uppercase tracking-widest text-slate-600">
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
                   {clock.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                 </p>
               </div>
@@ -628,7 +628,7 @@ export default function App() {
               : <LoginPage onSuccess={(u) => { setUser(u); setAuthState("authed"); navigate("/"); }} />} />
             <Route path="*" element={
               <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-6 text-center">
-                <p className="mono text-3xl font-bold tracking-widest text-slate-700">404</p>
+                <p className="mono text-3xl font-bold tracking-widest text-[var(--accent)]">404</p>
                 <p className="mono text-[13px] uppercase tracking-widest text-slate-400">no such sector — this sector is off the map</p>
                 <p className="max-w-md text-[12px] leading-relaxed text-slate-500">
                   The address you reached doesn't match any page in this console. Navigate back to the dashboard to keep scanning.
@@ -640,7 +640,7 @@ export default function App() {
         </main>
 
         <footer className="border-t border-white/5 px-7 py-3">
-          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-600">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-500">
             <span>TriNetra · Universal Log Pre-processing</span>
             <span className="mono">normalize → dedup → modules → analyze</span>
           </div>

@@ -262,7 +262,7 @@ export default function SettingsPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="mono text-[13px] text-slate-100">{u.username}{u.username === session?.username && <span className="text-slate-500"> (you)</span>}</p>
-                  <p className="mono text-[10px] text-slate-600">{u.created_at}</p>
+                  <p className="mono text-[10px] text-slate-500">{u.created_at}</p>
                 </div>
                 <PlainBadge cls={u.role === "admin" ? "!text-emerald-300" : u.role === "analyst" ? "!text-cyan-300" : "!text-slate-400"}>{u.role}</PlainBadge>
                 {u.username !== session?.username && (
@@ -289,7 +289,7 @@ export default function SettingsPage() {
               <Stat value={storage ? fmtBytes(storage.raw_store_bytes) : "…"} label="raw store" />
             </div>
             {storage?.cutoff && (
-              <p className="mono mt-3 text-[10px] text-slate-600">
+              <p className="mono mt-3 text-[10px] text-slate-500">
                 prune cutoff: keeping events newer than {storage.cutoff}
               </p>
             )}
@@ -349,7 +349,7 @@ export default function SettingsPage() {
             ) : (
               <span className="mono">session expiry from token</span>
             )}
-            <span className="text-slate-600">JWT-secured · rotations recorded to audit</span>
+            <span className="text-slate-500">JWT-secured · rotations recorded to audit</span>
           </div>
         </section>
       </div>
@@ -417,7 +417,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               {tailingPaths.length === 0 && (
-                <p className="text-[10.5px] text-slate-600">No files being followed.</p>
+                <p className="text-[10.5px] text-slate-500">No files being followed.</p>
               )}
               {tailingPaths.map((p) => (
                 <div key={p} className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
@@ -552,7 +552,7 @@ export default function SettingsPage() {
           <div className="terminal max-h-[18rem] overflow-y-auto p-3">
             {audit.map((a, i) => (
               <div key={i} className="flex gap-3 border-b border-white/[0.04] px-2 py-1.5 text-[11px]">
-                <span className="mono shrink-0 text-slate-600">{(a.ts || "").replace("T", " ").slice(0, 19)}</span>
+                <span className="mono shrink-0 text-slate-500">{(a.ts || "").replace("T", " ").slice(0, 19)}</span>
                 <span className="mono w-32 shrink-0 truncate text-slate-400">{a.actor}</span>
                 <span className="mono shrink-0 text-emerald-300/90">{a.action}</span>
                 <span className="min-w-0 flex-1 truncate text-slate-500" title={a.detail}>{a.detail}</span>

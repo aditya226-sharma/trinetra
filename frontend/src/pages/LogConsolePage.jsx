@@ -320,7 +320,7 @@ export default function LogConsolePage() {
 
         {sevOptions.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">severity</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-500">severity</span>
             <button
               onClick={() => setSevFilter("")}
               className={`chip text-[10px] ${sevFilter === "" ? "chip-on" : ""}`}
@@ -341,7 +341,7 @@ export default function LogConsolePage() {
 
         {catOptions.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">category</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-500">category</span>
             <button
               onClick={() => setCatFilter("")}
               className={`chip text-[10px] ${catFilter === "" ? "chip-on" : ""}`}
@@ -362,7 +362,7 @@ export default function LogConsolePage() {
 
         {srcOptions.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">source</span>
+            <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-500">source</span>
             <button
               onClick={() => setSrcFilter("")}
               className={`chip text-[10px] ${srcFilter === "" ? "chip-on" : ""}`}
@@ -409,7 +409,7 @@ export default function LogConsolePage() {
           ))
         )}
         {!loading && filtered.length > 0 && filtered.length < lines.length && (
-          <p className="sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-slate-600">
+          <p className="sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-slate-500">
             showing {filtered.length} of {lines.length} lines — clear filters to see the rest
           </p>
         )}
@@ -442,7 +442,7 @@ function ClientInfo({ meta, total, isOnline }) {
       </div>
       {meta?.source_types?.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
-          <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-600">source_types</span>
+          <span className="mono mr-1 text-[9px] uppercase tracking-widest text-slate-500">source_types</span>
           {meta.source_types.map((st) => (
             <span key={st} className="mono rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
               {st}
@@ -457,7 +457,7 @@ function ClientInfo({ meta, total, isOnline }) {
 function InfoTile({ k, v, mono }) {
   return (
     <div className="min-w-0">
-      <p className="text-[9px] uppercase tracking-widest text-slate-600">{k}</p>
+      <p className="text-[9px] uppercase tracking-widest text-slate-500">{k}</p>
       <p className={`mt-0.5 truncate text-[13px] text-slate-200 ${mono ? "mono" : ""}`}>{v}</p>
     </div>
   );
@@ -518,7 +518,7 @@ function EventDetail({ event: e, onClose }) {
           )}
         </div>
 
-        <div className="mono flex flex-wrap gap-x-6 gap-y-1 border-t border-white/5 pt-3 text-[10px] text-slate-600">
+        <div className="mono flex flex-wrap gap-x-6 gap-y-1 border-t border-white/5 pt-3 text-[10px] text-slate-500">
           <span>event_id <b className="text-slate-400">{e.event_id || "—"}</b></span>
           <span>trace_id <b className="text-slate-400">{e.trace_id || "—"}</b></span>
         </div>
@@ -570,16 +570,16 @@ function LogLine({ event: e, showRaw, active, onSelect }) {
       title="view event detail"
       className={`group flex w-full cursor-pointer gap-3 px-1 py-0.5 text-left transition hover:bg-white/[0.04] ${active ? "bg-emerald-500/10" : ""}`}
     >
-      <span className="shrink-0 text-slate-600">{time}</span>
+      <span className="shrink-0 text-slate-500">{time}</span>
       <SeverityDot severity={e.severity} />
       <span className={`min-w-0 flex-1 break-all ${showRaw ? "text-slate-400" : sevColor}`}>
         {text}
       </span>
-      <span className="hidden shrink-0 text-[10px] text-slate-600 group-hover:inline">
+      <span className="hidden shrink-0 text-[10px] text-slate-500 group-hover:inline">
         {e.source_type}
         {e.fields?.channel ? ` · ${e.fields.channel}` : ""}
       </span>
-      <span className={`shrink-0 text-[12px] ${active ? "text-emerald-300" : "text-slate-700 group-hover:text-emerald-300"}`}>›</span>
+      <span className={`shrink-0 text-[12px] ${active ? "text-emerald-300" : "text-slate-500 group-hover:text-emerald-300"}`}>›</span>
     </button>
   );
 }

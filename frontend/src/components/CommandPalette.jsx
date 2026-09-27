@@ -114,12 +114,12 @@ export default function CommandPalette({ theme, setTheme, role }) {
                 }`}
               >
                 <span>{a.label}</span>
-                <span className="mono text-[10px] uppercase tracking-widest text-slate-600">{a.hint}</span>
+                <span className="mono text-[10px] uppercase tracking-widest text-slate-500">{a.hint}</span>
               </button>
             ))
           )}
         </div>
-        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-slate-600">
+        <div className="flex items-center gap-3 border-t border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-slate-500">
           <span>↑↓ navigate</span><span>↵ run</span><span>esc close</span>
         </div>
       </div>

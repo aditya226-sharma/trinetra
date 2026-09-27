@@ -88,13 +88,13 @@ export default function FleetPage({ role }) {
             value={mintLabel}
             onChange={(e) => setMintLabel(e.target.value)}
             placeholder="label, e.g. vpn-gw-beta"
-            className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[12.5px] outline-none placeholder:text-slate-600 focus:border-emerald-500/40"
+            className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[12.5px] outline-none placeholder:text-slate-500 focus:border-emerald-500/40"
           />
           <input
             value={mintClient}
             onChange={(e) => setMintClient(e.target.value)}
             placeholder="client_id (pre-bind, optional)"
-            className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[12.5px] outline-none placeholder:text-slate-600 focus:border-emerald-500/40"
+            className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[12.5px] outline-none placeholder:text-slate-500 focus:border-emerald-500/40"
           />
           <button
             onClick={doMint}
@@ -146,7 +146,7 @@ export default function FleetPage({ role }) {
                         {a.enabled ? (
                           <PulseDot color="bg-emerald-400" cls="pulse-dot-green" />
                         ) : (
-                          <span className="rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-[10px] uppercase text-red-300">revoked</span>
+                          <span className="sev-chip-critical rounded-full border px-2 py-0.5 text-[10px] uppercase">revoked</span>
                         )}
                       </td>
                       <td className="py-2.5 text-right">

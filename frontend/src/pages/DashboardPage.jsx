@@ -297,7 +297,7 @@ function ScopedDashboard({ data, scope }) {
       </div>
 
       {/* read-only footer note */}
-      <p className="mono text-center text-[9.5px] uppercase tracking-[0.2em] text-slate-600">
+      <p className="mono text-center text-[9.5px] uppercase tracking-[0.2em] text-slate-500">
         TriNetra client portal · restricted to {scope} · questions? contact your SOC team
       </p>
     </div>
@@ -373,7 +373,7 @@ function NeedsReview({ rows }) {
                     {(r.subject || r.ago) && (
                       <span className="mono mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#94a3b8]">
                         {r.subject && <span className="truncate">{r.subject}</span>}
-                        {r.subject && r.ago && <span aria-hidden="true" className="text-slate-600">·</span>}
+                        {r.subject && r.ago && <span aria-hidden="true" className="text-slate-500">·</span>}
                         {r.ago && (
                           <time className="shrink-0" dateTime={new Date(r.when).toISOString()}>
                             {r.ago}
@@ -461,7 +461,7 @@ function AdminOverview({ data, clients }) {
       <div className="glass flex flex-wrap items-center gap-x-2 gap-y-3 px-5 py-4 anim-fadeup">
         {PIPELINE.map((p, i) => (
           <React.Fragment key={p.id}>
-            {i > 0 && <span className="text-slate-600">›</span>}
+            {i > 0 && <span className="text-slate-500">›</span>}
             <span className="flex items-center gap-2">
               <PulseDot />
               <span className="mono text-[11px] uppercase tracking-widest text-emerald-300">{p.label}</span>
@@ -574,9 +574,9 @@ function AdminOverview({ data, clients }) {
                     <div key={c.client_id} className="flex items-center gap-2 text-[12px]">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
                       <span className="mono truncate text-slate-300">{c.client_id}</span>
-                      <span className="text-[10px] text-slate-600">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
+                      <span className="text-[10px] text-slate-500">{(c.source_types || [c.source_type]).filter(Boolean).join(", ")}</span>
                       {!activeIds.has(c.client_id) && (
-                        <span className="text-[9.5px] uppercase tracking-wider text-slate-600">silent</span>
+                        <span className="text-[9.5px] uppercase tracking-wider text-slate-500">silent</span>
                       )}
                       <span className="ml-auto mono tabular-nums text-slate-500">{c.events ?? 0}</span>
                     </div>
@@ -584,7 +584,7 @@ function AdminOverview({ data, clients }) {
                 })}
               </div>
               {active.length < top.length && (
-                <p className="mt-2 text-[10.5px] text-slate-600">
+                <p className="mt-2 text-[10.5px] text-slate-500">
                   {top.length - active.length} registered sensor{top.length - active.length === 1 ? "" : "s"} reported no events and {top.length - active.length === 1 ? "is" : "are"} excluded from the ring.
                 </p>
               )}
@@ -651,7 +651,7 @@ function IncidentBoard({ incidents }) {
             </div>
             <div className="space-y-2">
               {l.items.length === 0 ? (
-                <p className="mono text-[10px] text-slate-600">—</p>
+                <p className="mono text-[10px] text-slate-500">—</p>
               ) : (
                 l.items.slice(0, 6).map((c) => (
                   <Link
@@ -715,9 +715,9 @@ function LiveToast({ toast, onDismiss }) {
       <div className="min-w-0 flex-1">
         <p className="mono text-[11.5px] font-semibold text-slate-100">{toast.title}</p>
         <p className="mono mt-0.5 truncate text-[10px] text-slate-400">{toast.detail}</p>
-        <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-600">{toast.ts}</p>
+        <p className="mono mt-1 text-[9px] uppercase tracking-widest text-slate-500">{toast.ts}</p>
       </div>
-      <button onClick={onDismiss} className="text-slate-600 transition hover:text-slate-300">✕</button>
+      <button onClick={onDismiss} className="text-slate-500 transition hover:text-slate-300">✕</button>
     </div>
   );
 }
@@ -765,7 +765,7 @@ export function TaskRow({ task, onPatch, canPatch }) {
             {task.linked_case_id && (
               <Link to={`/incidents/${task.linked_case_id}`} className="mono text-cyan-300 underline-offset-2 hover:underline">incident {task.linked_case_id.slice(0, 8)}</Link>
             )}
-            {task.created_by && <span className="mono text-slate-600">by {task.created_by}</span>}
+            {task.created_by && <span className="mono text-slate-500">by {task.created_by}</span>}
           </div>
           {canPatch && (
             <div className="mt-2 flex items-center gap-2">
@@ -774,7 +774,7 @@ export function TaskRow({ task, onPatch, canPatch }) {
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { onPatch(task.id, { note: note.trim() }); setNote(""); } }}
                 placeholder="add a note (enter to post)"
-                className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200 outline-none placeholder:text-slate-600"
+                className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200 outline-none placeholder:text-slate-500"
               />
             </div>
           )}
@@ -857,10 +857,10 @@ export function AdminTaskManage({ clients, initial }) {
         <form onSubmit={submit} className="space-y-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} required
             placeholder="Task title · what needs to be done"
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12.5px] text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12.5px] text-slate-100 outline-none placeholder:text-slate-500 focus:border-emerald-500/50" />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
             placeholder="Instructions / context for the client"
-            className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50" />
+            className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-slate-200 outline-none placeholder:text-slate-500 focus:border-emerald-500/50" />
           <div className="grid gap-3 sm:grid-cols-3">
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} required
               className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-[12px] text-slate-100 outline-none focus:border-emerald-500/50">

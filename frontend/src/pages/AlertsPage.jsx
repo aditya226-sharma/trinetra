@@ -241,7 +241,7 @@ export default function AlertsPage({ role }) {
                         {c.assignee && <span className="text-emerald-300"> · @{c.assignee}</span>}
                       </p>
                     </div>
-                    <span className="text-slate-600 transition group-hover:text-emerald-300">{open ? "−" : "+"}</span>
+                    <span className="text-slate-500 transition group-hover:text-emerald-300">{open ? "−" : "+"}</span>
                   </button>
 
                   {open && (
@@ -287,7 +287,7 @@ export default function AlertsPage({ role }) {
                           <div className="space-y-1">
                             {c.timeline.map((t, ti) => (
                               <p key={ti} className="mono text-[10.5px] text-slate-500">
-                                <span className="text-slate-600">{t.ts}</span>{"  "}
+                                <span className="text-slate-500">{t.ts}</span>{"  "}
                                 <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
                                 {" by "}<span className="text-slate-400">{t.actor}</span>
                                 {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
@@ -357,7 +357,7 @@ function IncidentPanel({ data, loading }) {
             <div className="space-y-1">
               {incident.timeline.map((t, ti) => (
                 <p key={ti} className="mono text-[10.5px] text-slate-500">
-                  <span className="text-slate-600">{t.ts}</span>{" "}
+                  <span className="text-slate-500">{t.ts}</span>{" "}
                   <span className={t.action === "created" ? "text-slate-400" : "text-emerald-300"}>{t.action}</span>
                   {" by "}<span className="text-slate-400">{t.actor}</span>
                   {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
@@ -401,7 +401,7 @@ function IncidentGraph({ graph }) {
           </g>
         ))}
       </svg>
-      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-600">{nodes.length} nodes · {edges.length} edges</p>
+      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-500">{nodes.length} nodes · {edges.length} edges</p>
     </div>
   );
 }

@@ -194,7 +194,7 @@ export default function OnboardingPage({ role }) {
                   {busy ? "MINTING…" : "Generate token"}
                 </button>
               </div>
-              <p className="mt-1 text-[10px] text-slate-600">
+              <p className="mt-1 text-[10px] text-slate-500">
                 Shown exactly once — the dashboard only stores a hash. The machine's first heartbeat binds it to this name in the fleet.
               </p>
             </div>
@@ -247,13 +247,13 @@ export default function OnboardingPage({ role }) {
                       </p>
                       <p className="mono truncate text-[10px] text-slate-500">
                         {a.token_id} · {revoked
-                          ? <span className="text-red-400/80">revoked</span>
+                          ? <span className="sev-text-critical">revoked</span>
                           : (a.client_id ? `bound to ${a.client_id}` : "unbound")}
                       </p>
                     </div>
-                    <span className="mono text-[10px] text-slate-600">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
+                    <span className="mono text-[10px] text-slate-500">used {fmtAgo(a.last_used || a.last_used_at || a.created_at)}</span>
                     {revoked ? (
-                      <PlainBadge cls="!text-red-300">revoked</PlainBadge>
+                      <PlainBadge cls="!sev-text-critical">revoked</PlainBadge>
                     ) : (
                       !isPreview && isAdmin && (
                         <button

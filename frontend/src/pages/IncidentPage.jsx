@@ -128,7 +128,7 @@ export default function IncidentPage({ role }) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="note for your action…"
-              className="w-56 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+              className="w-56 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[11px] text-slate-200 outline-none placeholder:text-slate-500 focus:border-emerald-500/50"
             />
             {c.status === "open" || c.status === "investigation" ? (
               <button onClick={() => act("assign", { assignee: "soc" })} disabled={busy} className="btn-ghost mono !py-1.5 text-[10.5px]">assign to soc</button>
@@ -163,17 +163,17 @@ export default function IncidentPage({ role }) {
                       <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
                         {geo.country && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-400">📍 {geo.country}{geo.city ? ` · ${geo.city}` : ""}</span>}
                         {geo.asn && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-400">AS{geo.asn}</span>}
-                        {geo.registered_country && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-600">reg {geo.registered_country}</span>}
+                        {geo.registered_country && <span className="mono rounded border border-white/10 px-1.5 py-0.5 text-slate-500">reg {geo.registered_country}</span>}
                         {intel.verdict && <span className={`mono rounded border px-1.5 py-0.5 ${intel.verdict === "malicious" ? "border-red-400/40 text-red-300" : intel.verdict === "suspicious" ? "border-amber-500/40 text-amber-300" : "border-emerald-500/40 text-emerald-300"}`}>{intel.verdict}</span>}
-                        {intel.confidence && <span className="mono text-slate-600">conf {intel.confidence}</span>}
-                        {intel.source && <span className="mono text-slate-600">via {intel.source}</span>}
-                        {(geo.lat != null && geo.lon != null) && <span className="mono text-[9.5px] text-slate-600">{geo.lat.toFixed(2)},{geo.lon.toFixed(2)}</span>}
+                        {intel.confidence && <span className="mono text-slate-500">conf {intel.confidence}</span>}
+                        {intel.source && <span className="mono text-slate-500">via {intel.source}</span>}
+                        {(geo.lat != null && geo.lon != null) && <span className="mono text-[9.5px] text-slate-500">{geo.lat.toFixed(2)},{geo.lon.toFixed(2)}</span>}
                       </div>
                     )}
                     {(e.activity || []).length > 0 && (
                       <div className="mt-2 space-y-0.5">
                         {e.activity.map((a, ai) => (
-                          <p key={ai} className="mono truncate text-[9.5px] text-slate-600">
+                          <p key={ai} className="mono truncate text-[9.5px] text-slate-500">
                             <span className="text-slate-500">{a.event_type}</span> — {String(a.summary || a.message || "").slice(0, 70)}
                           </p>
                         ))}
@@ -196,7 +196,7 @@ export default function IncidentPage({ role }) {
             <div className="mt-3 space-y-1.5">
               {timeline.map((t, ti) => (
                 <p key={ti} className="mono text-[10.5px] text-slate-400">
-                  <span className="text-slate-600">{t.ts}</span>{" "}
+                  <span className="text-slate-500">{t.ts}</span>{" "}
                   <span className={t.action === "created" ? "text-slate-500" : "text-emerald-300"}>{t.action}</span>
                   {" by "}<span className="text-slate-400">{t.actor}</span>
                   {t.detail && <span className="text-slate-500"> — {t.detail}</span>}
@@ -242,7 +242,7 @@ export default function IncidentPage({ role }) {
         </section>
       </div>
 
-      {!canAct && <p className="mono text-[10px] uppercase tracking-widest text-slate-600">read-only view · manage this incident in the alert queue</p>}
+      {!canAct && <p className="mono text-[10px] uppercase tracking-widest text-slate-500">read-only view · manage this incident in the alert queue</p>}
     </div>
   );
 }
@@ -268,7 +268,7 @@ function IncidentGraph({ graph }) {
           </g>
         ))}
       </svg>
-      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-600">{nodes.length} nodes · {edges.length} edges</p>
+      <p className="mono text-[9.5px] uppercase tracking-widest text-slate-500">{nodes.length} nodes · {edges.length} edges</p>
     </div>
   );
 }

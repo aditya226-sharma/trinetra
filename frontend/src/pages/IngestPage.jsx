@@ -207,7 +207,7 @@ export default function IngestPage() {
               onChange={(e) => setLines(e.target.value)}
               rows={11}
               placeholder={'$ paste raw log lines…\n<134>Sep 10 09:00:01 web01 sshd: Failed password for invalid user root from 203.0.113.9 port 51122 ssh2'}
-              className="mono w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3.5 py-3 text-[12px] leading-relaxed text-emerald-100/90 caret-emerald-400 outline-none placeholder:text-slate-600 focus:border-emerald-500/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.08)]"
+              className="mono w-full resize-y rounded-lg border border-white/10 bg-black/50 px-3.5 py-3 text-[12px] leading-relaxed text-emerald-100/90 caret-emerald-400 outline-none placeholder:text-slate-500 focus:border-emerald-500/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.08)]"
             />
 
             {/* artist bar */}
@@ -218,7 +218,7 @@ export default function IngestPage() {
               <button onClick={sample} className="btn-ghost mono text-[11px]">
                 INSERT SAMPLE ×3
               </button>
-              <span className="mono ml-auto text-[10px] text-slate-600">
+              <span className="mono ml-auto text-[10px] text-slate-500">
                 buffer: {lineCount} line{lineCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -227,14 +227,14 @@ export default function IngestPage() {
             <div className="mt-4 flex items-center gap-2">
               {PIPELINE_STAGES.map((p, i) => (
                 <React.Fragment key={p}>
-                  {i > 0 && <span className="text-slate-700">›</span>}
+                  {i > 0 && <span className="text-slate-500">›</span>}
                   <span
                     className={`mono rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-widest transition ${
                       sending && stage >= i
                         ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
                         : result && stage >= PIPELINE_STAGES.length
                           ? "border-emerald-500/40 text-emerald-400/80"
-                          : "border-white/5 text-slate-600"
+                          : "border-white/5 text-slate-500"
                     }`}
                   >
                     {sending && stage === i && <Blink />} {p}
@@ -387,7 +387,7 @@ export default function IngestPage() {
             <button onClick={uploadBulk} disabled={bulkBusy || !bulkFile} className="btn-primary mono">
               {bulkBusy ? "UPLOADING…" : "↑ UPLOAD"}
             </button>
-            <span className="mono text-[10px] text-slate-600">
+            <span className="mono text-[10px] text-slate-500">
               client_id from the field above · rows go through the full pipeline
             </span>
           </div>

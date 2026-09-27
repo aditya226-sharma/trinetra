@@ -219,7 +219,7 @@ export default function ConsolePage() {
         <button onClick={() => setShowRaw(!showRaw)} className={`chip ${showRaw ? "chip-on" : ""}`}>
           {showRaw ? "RAW" : "PARSED"}
         </button>
-        <span className="ml-auto mono text-[10px] text-slate-600">
+        <span className="ml-auto mono text-[10px] text-slate-500">
           {filtered.length} / {lines.length} lines
         </span>
       </div>
@@ -256,10 +256,10 @@ function LogLine({ event: e, showRaw }) {
 
   return (
     <div className="group flex gap-3 py-0.5 hover:bg-white/[0.02]">
-      <span className="shrink-0 text-slate-600">{time}</span>
+      <span className="shrink-0 text-slate-500">{time}</span>
       <SeverityDot severity={e.severity} />
       <span className={`min-w-0 flex-1 break-all ${sevColor}`}>{text}</span>
-      <span className="hidden shrink-0 text-[10px] text-slate-600 group-hover:inline">
+      <span className="hidden shrink-0 text-[10px] text-slate-500 group-hover:inline">
         {e.client_id}
         {e.source_type ? ` · ${e.source_type}` : ""}
       </span>

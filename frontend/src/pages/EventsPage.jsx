@@ -340,7 +340,7 @@ export default function EventsPage() {
           <span className="eyebrow mx-1">TIME</span>
           <input type="datetime-local" value={fromTs} onChange={(e) => setFromTs(e.target.value)}
             className="field mono px-3 py-1.5 text-[11px]" title="From (UTC)" />
-          <span className="text-[10px] text-slate-600">→</span>
+          <span className="text-[10px] text-slate-500">→</span>
           <input type="datetime-local" value={toTs} onChange={(e) => setToTs(e.target.value)}
             className="field mono px-3 py-1.5 text-[11px]" title="To (UTC)" />
           <button onClick={saveSearch} className="btn-ghost !px-3 !py-1.5 text-[11px]" title="Save this filter for later">
@@ -418,7 +418,7 @@ export default function EventsPage() {
           )}
           {events.length > 0 && (
             <div className="flex items-center justify-between pt-2">
-              <p className="mono text-[10px] uppercase tracking-widest text-slate-600">
+              <p className="mono text-[10px] uppercase tracking-widest text-slate-500">
                 showing {events.length.toLocaleString()} of {total.toLocaleString()}
               </p>
               {hasMore && (
@@ -680,7 +680,7 @@ function RelatedEvents({ detail, onOpen }) {
   }
   ids.delete(detail?.event_id);
   const related = [...ids].slice(0, 40);
-  if (related.length === 0) return <p className="text-[11px] text-slate-600">no correlated events</p>;
+  if (related.length === 0) return <p className="text-[11px] text-slate-500">no correlated events</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {related.map((id) => (
@@ -701,7 +701,7 @@ function InvestigationPanel({ detail, meta }) {
   const cases = meta?.relatedCases || [];
   if (cases.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-white/10 p-3 text-[11px] text-slate-600">
+      <div className="rounded-lg border border-dashed border-white/10 p-3 text-[11px] text-slate-500">
         not linked to any SOC case · {meta?.loading ? "correlating…" : "no alert created for this event"}
       </div>
     );
@@ -728,7 +728,7 @@ function InvestigationPanel({ detail, meta }) {
             <div className="mt-2 space-y-1">
               {(c.notes || []).map((n, ni) => (
                 <p key={ni} className="mono rounded bg-black/30 px-2 py-1 text-[10px] text-amber-200/80">
-                  <span className="text-slate-600">[{n.ts || ""}] {n.actor || ""}</span> — {n.note || ""}
+                  <span className="text-slate-500">[{n.ts || ""}] {n.actor || ""}</span> — {n.note || ""}
                 </p>
               ))}
             </div>

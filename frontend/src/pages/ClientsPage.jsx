@@ -117,7 +117,7 @@ export default function ClientsPage() {
             {f}
           </button>
         ))}
-        <span className="ml-auto mono text-[10px] text-slate-600">
+        <span className="ml-auto mono text-[10px] text-slate-500">
           {filtered.length} shown
         </span>
       </div>
@@ -212,20 +212,20 @@ function ClientCard({ c, delay, onOpen }) {
         <div className="mt-3 grid grid-cols-3 gap-3 border-t border-white/5 pt-3">
           <div>
             <p className="mono text-[18px] font-bold text-slate-100">{(c.events ?? 0).toLocaleString()}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">total</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500">total</p>
           </div>
           <div>
             <p className="mono text-[18px] font-bold text-cyan-300">{c.events_recent ?? 0}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">recent</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500">recent</p>
           </div>
           <div>
             <p className="mono text-[11px] text-slate-400">{fmtAgo(c.last_seen)}</p>
-            <p className="text-[10px] uppercase tracking-widest text-slate-600">last seen</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500">last seen</p>
           </div>
         </div>
 
         {/* first seen + heartbeat */}
-        <div className="mt-2 flex items-center gap-4 text-[10px] text-slate-600">
+        <div className="mt-2 flex items-center gap-4 text-[10px] text-slate-500">
           {c.first_seen && <span>first {fmtAgo(c.first_seen)}</span>}
           {c.heartbeat_at && <span>heartbeat {fmtAgo(c.heartbeat_at)}</span>}
         </div>

@@ -113,7 +113,7 @@ export default function WatchlistPage({ role }) {
                 <span className="mono w-16 shrink-0 text-[10px] uppercase tracking-widest text-cyan-300">{en.kind}</span>
                 <span className={`mono min-w-0 flex-1 truncate text-[13px] ${en.active ? "text-slate-100" : "text-slate-500 line-through"}`}>{en.value}</span>
                 <span className="hidden max-w-[220px] truncate text-[11px] text-slate-500 lg:block" title={en.reason}>{en.reason || "—"}</span>
-                <span className="mono hidden shrink-0 text-[10px] text-slate-600 md:block">{en.created_by}</span>
+                <span className="mono hidden shrink-0 text-[10px] text-slate-500 md:block">{en.created_by}</span>
                 {isAdmin && (<>
                   <button onClick={() => toggle(en.kind, en.value, !en.active)} className={`chip mono !px-2 !py-1 text-[10px] ${en.active ? "chip-on" : ""}`}>
                     {en.active ? "ON" : "OFF"}

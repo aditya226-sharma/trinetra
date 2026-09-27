@@ -67,7 +67,7 @@ export default function LoginPage({ onSuccess }) {
           </button>
         </form>
 
-        <p className="text-center text-[10px] uppercase tracking-widest text-slate-600">
+        <p className="text-center text-[10px] uppercase tracking-widest text-slate-500">
           protected console · sessions expire
         </p>
       </div>
