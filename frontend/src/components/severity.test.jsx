@@ -11,7 +11,7 @@ import {
 describe("severity normalisation", () => {
   it("resolves mixed case to the same hue and rank as lowercase", () => {
     for (const v of ["Critical", "CRITICAL", "critical", " Critical "]) {
-      expect(severityHex(v)).toBe("#ec4899");
+      expect(severityHex(v)).toBe("#f87171");
       expect(severityRank(v)).toBe(0);
     }
   });
@@ -21,8 +21,8 @@ describe("severity normalisation", () => {
   });
 
   it("falls back to info for unknown or missing severities", () => {
-    expect(severityHex("nonsense")).toBe("#d8b4fe");
-    expect(severityHex(undefined)).toBe("#d8b4fe");
+    expect(severityHex("nonsense")).toBe("#38bdf8");
+    expect(severityHex(undefined)).toBe("#38bdf8");
     expect(severityRank(null)).toBe(severityRank("info"));
   });
 
@@ -39,15 +39,15 @@ describe("SeverityBadge", () => {
     // fell back to info and painted a critical finding blue.
     const { container } = render(<SeverityBadge severity="Critical" />);
     const dot = container.querySelector("span span");
-    expect(dot.className).toContain("ec4899");
-    expect(dot.className).not.toContain("d8b4fe");
+    expect(dot.className).toContain("f87171");
+    expect(dot.className).not.toContain("38bdf8");
   });
 
   it("renders each severity on its own hue", () => {
     const cases = [
-      ["critical", "ec4899"],
-      ["warning", "c084fc"],
-      ["info", "d8b4fe"],
+      ["critical", "f87171"],
+      ["warning", "fbbf24"],
+      ["info", "38bdf8"],
     ];
     for (const [sev, hex] of cases) {
       const { container } = render(<SeverityBadge severity={sev} />);
@@ -57,7 +57,7 @@ describe("SeverityBadge", () => {
 
   it("falls back to the info hue for an unknown severity", () => {
     const { container } = render(<SeverityBadge severity="bogus" />);
-    expect(container.querySelector("span span").className).toContain("d8b4fe");
+    expect(container.querySelector("span span").className).toContain("38bdf8");
   });
 });
 
@@ -65,6 +65,43 @@ describe("SeverityDot", () => {
   it("glows with the severity hue, not a fixed grey", () => {
     const { container } = render(<SeverityDot severity="Critical" />);
     const style = container.querySelector("span").getAttribute("style");
-    expect(style).toContain("#ec4899");
+    expect(style).toContain("#f87171");
+  });
+});
+
+describe("locked-in palette severity hues", () => {
+  it("maps each severity to the exact hue from the palette spec", () => {
+    // High and Error deliberately share #FB923C, per spec.
+    const spec = {
+      critical: "#f87171",
+      high: "#fb923c",
+      error: "#fb923c",
+      warning: "#fbbf24",
+      medium: "#fbbf24",
+      info: "#38bdf8",
+      low: "#34d399",
+      success: "#34d399",
+      resolved: "#34d399",
+    };
+    for (const [sev, hex] of Object.entries(spec)) {
+      expect(severityHex(sev)).toBe(hex);
+    }
+  });
+
+  it("gives every severity a chip fill so it reads as a block, not only as text", () => {
+    for (const sev of ["critical", "high", "error", "warning", "medium", "info", "low", "success"]) {
+      const { container } = render(<SeverityBadge severity={sev} />);
+      expect(container.querySelector("span").className).toMatch(/sev-chip-/);
+    }
+  });
+
+  it("keeps the strip and the chip on the same hue for one severity", () => {
+    // A row whose strip says critical but whose dot says something else
+    // reads as two different severities; the two must not drift.
+    const { container } = render(<SeverityBadge severity="critical" />);
+    const chip = container.querySelector("span").className;
+    const dot = container.querySelector("span span").className;
+    expect(chip).toContain("sev-chip-critical");
+    expect(dot).toContain("f87171");
   });
 });
