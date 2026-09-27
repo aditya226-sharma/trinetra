@@ -229,7 +229,7 @@ export default function ConsolePage() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
+        className="term-surface flex-1 overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
       >
         {loading ? (
           <div className="flex h-full items-center justify-center text-slate-500">Loading console…</div>

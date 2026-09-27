@@ -368,7 +368,7 @@ function NeedsReview({ rows }) {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <SeverityDot severity={r.severity} />
-                      <span className="truncate text-[13px] font-medium text-[#e2e8f0]">{r.title}</span>
+                      <span className="truncate text-[13px] font-medium text-[var(--text)]">{r.title}</span>
                     </span>
                     {(r.subject || r.ago) && (
                       <span className="mono mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#94a3b8]">
@@ -910,7 +910,7 @@ function KpiCard({ label, value, sub, tone, icon, spark, delay }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="eyebrow truncate">{label}</p>
-          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-[#e2e8f0]">{value}</p>
+          <p className="mono mt-1.5 text-[24px] font-bold leading-none text-[var(--text)]">{value}</p>
           <p className="mt-2 text-[11px] leading-snug text-[#94a3b8]">{sub}</p>
         </div>
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 ${t.icon}`}>{icon}</span>

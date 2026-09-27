@@ -740,3 +740,347 @@ select.field option {
   .report-mode > a[href*="ngrok"] { display: none !important; }
   .report-mode main { padding: 0 !important; max-width: none !important; }
 }
+@layer utilities {
+/* ---- light theme: theme-blind text colours ------------------------------
+   Around 200 call sites colour text with Tailwind palette utilities
+   (text-emerald-300 for success, text-red-400 for critical, and so on).
+   Those are tuned for the dark panel and have no light counterpart, so on
+   a #FFFFFF card they land between 1.2:1 and 1.7:1. The dashboard's
+   headline KPI number rendered at 1.23:1 and was unreadable in light mode.
+
+   Remapping the utilities once here keeps the call sites readable and
+   mirrors the severity remaps above: light mode gets the darker ink
+   variants, dark mode is untouched. Every shade and opacity variant in the
+   source is listed rather than matched loosely, so a class such as
+   hover:text-cyan-300 cannot pull in an element that is not cyan at rest.
+
+   These live inside @layer utilities on purpose. A handful of call sites
+   use Tailwind's own ! modifier, and the cascade reverses layer order for
+   !important declarations -- layered !important beats unlayered
+   !important regardless of specificity. Sharing the layer lets ordinary
+   specificity settle it. */
+[data-theme="light"] .text-emerald-100,
+[data-theme="light"] .text-emerald-200,
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-emerald-400,
+[data-theme="light"] .text-emerald-100\/70,
+[data-theme="light"] .text-emerald-200\/70,
+[data-theme="light"] .text-emerald-300\/70,
+[data-theme="light"] .text-emerald-400\/70,
+[data-theme="light"] .text-emerald-100\/80,
+[data-theme="light"] .text-emerald-200\/80,
+[data-theme="light"] .text-emerald-300\/80,
+[data-theme="light"] .text-emerald-400\/80,
+[data-theme="light"] .text-emerald-100\/90,
+[data-theme="light"] .text-emerald-200\/90,
+[data-theme="light"] .text-emerald-300\/90,
+[data-theme="light"] .text-emerald-400\/90,
+[data-theme="light"] .hover\:text-emerald-100,
+[data-theme="light"] .hover\:text-emerald-200,
+[data-theme="light"] .hover\:text-emerald-300,
+[data-theme="light"] .hover\:text-emerald-400,
+[data-theme="light"] .hover\:text-emerald-100\/70,
+[data-theme="light"] .hover\:text-emerald-200\/70,
+[data-theme="light"] .hover\:text-emerald-300\/70,
+[data-theme="light"] .hover\:text-emerald-400\/70,
+[data-theme="light"] .hover\:text-emerald-100\/80,
+[data-theme="light"] .hover\:text-emerald-200\/80,
+[data-theme="light"] .hover\:text-emerald-300\/80,
+[data-theme="light"] .hover\:text-emerald-400\/80,
+[data-theme="light"] .hover\:text-emerald-100\/90,
+[data-theme="light"] .hover\:text-emerald-200\/90,
+[data-theme="light"] .hover\:text-emerald-300\/90,
+[data-theme="light"] .hover\:text-emerald-400\/90,
+[data-theme="light"] .group-hover\:text-emerald-100,
+[data-theme="light"] .group-hover\:text-emerald-200,
+[data-theme="light"] .group-hover\:text-emerald-300,
+[data-theme="light"] .group-hover\:text-emerald-400,
+[data-theme="light"] .group-hover\:text-emerald-100\/70,
+[data-theme="light"] .group-hover\:text-emerald-200\/70,
+[data-theme="light"] .group-hover\:text-emerald-300\/70,
+[data-theme="light"] .group-hover\:text-emerald-400\/70,
+[data-theme="light"] .group-hover\:text-emerald-100\/80,
+[data-theme="light"] .group-hover\:text-emerald-200\/80,
+[data-theme="light"] .group-hover\:text-emerald-300\/80,
+[data-theme="light"] .group-hover\:text-emerald-400\/80,
+[data-theme="light"] .group-hover\:text-emerald-100\/90,
+[data-theme="light"] .group-hover\:text-emerald-200\/90,
+[data-theme="light"] .group-hover\:text-emerald-300\/90,
+[data-theme="light"] .group-hover\:text-emerald-400\/90,
+[data-theme="light"] .focus\:text-emerald-100,
+[data-theme="light"] .focus\:text-emerald-200,
+[data-theme="light"] .focus\:text-emerald-300,
+[data-theme="light"] .focus\:text-emerald-400,
+[data-theme="light"] .focus\:text-emerald-100\/70,
+[data-theme="light"] .focus\:text-emerald-200\/70,
+[data-theme="light"] .focus\:text-emerald-300\/70,
+[data-theme="light"] .focus\:text-emerald-400\/70,
+[data-theme="light"] .focus\:text-emerald-100\/80,
+[data-theme="light"] .focus\:text-emerald-200\/80,
+[data-theme="light"] .focus\:text-emerald-300\/80,
+[data-theme="light"] .focus\:text-emerald-400\/80,
+[data-theme="light"] .focus\:text-emerald-100\/90,
+[data-theme="light"] .focus\:text-emerald-200\/90,
+[data-theme="light"] .focus\:text-emerald-300\/90,
+[data-theme="light"] .focus\:text-emerald-400\/90 { color: var(--sev-success-ink) !important; }
+
+[data-theme="light"] .text-cyan-200,
+[data-theme="light"] .text-cyan-300,
+[data-theme="light"] .text-cyan-400,
+[data-theme="light"] .text-cyan-200\/70,
+[data-theme="light"] .text-cyan-300\/70,
+[data-theme="light"] .text-cyan-400\/70,
+[data-theme="light"] .text-cyan-200\/80,
+[data-theme="light"] .text-cyan-300\/80,
+[data-theme="light"] .text-cyan-400\/80,
+[data-theme="light"] .text-cyan-200\/90,
+[data-theme="light"] .text-cyan-300\/90,
+[data-theme="light"] .text-cyan-400\/90,
+[data-theme="light"] .hover\:text-cyan-200,
+[data-theme="light"] .hover\:text-cyan-300,
+[data-theme="light"] .hover\:text-cyan-400,
+[data-theme="light"] .hover\:text-cyan-200\/70,
+[data-theme="light"] .hover\:text-cyan-300\/70,
+[data-theme="light"] .hover\:text-cyan-400\/70,
+[data-theme="light"] .hover\:text-cyan-200\/80,
+[data-theme="light"] .hover\:text-cyan-300\/80,
+[data-theme="light"] .hover\:text-cyan-400\/80,
+[data-theme="light"] .hover\:text-cyan-200\/90,
+[data-theme="light"] .hover\:text-cyan-300\/90,
+[data-theme="light"] .hover\:text-cyan-400\/90,
+[data-theme="light"] .group-hover\:text-cyan-200,
+[data-theme="light"] .group-hover\:text-cyan-300,
+[data-theme="light"] .group-hover\:text-cyan-400,
+[data-theme="light"] .group-hover\:text-cyan-200\/70,
+[data-theme="light"] .group-hover\:text-cyan-300\/70,
+[data-theme="light"] .group-hover\:text-cyan-400\/70,
+[data-theme="light"] .group-hover\:text-cyan-200\/80,
+[data-theme="light"] .group-hover\:text-cyan-300\/80,
+[data-theme="light"] .group-hover\:text-cyan-400\/80,
+[data-theme="light"] .group-hover\:text-cyan-200\/90,
+[data-theme="light"] .group-hover\:text-cyan-300\/90,
+[data-theme="light"] .group-hover\:text-cyan-400\/90,
+[data-theme="light"] .focus\:text-cyan-200,
+[data-theme="light"] .focus\:text-cyan-300,
+[data-theme="light"] .focus\:text-cyan-400,
+[data-theme="light"] .focus\:text-cyan-200\/70,
+[data-theme="light"] .focus\:text-cyan-300\/70,
+[data-theme="light"] .focus\:text-cyan-400\/70,
+[data-theme="light"] .focus\:text-cyan-200\/80,
+[data-theme="light"] .focus\:text-cyan-300\/80,
+[data-theme="light"] .focus\:text-cyan-400\/80,
+[data-theme="light"] .focus\:text-cyan-200\/90,
+[data-theme="light"] .focus\:text-cyan-300\/90,
+[data-theme="light"] .focus\:text-cyan-400\/90 { color: var(--accent) !important; }
+
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-400,
+[data-theme="light"] .text-sky-300\/70,
+[data-theme="light"] .text-sky-400\/70,
+[data-theme="light"] .text-sky-300\/80,
+[data-theme="light"] .text-sky-400\/80,
+[data-theme="light"] .text-sky-300\/90,
+[data-theme="light"] .text-sky-400\/90,
+[data-theme="light"] .hover\:text-sky-300,
+[data-theme="light"] .hover\:text-sky-400,
+[data-theme="light"] .hover\:text-sky-300\/70,
+[data-theme="light"] .hover\:text-sky-400\/70,
+[data-theme="light"] .hover\:text-sky-300\/80,
+[data-theme="light"] .hover\:text-sky-400\/80,
+[data-theme="light"] .hover\:text-sky-300\/90,
+[data-theme="light"] .hover\:text-sky-400\/90,
+[data-theme="light"] .group-hover\:text-sky-300,
+[data-theme="light"] .group-hover\:text-sky-400,
+[data-theme="light"] .group-hover\:text-sky-300\/70,
+[data-theme="light"] .group-hover\:text-sky-400\/70,
+[data-theme="light"] .group-hover\:text-sky-300\/80,
+[data-theme="light"] .group-hover\:text-sky-400\/80,
+[data-theme="light"] .group-hover\:text-sky-300\/90,
+[data-theme="light"] .group-hover\:text-sky-400\/90,
+[data-theme="light"] .focus\:text-sky-300,
+[data-theme="light"] .focus\:text-sky-400,
+[data-theme="light"] .focus\:text-sky-300\/70,
+[data-theme="light"] .focus\:text-sky-400\/70,
+[data-theme="light"] .focus\:text-sky-300\/80,
+[data-theme="light"] .focus\:text-sky-400\/80,
+[data-theme="light"] .focus\:text-sky-300\/90,
+[data-theme="light"] .focus\:text-sky-400\/90 { color: var(--sev-info-ink) !important; }
+
+[data-theme="light"] .text-red-200,
+[data-theme="light"] .text-red-300,
+[data-theme="light"] .text-red-400,
+[data-theme="light"] .text-red-200\/70,
+[data-theme="light"] .text-red-300\/70,
+[data-theme="light"] .text-red-400\/70,
+[data-theme="light"] .text-red-200\/80,
+[data-theme="light"] .text-red-300\/80,
+[data-theme="light"] .text-red-400\/80,
+[data-theme="light"] .text-red-200\/90,
+[data-theme="light"] .text-red-300\/90,
+[data-theme="light"] .text-red-400\/90,
+[data-theme="light"] .hover\:text-red-200,
+[data-theme="light"] .hover\:text-red-300,
+[data-theme="light"] .hover\:text-red-400,
+[data-theme="light"] .hover\:text-red-200\/70,
+[data-theme="light"] .hover\:text-red-300\/70,
+[data-theme="light"] .hover\:text-red-400\/70,
+[data-theme="light"] .hover\:text-red-200\/80,
+[data-theme="light"] .hover\:text-red-300\/80,
+[data-theme="light"] .hover\:text-red-400\/80,
+[data-theme="light"] .hover\:text-red-200\/90,
+[data-theme="light"] .hover\:text-red-300\/90,
+[data-theme="light"] .hover\:text-red-400\/90,
+[data-theme="light"] .group-hover\:text-red-200,
+[data-theme="light"] .group-hover\:text-red-300,
+[data-theme="light"] .group-hover\:text-red-400,
+[data-theme="light"] .group-hover\:text-red-200\/70,
+[data-theme="light"] .group-hover\:text-red-300\/70,
+[data-theme="light"] .group-hover\:text-red-400\/70,
+[data-theme="light"] .group-hover\:text-red-200\/80,
+[data-theme="light"] .group-hover\:text-red-300\/80,
+[data-theme="light"] .group-hover\:text-red-400\/80,
+[data-theme="light"] .group-hover\:text-red-200\/90,
+[data-theme="light"] .group-hover\:text-red-300\/90,
+[data-theme="light"] .group-hover\:text-red-400\/90,
+[data-theme="light"] .focus\:text-red-200,
+[data-theme="light"] .focus\:text-red-300,
+[data-theme="light"] .focus\:text-red-400,
+[data-theme="light"] .focus\:text-red-200\/70,
+[data-theme="light"] .focus\:text-red-300\/70,
+[data-theme="light"] .focus\:text-red-400\/70,
+[data-theme="light"] .focus\:text-red-200\/80,
+[data-theme="light"] .focus\:text-red-300\/80,
+[data-theme="light"] .focus\:text-red-400\/80,
+[data-theme="light"] .focus\:text-red-200\/90,
+[data-theme="light"] .focus\:text-red-300\/90,
+[data-theme="light"] .focus\:text-red-400\/90 { color: var(--sev-critical-ink) !important; }
+
+[data-theme="light"] .text-amber-100,
+[data-theme="light"] .text-amber-200,
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400,
+[data-theme="light"] .text-amber-100\/70,
+[data-theme="light"] .text-amber-200\/70,
+[data-theme="light"] .text-amber-300\/70,
+[data-theme="light"] .text-amber-400\/70,
+[data-theme="light"] .text-amber-100\/80,
+[data-theme="light"] .text-amber-200\/80,
+[data-theme="light"] .text-amber-300\/80,
+[data-theme="light"] .text-amber-400\/80,
+[data-theme="light"] .text-amber-100\/90,
+[data-theme="light"] .text-amber-200\/90,
+[data-theme="light"] .text-amber-300\/90,
+[data-theme="light"] .text-amber-400\/90,
+[data-theme="light"] .hover\:text-amber-100,
+[data-theme="light"] .hover\:text-amber-200,
+[data-theme="light"] .hover\:text-amber-300,
+[data-theme="light"] .hover\:text-amber-400,
+[data-theme="light"] .hover\:text-amber-100\/70,
+[data-theme="light"] .hover\:text-amber-200\/70,
+[data-theme="light"] .hover\:text-amber-300\/70,
+[data-theme="light"] .hover\:text-amber-400\/70,
+[data-theme="light"] .hover\:text-amber-100\/80,
+[data-theme="light"] .hover\:text-amber-200\/80,
+[data-theme="light"] .hover\:text-amber-300\/80,
+[data-theme="light"] .hover\:text-amber-400\/80,
+[data-theme="light"] .hover\:text-amber-100\/90,
+[data-theme="light"] .hover\:text-amber-200\/90,
+[data-theme="light"] .hover\:text-amber-300\/90,
+[data-theme="light"] .hover\:text-amber-400\/90,
+[data-theme="light"] .group-hover\:text-amber-100,
+[data-theme="light"] .group-hover\:text-amber-200,
+[data-theme="light"] .group-hover\:text-amber-300,
+[data-theme="light"] .group-hover\:text-amber-400,
+[data-theme="light"] .group-hover\:text-amber-100\/70,
+[data-theme="light"] .group-hover\:text-amber-200\/70,
+[data-theme="light"] .group-hover\:text-amber-300\/70,
+[data-theme="light"] .group-hover\:text-amber-400\/70,
+[data-theme="light"] .group-hover\:text-amber-100\/80,
+[data-theme="light"] .group-hover\:text-amber-200\/80,
+[data-theme="light"] .group-hover\:text-amber-300\/80,
+[data-theme="light"] .group-hover\:text-amber-400\/80,
+[data-theme="light"] .group-hover\:text-amber-100\/90,
+[data-theme="light"] .group-hover\:text-amber-200\/90,
+[data-theme="light"] .group-hover\:text-amber-300\/90,
+[data-theme="light"] .group-hover\:text-amber-400\/90,
+[data-theme="light"] .focus\:text-amber-100,
+[data-theme="light"] .focus\:text-amber-200,
+[data-theme="light"] .focus\:text-amber-300,
+[data-theme="light"] .focus\:text-amber-400,
+[data-theme="light"] .focus\:text-amber-100\/70,
+[data-theme="light"] .focus\:text-amber-200\/70,
+[data-theme="light"] .focus\:text-amber-300\/70,
+[data-theme="light"] .focus\:text-amber-400\/70,
+[data-theme="light"] .focus\:text-amber-100\/80,
+[data-theme="light"] .focus\:text-amber-200\/80,
+[data-theme="light"] .focus\:text-amber-300\/80,
+[data-theme="light"] .focus\:text-amber-400\/80,
+[data-theme="light"] .focus\:text-amber-100\/90,
+[data-theme="light"] .focus\:text-amber-200\/90,
+[data-theme="light"] .focus\:text-amber-300\/90,
+[data-theme="light"] .focus\:text-amber-400\/90 { color: var(--sev-warning-ink) !important; }
+
+[data-theme="light"] .text-violet-300,
+[data-theme="light"] .text-violet-300\/70,
+[data-theme="light"] .text-violet-300\/80,
+[data-theme="light"] .text-violet-300\/90,
+[data-theme="light"] .hover\:text-violet-300,
+[data-theme="light"] .hover\:text-violet-300\/70,
+[data-theme="light"] .hover\:text-violet-300\/80,
+[data-theme="light"] .hover\:text-violet-300\/90,
+[data-theme="light"] .group-hover\:text-violet-300,
+[data-theme="light"] .group-hover\:text-violet-300\/70,
+[data-theme="light"] .group-hover\:text-violet-300\/80,
+[data-theme="light"] .group-hover\:text-violet-300\/90,
+[data-theme="light"] .focus\:text-violet-300,
+[data-theme="light"] .focus\:text-violet-300\/70,
+[data-theme="light"] .focus\:text-violet-300\/80,
+[data-theme="light"] .focus\:text-violet-300\/90 { color: #6d28d9 !important; }
+
+/* Tailwind's ! modifier is part of the class name (the DOM carries
+   "!text-cyan-300"), so those need their own selectors. */
+[data-theme="light"] .\!text-cyan-300 { color: var(--accent) !important; }
+[data-theme="light"] .\!text-emerald-300 { color: var(--sev-success-ink) !important; }
+[data-theme="light"] .\!text-amber-300 { color: var(--sev-warning-ink) !important; }
+[data-theme="light"] .\!text-slate-300 { color: var(--text) !important; }
+[data-theme="light"] .\!text-slate-400 { color: var(--muted-2) !important; }
+
+/* The spec's Secondary (#94A3B8) is tuned for the dark page and only
+   reaches 2.56:1 on white, so light mode uses Muted for it. */
+[data-theme="light"] .text-\[\#94a3b8\] { color: var(--muted) !important; }
+}
+
+/* .chip hardcoded dark values: a near-black fill, light text, and a cyan
+   active state. All three are wrong once the page is light. */
+[data-theme="light"] .chip { background: #ffffff; color: #1e293b; border-color: #cbd5e1; }
+[data-theme="light"] .chip:hover { border-color: var(--accent); color: var(--accent); }
+[data-theme="light"] .chip-on {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  background: #cffafe !important;
+  box-shadow: 0 0 18px -4px rgba(14, 116, 144, 0.4);
+}
+
+/* Native <select> popups are drawn by the OS from these values, so they do
+   not follow the page theme automatically. */
+[data-theme="light"] select.field option { background: #ffffff; color: #1e293b; }
+
+/* ---- dark terminal surface ---------------------------------------------
+   The log console is a terminal: it keeps a near-black background in both
+   themes. Without this, light mode painted it with light-theme inks --
+   #b91c1c critical on rgba(0,0,0,0.6) measured 3.25:1.
+
+   Every light remap above resolves through these variables, so re-declaring
+   the dark values on the surface opts the whole subtree out in one rule
+   rather than enumerating each class it contains. */
+.term-surface {
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --muted-2: #94a3b8;
+  --accent: #22d3ee;
+  --sev-critical-ink: #f87171;
+  --sev-high-ink: #fb923c;
+  --sev-warning-ink: #fbbf24;
+  --sev-info-ink: #38bdf8;
+  --sev-success-ink: #34d399;
+}

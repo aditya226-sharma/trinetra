@@ -391,7 +391,7 @@ export default function LogConsolePage() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="h-[min(60vh,640px)] min-h-[320px] overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
+        className="term-surface h-[min(60vh,640px)] min-h-[320px] overflow-y-auto rounded-xl border border-white/5 bg-black/60 p-4 font-mono text-[12px] leading-relaxed"
       >
         {loading ? (
           <div className="flex h-full items-center justify-center text-slate-500">Loading logs…</div>
@@ -409,7 +409,7 @@ export default function LogConsolePage() {
           ))
         )}
         {!loading && filtered.length > 0 && filtered.length < lines.length && (
-          <p className="sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-slate-500">
+          <p className="term-surface sticky bottom-0 bg-black/80 py-1 text-center text-[10px] text-slate-500">
             showing {filtered.length} of {lines.length} lines — clear filters to see the rest
           </p>
         )}
@@ -472,7 +472,7 @@ function EventDetail({ event: e, onClose }) {
   const mf = e.module_findings || fields.module_findings;
   return (
     <section className="glass overflow-hidden anim-fadeup">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
+      <div className="term-surface flex flex-wrap items-center justify-between gap-2 border-b border-white/5 bg-black/40 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mono text-[11px] tracking-widest text-slate-500">event detail</span>
           <SeverityBadge severity={e.severity} />
