@@ -12,9 +12,14 @@ import "./index.css";
 const base = import.meta.env.BASE_URL || "/";
 const Router = base === "/" ? BrowserRouter : HashRouter;
 
+// Opt into the v6 behaviours that change in v7 now, so the upgrade is a
+// version bump rather than a migration. Without these the router logs a
+// future-flag warning on every route in dev.
+const future = { v7_startTransition: true, v7_relativeSplatPath: true };
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Router>
+    <Router future={future}>
       <App />
     </Router>
   </React.StrictMode>,

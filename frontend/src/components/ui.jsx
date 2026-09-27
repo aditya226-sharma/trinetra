@@ -3,9 +3,14 @@ import { Sparkline } from "./charts";
 
 /* Shared UI primitives for the TriNetra command center */
 
-// Seven severity keys preserved so existing data and call sites keep working,
-// mapped onto the three command-center hues: critical #F87171, warning
-// #FBBF24, info #38BDF8. `error` keeps violet to stay distinct from warning.
+/* The one severity map in the app. Every page must read severity styling
+   from here rather than keeping a local copy: the copies had already drifted
+   (one page painted `error` violet while the badge used #FB923C, and two
+   omitted `high` entirely so high-severity log lines rendered grey). Callers
+   get the helpers below, which also normalise case.
+
+   Hues follow the palette spec: critical #F87171, high/error #FB923C,
+   warning #FBBF24, info #38BDF8, low/success/resolved #34D399. */
 const SEV = {
   critical: { strip: "sev-critical", text: "sev-text-critical", chip: "sev-chip-critical", label: "bg-[#f87171]" },
   high: { strip: "sev-high", text: "sev-text-high", chip: "sev-chip-high", label: "bg-[#fb923c]" },
@@ -47,6 +52,13 @@ export const severityRank = (severity) =>
 
 export const severityHex = (severity) =>
   SEV_HUE[normaliseSeverity(severity)] ?? SEV_HUE.info;
+
+// Class helpers, so a page cannot pick a severity colour that the badge
+// disagrees with. Each normalises case and falls back to info.
+export const severityStrip = (severity) => SEV_TONE(severity).strip;
+export const severityText = (severity) => SEV_TONE(severity).text;
+export const severityChip = (severity) => SEV_TONE(severity).chip;
+export const severityDotClass = (severity) => SEV_TONE(severity).label;
 
 export function SeverityDot({ severity }) {
   const s = SEV_TONE(severity);

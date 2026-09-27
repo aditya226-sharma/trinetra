@@ -1,18 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { severityHex } from "../components/ui";
 import { getCompliance } from "../lib/api";
 
-// Severity hues aligned with the command-center palette (critical #f87171,
-// warning #fbbf24, info #38bdf8). The previous values were pre-re-skin reds
-// that matched neither the shared SEV map nor the report stylesheet.
-const SEV = {
-  critical: "#f87171",
-  high: "#fca5a5",
-  medium: "#fbbf24",
-  warning: "#fbbf24",
-  info: "#38bdf8",
-  low: "#94a3b8",
-};
+// Severity hues come from the shared map, so the printable report cannot
+// drift from the on-screen badges. This local copy had `high` as #fca5a5
+// (pale red, not the specified #fb923c) and `low` as grey.
 
 export default function ReportPage() {
   const { assetId } = useParams();
@@ -68,7 +61,7 @@ export default function ReportPage() {
             <div key={i} className="report-ctrl">
               <div className="report-ctrl-top">
                 <h3>{ctrl.threat_class}</h3>
-                <span style={{ color: SEV[String(ctrl.severity || "").toLowerCase()] || SEV.low }}>{ctrl.severity}</span>
+                <span style={{ color: severityHex(ctrl.severity) }}>{ctrl.severity}</span>
               </div>
               <p className="report-muted">{ctrl.description}</p>
               <p><span className="report-k">NIST CSF</span> {ctrl.nist_csf || "—"}</p>

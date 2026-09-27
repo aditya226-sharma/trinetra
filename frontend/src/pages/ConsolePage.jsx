@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { searchEvents, streamEvents } from "../lib/api";
-import { PageHeader, SeverityDot, Empty, PlainBadge } from "../components/ui";
+import { PageHeader, SeverityDot, Empty, PlainBadge, severityText } from "../components/ui";
 
 const MAX_LINES = 2000;
 
@@ -244,13 +244,9 @@ export default function ConsolePage() {
 }
 
 function LogLine({ event: e, showRaw }) {
-  const sevColor = {
-    critical: "text-red-400",
-    error: "text-violet-400",
-    warning: "text-amber-400",
-    info: "text-slate-300",
-    low: "text-slate-400",
-  }[e.severity] || "text-slate-300";
+  // This map had no `high` or `medium` key and no case normalisation, so a
+  // line logged as "high" or "HIGH" silently fell through to default grey.
+  const sevColor = severityText(e.severity);
 
   const ts = e.timestamp ? new Date(e.timestamp) : null;
   const time = ts && !Number.isNaN(ts.getTime()) ? ts.toLocaleTimeString("en-GB", { hour12: false }) : "";

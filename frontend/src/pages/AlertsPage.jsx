@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { caseAction, getCases, getIncidentDetail } from "../lib/api";
 import { usePagedList, ShowMoreBar } from "../components/ShowMore";
-import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge } from "../components/ui";
+import { PageHeader, LiveBadge, SeverityBadge, CodeBlock, Empty, PlainBadge, severityStrip, severityDotClass, severityRank } from "../components/ui";
 
 const POLL_MS = 15000;
 const STATUS_FILTERS = ["", "unresolved", "open", "investigation", "closed"];
@@ -93,7 +93,9 @@ export default function AlertsPage({ role }) {
       if (assigneeFilter === "unassigned") out = out.filter((c) => !c.assignee);
       else out = out.filter((c) => (c.assignee || "") === assigneeFilter);
     }
-    const sevRank = { critical: 0, high: 1, warning: 2, error: 3, info: 4, low: 5 };
+    // Shared ranking, so sorting cannot order severities differently from
+    // the rest of the app (this table had error at 3 and no `medium`).
+    const sevRank = severityRank;
     const ts = (c) => (c.last_seen || c.timestamp || "");
     const sorted = [...out];
     if (sortBy === "newest") sorted.sort((a, b) => ts(b).localeCompare(ts(a)));
@@ -450,11 +452,8 @@ function Tile({ label, value, tone }) {
   );
 }
 
-const stripCls = (sev) => {
-  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", warning: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
-  return m[sev] || "sev-info";
-};
-const dotCls = (sev) => {
-  const m = { critical: "bg-red-400", high: "bg-orange-500", warning: "bg-amber-400", error: "bg-violet-500", info: "bg-sky-500", low: "bg-sky-500" };
-  return m[sev] || "bg-sky-500";
-};
+// Severity styling comes from the shared map in components/ui so a row's dot
+// can never disagree with its badge. The local copy here painted `error`
+// violet and `low` sky-blue, neither of which is the severity's actual colour.
+const stripCls = (sev) => severityStrip(sev);
+const dotCls = (sev) => severityDotClass(sev);

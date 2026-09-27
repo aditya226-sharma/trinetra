@@ -246,8 +246,8 @@ select.field option {
   border-radius: 999px;
   align-self: stretch;
 }
-/* Severity hues per the command-center spec: critical #F87171, warning
-   #FBBF24, info #38BDF8. `error` keeps violet to stay distinct from warning. */
+/* Severity hues per the command-center spec: critical #F87171,
+   high/error #FB923C, warning #FBBF24, info #38BDF8, low/resolved #34D399. */
 .sev-critical { background: linear-gradient(180deg, #fca5a5, #f87171); box-shadow: 0 0 10px rgba(248, 113, 113, 0.8); }
 .sev-high { background: linear-gradient(180deg, #fdba74, #fb923c); box-shadow: 0 0 10px rgba(251, 146, 60, 0.7); }
 .sev-warning, .sev-medium { background: linear-gradient(180deg, #fde047, #fbbf24); box-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }

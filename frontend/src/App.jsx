@@ -392,7 +392,7 @@ export default function App() {
 
         <div className="relative px-5 pb-5 pt-6">
           <Link to="/" className="group flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-emerald-500/40 bg-[#0b1a14] shadow-[0_0_24px_-4px_rgba(52,211,153,0.7)]">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl border border-[#22d3ee]/40 bg-[#0b1220] shadow-[0_0_24px_-4px_rgba(34,211,238,0.7)]">
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="TriNetra" className="h-full w-full object-cover" />
             </div>
             <div>
@@ -498,7 +498,7 @@ export default function App() {
                 <button
                   onClick={(e) => { e.stopPropagation(); setBell((b) => ({ ...b, open: !b.open })); }}
                   title="Recent alerts"
-                  className="relative grid h-9 w-9 place-items-center rounded-full border border-white/5 bg-white/[0.03] transition hover:border-emerald-500/40"
+                  className="relative grid h-9 w-9 place-items-center rounded-full border border-white/5 bg-white/[0.03] transition hover:border-[#22d3ee]/50"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
                     <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -571,7 +571,7 @@ export default function App() {
               <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-                  className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 transition hover:border-emerald-500/40 lg:flex"
+                  className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 transition hover:border-[#22d3ee]/50 lg:flex"
                 >
                   {theme === "dark" ? (
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-amber-300">

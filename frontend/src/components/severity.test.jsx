@@ -6,6 +6,10 @@ import {
   severityHex,
   severityRank,
   normaliseSeverity,
+  severityStrip,
+  severityText,
+  severityChip,
+  severityDotClass,
 } from "./ui";
 
 describe("severity normalisation", () => {
@@ -103,5 +107,42 @@ describe("locked-in palette severity hues", () => {
     const dot = container.querySelector("span span").className;
     expect(chip).toContain("sev-chip-critical");
     expect(dot).toContain("f87171");
+  });
+});
+
+describe("severity styling has a single source of truth", () => {
+  it("exposes strip, text, chip and dot classes for every severity", () => {
+    const sevs = ["critical", "high", "error", "warning", "medium", "info", "low", "success", "resolved", "High", "HIGH", " Info ", "bogus"];
+    for (const s of sevs) {
+      expect(severityStrip(s)).toMatch(/^sev-/);
+      expect(severityText(s)).toMatch(/^sev-text-/);
+      expect(severityChip(s)).toMatch(/^sev-chip-/);
+      expect(severityDotClass(s)).toMatch(/^bg-\[/);
+    }
+  });
+
+  it("high and error resolve to the same hue, per the palette spec", () => {
+    // These drifted apart before: one page painted error violet while the
+    // badge used #FB923C, so a row and its own badge disagreed.
+    expect(severityHex("error")).toBe(severityHex("high"));
+    expect(severityDotClass("error")).toBe(severityDotClass("high"));
+  });
+
+  it("does not paint a severity a colour from a different severity", () => {
+    const hues = ["critical", "high", "error", "warning", "medium", "info", "low", "success", "resolved"]
+      .map(severityHex);
+    // error/high legitimately share, and medium/warning share, and
+    // low/success/resolved share. Everything else must be distinct.
+    const groups = [[severityHex("critical")], [severityHex("high"), severityHex("error")],
+      [severityHex("warning"), severityHex("medium")], [severityHex("info")],
+      [severityHex("low"), severityHex("success"), severityHex("resolved")]].map((g) => g.join());
+    expect(new Set(groups).size).toBe(groups.length);
+    expect(hues.every((h) => /^#[0-9a-f]{6}$/i.test(h))).toBe(true);
+  });
+
+  it("ranks critical first and resolves mixed case", () => {
+    expect(severityRank("Critical")).toBe(0);
+    expect(severityRank("critical")).toBeLessThan(severityRank("high"));
+    expect(severityRank("HIGH")).toBe(severityRank("high"));
   });
 });

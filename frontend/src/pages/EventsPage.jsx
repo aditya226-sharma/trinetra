@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { searchEvents, getClients, getEvent, streamEvents, exportCsv, enrichEntity, getCases } from "../lib/api";
-import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty } from "../components/ui";
+import { SeverityDot, SeverityBadge, PageHeader, LiveBadge, PlainBadge, CodeBlock, Empty, severityStrip } from "../components/ui";
 
 const CATEGORIES = ["", "flow", "auth", "application", "network", "system", "vpn"];
 // Live agent sources (my log-agent collectors) are shown alongside the demo ones.
@@ -812,10 +812,7 @@ function TraceTimeline({ events, current }) {
   );
 }
 
-const stripCls = (sev) => {
-  const m = { critical: "sev-critical", high: "sev-high", medium: "sev-warning", warning: "sev-warning", error: "sev-error", info: "sev-info", low: "sev-info" };
-  return m[sev] || "sev-info";
-};
+const stripCls = (sev) => severityStrip(sev);
 
 // Mirrors the backend /api/events/search matching so live SSE events respect
 // the currently active filters.
